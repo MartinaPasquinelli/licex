@@ -1,0 +1,473 @@
+import { ChevronDown, Info, Settings, Zap, X } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'react-toastify'
+
+import {
+  getModalPortalTarget,
+  getModalPositionClass,
+} from '../../helpers/modalPortal'
+import { ERROR_NOT_ENOUGH_UNCOLORED, DEFAULT_UTXO_SIZE } from '../../constants'
+import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
+import { Button, IconButton } from '../ui'
+import { logger } from '../../utils/logger'
+import { extractErrorMessage } from '../../api/errors'
+
+interface CreateUTXOModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+  operationType: 'issuance' | 'channel'
+  channelCapacity?: number
+  error?: string
+  retryFunction?: () => Promise<any>
+}
+
+export const CreateUTXOModal: React.FC<CreateUTXOModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  operationType,
+  channelCapacity = 0,
+  error,
+  retryFunction,
+}) => {
+  const { t } = useTranslation()
+  const [isLoading, setIsLoading] = useState(false)
+  const [creationError, setCreationError] = useState<string>()
+  const [feeRate, setFeeRate] = useState(0)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [numUtxos, setNumUtxos] = useState(() => {
+    // For channel creation with no uncolored UTXOs, always use 1 UTXO
+    if (
+      operationType === 'channel' &&
+      (error?.includes(ERROR_NOT_ENOUGH_UNCOLORED) ||
+        error?.includes('No uncolored UTXOs available'))
+    ) {
+      return 1
+    }
+    return operationType === 'issuance' ? 1 : 3
+  })
+  const [utxoSize, setUtxoSize] = useState(() => {
+    // For channel creation with no uncolored UTXOs, use the channel capacity
+    if (
+      operationType === 'channel' &&
+      (error?.includes(ERROR_NOT_ENOUGH_UNCOLORED) ||
+        error?.includes('No uncolored UTXOs available'))
+    ) {
+      logger.debug(
+        'CreateUTXOModal: Detected channel UTXO error, using channelCapacity:',
+        channelCapacity
+      )
+      return channelCapacity || DEFAULT_UTXO_SIZE
+    }
+    // Default size for issuing an asset
+    if (operationType === 'issuance') {
+      return DEFAULT_UTXO_SIZE
+    }
+    // For channel, use the channel capacity
+    logger.debug(
+      'CreateUTXOModal: Using channelCapacity for regular channel operation:',
+      channelCapacity
+    )
+    return channelCapacity || DEFAULT_UTXO_SIZE
+  })
+
+  // For createutxos API
+  const [createUtxos] = nodeApi.useCreateUtxosMutation()
+  // For 6-block fee estimation
+  const [estimateFee] = nodeApi.useLazyEstimateFeeQuery()
+  // For getting BTC balance
+  const [getBtcBalance, { data: btcBalanceData }] =
+    nodeApi.endpoints.btcBalance.useLazyQuery()
+
+  useEffect(() => {
+    const fetchFeeRate = async () => {
+      try {
+        const response = await estimateFee({ blocks: 6 }).unwrap()
+        const feeRate = response?.fee_rate
+        if (!feeRate) {
+          throw Error('Unable to calculate fee-rate')
+        }
+        setFeeRate(Math.max(1, Math.ceil(feeRate)))
+      } catch (error) {
+        logger.error('Failed to fetch fee rate:', error)
+        // Default to a reasonable fee rate if we can't fetch it
+        setFeeRate(1.0)
+      }
+    }
+
+    if (isOpen) {
+      fetchFeeRate()
+      getBtcBalance()
+    }
+  }, [isOpen, estimateFee, getBtcBalance])
+
+  // Update UTXO size when channelCapacity changes
+  useEffect(() => {
+    if (
+      channelCapacity &&
+      channelCapacity > 0 &&
+      operationType === 'channel' &&
+      (error?.includes(ERROR_NOT_ENOUGH_UNCOLORED) ||
+        error?.includes('No uncolored UTXOs available'))
+    ) {
+      logger.debug(
+        'CreateUTXOModal: Updating UTXO size based on channelCapacity:',
+        channelCapacity
+      )
+      setUtxoSize(channelCapacity)
+    }
+  }, [channelCapacity, operationType, error])
+
+  const toggleAdvanced = () => {
+    setShowAdvanced((prev) => !prev)
+  }
+
+  const handleCreateUTXOs = async () => {
+    if (isLoading || feeRate <= 0 || insufficientBalance) return
+    setCreationError(undefined)
+    setIsLoading(true)
+
+    try {
+      await createUtxos({
+        fee_rate: Math.round(feeRate),
+        num: numUtxos,
+        size: utxoSize,
+        up_to: false,
+      }).unwrap()
+
+      toast.success(t('createUtxos.toasts.created', 'UTXOs created'))
+
+      // Close the modal first
+      setIsLoading(false)
+      onClose()
+
+      // If we have a retry function, call it after closing the modal
+      if (retryFunction) {
+        try {
+          await retryFunction()
+          onSuccess()
+        } catch (retryError) {
+          logger.error('Error retrying operation:', retryError)
+          toast.error(
+            t(
+              'createUtxos.toasts.retryFailed',
+              'UTXOs were created, but the original operation failed. Try it again.'
+            )
+          )
+        }
+      } else {
+        onSuccess()
+      }
+    } catch (error: any) {
+      const message = extractErrorMessage(error)
+      setCreationError(message)
+      toast.error(message)
+      setIsLoading(false)
+    }
+  }
+
+  const availableBalance = btcBalanceData?.vanilla?.spendable
+  const totalAmount = numUtxos * utxoSize
+  const insufficientBalance =
+    availableBalance !== undefined && totalAmount >= availableBalance
+
+  // Output sizes exclude the transaction fee; the node calculates the exact fee.
+  // Calculate the maximum possible size based on available balance
+  const maxPossibleSize =
+    availableBalance !== undefined
+      ? Math.floor(availableBalance / numUtxos)
+      : utxoSize
+
+  if (!isOpen) return null
+
+  const pos = getModalPositionClass()
+
+  return createPortal(
+    <div
+      className={`${pos} inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] pointer-events-auto animate-fadeIn`}
+      onClick={onClose}
+    >
+      <div
+        className="bg-surface-base p-0 rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-border-subtle/50 animate-scaleIn overflow-hidden flex flex-col max-h-[80vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header - Fixed */}
+        <div className="relative px-6 pt-6 pb-4 border-b border-border-subtle/50 flex-shrink-0">
+          <h3 className="text-xl font-bold text-white flex items-center">
+            <Zap className="mr-2 text-primary" size={20} />
+            Create Colored UTXOs
+          </h3>
+          <IconButton
+            aria-label="Close"
+            className="absolute top-5 right-5"
+            icon={<X size={18} />}
+            onClick={onClose}
+            variant="ghost"
+          />
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-6">
+            {error && (
+              <div className="bg-status-danger/10 border border-status-danger/30 rounded-xl p-4 mb-6 shadow-inner animate-pulse">
+                <div className="flex items-center gap-2">
+                  <svg
+                    className="text-status-danger"
+                    fill="none"
+                    height="16"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    width="16"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" x2="12" y1="8" y2="12"></line>
+                    <line x1="12" x2="12.01" y1="16" y2="16"></line>
+                  </svg>
+                  <p className="text-sm font-medium text-status-danger">
+                    Error: {error}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 flex items-start gap-3 mb-6 shadow-inner">
+              <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-content-primary">
+                <p className="mb-2 font-medium">
+                  {operationType === 'issuance'
+                    ? 'Issuing or receiving an RGB asset on-chain requires colorable UTXOs.'
+                    : 'Opening a channel with RGB assets requires colorable UTXOs.'}
+                </p>
+                <p className="text-content-secondary">
+                  This operation requires an on-chain transaction. A fee of
+                  approximately{' '}
+                  <span className="font-medium text-white">
+                    {feeRate.toFixed(2)} sat/vB
+                  </span>{' '}
+                  will be used.
+                </p>
+              </div>
+            </div>
+
+            <button
+              aria-expanded={showAdvanced}
+              className="w-full flex items-center justify-between py-3 px-4 mb-5 text-sm font-medium text-content-primary hover:text-white bg-surface-overlay/40 hover:bg-surface-overlay/60 border border-border-default rounded-xl transition-all duration-200 group hover:shadow-md"
+              onClick={toggleAdvanced}
+              type="button"
+            >
+              <div className="flex items-center">
+                <Settings
+                  className="mr-2 text-primary group-hover:text-primary-emphasis transition-colors"
+                  size={15}
+                />
+                <span>Advanced Settings</span>
+              </div>
+              <div
+                className={`transition-transform duration-300 ease-in-out ${showAdvanced ? 'rotate-180' : ''}`}
+              >
+                <ChevronDown
+                  className="text-content-secondary group-hover:text-primary transition-colors"
+                  size={16}
+                />
+              </div>
+            </button>
+
+            {showAdvanced && (
+              <div className="mb-6 space-y-5 bg-surface-overlay/50 p-5 rounded-xl border border-border-default shadow-inner animate-fadeIn max-h-[200px] overflow-y-auto">
+                <div>
+                  <label className="block text-sm font-medium text-content-primary mb-2 flex items-center">
+                    Number of UTXOs
+                    <div className="relative ml-2 group">
+                      <Info
+                        className="text-content-secondary hover:text-primary cursor-help"
+                        size={14}
+                      />
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-surface-overlay text-xs text-content-primary rounded-lg shadow-lg w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-10">
+                        Creating multiple UTXOs allows for parallel transactions
+                        but uses more chain space.
+                      </div>
+                    </div>
+                  </label>
+                  <div className="flex rounded-lg overflow-hidden border border-border-default focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+                    <button
+                      className="bg-surface-high text-white px-3 py-2 hover:bg-surface-elevated disabled:opacity-50 transition-colors"
+                      disabled={numUtxos <= 1}
+                      onClick={() =>
+                        setNumUtxos((prev) => Math.max(1, prev - 1))
+                      }
+                    >
+                      <svg
+                        fill="none"
+                        height="16"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                        width="16"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <line x1="5" x2="19" y1="12" y2="12"></line>
+                      </svg>
+                    </button>
+                    <input
+                      className="w-full bg-surface-overlay/80 text-white px-4 py-2 text-center focus:outline-none"
+                      max="10"
+                      min="1"
+                      onChange={(e) =>
+                        setNumUtxos(
+                          Math.min(
+                            10,
+                            Math.max(1, parseInt(e.target.value) || 1)
+                          )
+                        )
+                      }
+                      type="number"
+                      value={numUtxos}
+                    />
+                    <button
+                      className="bg-surface-high text-white px-3 py-2 hover:bg-surface-elevated disabled:opacity-50 transition-colors"
+                      disabled={numUtxos >= 10}
+                      onClick={() =>
+                        setNumUtxos((prev) => Math.min(10, prev + 1))
+                      }
+                    >
+                      <svg
+                        fill="none"
+                        height="16"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                        width="16"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <line x1="12" x2="12" y1="5" y2="19"></line>
+                        <line x1="5" x2="19" y1="12" y2="12"></line>
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-content-secondary">
+                    Recommended: 1-10 UTXOs
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-content-primary mb-2 flex items-center">
+                    UTXO Size (in satoshis)
+                    <div className="relative ml-2 group">
+                      <Info
+                        className="text-content-secondary hover:text-primary cursor-help"
+                        size={14}
+                      />
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-surface-overlay text-xs text-content-primary rounded-lg shadow-lg w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-10">
+                        Larger UTXOs allow for larger operations but require
+                        more capital.
+                      </div>
+                    </div>
+                  </label>
+                  <input
+                    className="w-full bg-surface-overlay/80 text-white px-4 py-2 rounded-lg border border-border-default 
+                           focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                    max={maxPossibleSize}
+                    min={DEFAULT_UTXO_SIZE}
+                    onChange={(e) =>
+                      setUtxoSize(
+                        Math.max(
+                          DEFAULT_UTXO_SIZE,
+                          parseInt(e.target.value) || DEFAULT_UTXO_SIZE
+                        )
+                      )
+                    }
+                    type="number"
+                    value={utxoSize}
+                  />
+                  <div className="mt-2 space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-content-secondary">
+                        Available balance:
+                      </span>
+                      <span className="text-content-primary font-medium">
+                        {availableBalance?.toLocaleString() ?? '...'} sats
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-content-secondary">
+                        Total amount:
+                      </span>
+                      <span className="text-primary font-medium">
+                        {(numUtxos * utxoSize).toLocaleString()} sats
+                      </span>
+                    </div>
+                    <div className="w-full bg-surface-high/50 rounded-full h-1.5 mt-1">
+                      <div
+                        className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                        style={{
+                          backgroundColor:
+                            numUtxos * utxoSize >
+                            (btcBalanceData?.vanilla?.spendable || 0)
+                              ? 'rgb(239, 68, 68)'
+                              : undefined,
+                          width: btcBalanceData?.vanilla?.spendable
+                            ? `${Math.min(100, ((numUtxos * utxoSize) / btcBalanceData.vanilla.spendable) * 100)}%`
+                            : '0%',
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer - Fixed */}
+        <div className="px-6 py-4 border-t border-border-subtle/50 bg-surface-overlay/50 flex-shrink-0 sticky bottom-0 z-10 w-full">
+          <div
+            aria-live="polite"
+            className="mb-3 text-sm text-content-secondary"
+          >
+            <p>
+              Available BTC: {availableBalance?.toLocaleString() ?? '...'} sats
+            </p>
+            <p>
+              Required: {totalAmount.toLocaleString()} sats + transaction fee
+            </p>
+            {insufficientBalance && (
+              <p className="mt-2 text-status-danger" role="alert">
+                Insufficient spendable BTC. Deposit BTC and wait for
+                confirmation, or reduce the number or size of UTXOs in Advanced
+                Settings.
+              </p>
+            )}
+            {creationError && (
+              <p className="mt-2 text-status-danger" role="alert">
+                {creationError}
+              </p>
+            )}
+          </div>
+          <Button
+            className="w-full"
+            disabled={isLoading || feeRate <= 0 || insufficientBalance}
+            icon={!isLoading ? <Zap size={18} /> : undefined}
+            isLoading={isLoading}
+            onClick={handleCreateUTXOs}
+            variant="primary"
+          >
+            Create UTXOs
+          </Button>
+        </div>
+      </div>
+    </div>,
+    getModalPortalTarget()
+  )
+}

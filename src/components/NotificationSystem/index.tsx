@@ -1,0 +1,440 @@
+import {
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  X,
+  Bell,
+  Download,
+  MailOpen,
+} from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+
+import { UpdateModal } from './UpdateModal'
+
+const DEFAULT_NOTIFICATION_AUTO_CLOSE_MS = 5000
+
+export type NotificationType =
+  'success' | 'error' | 'warning' | 'info' | 'loading'
+
+export interface Notification {
+  id: string
+  title?: string
+  message: string | React.ReactNode
+  type: NotificationType
+  autoClose?: number
+  showProgress?: boolean
+  data?: any
+  onClose?: () => void
+  timestamp?: Date
+}
+
+interface NotificationContextType {
+  notifications: Notification[]
+  addNotification: (notification: Omit<Notification, 'id'>) => string
+  removeNotification: (id: string) => void
+  clearNotifications: () => void
+  toggleNotificationPanel: () => void
+  isNotificationPanelOpen: boolean
+}
+
+export const NotificationContext = React.createContext<NotificationContextType>(
+  {
+    addNotification: () => '',
+    clearNotifications: () => {},
+    isNotificationPanelOpen: false,
+    notifications: [],
+    removeNotification: () => {},
+    toggleNotificationPanel: () => {},
+  }
+)
+
+const getNotificationConfig = (type: NotificationType) => {
+  switch (type) {
+    case 'success':
+      return {
+        badgeClass: 'bg-green-500/20 text-green-600 dark:text-green-400',
+        containerClass: 'bg-green-500/10 dark:bg-green-900/20',
+        icon: CheckCircle,
+        iconClass: 'text-green-500',
+      }
+    case 'error':
+      return {
+        badgeClass: 'bg-red-500/20 text-red-600 dark:text-red-400',
+        containerClass: 'bg-red-500/10 dark:bg-red-900/20',
+        icon: AlertCircle,
+        iconClass: 'text-red-500',
+      }
+    case 'warning':
+      return {
+        badgeClass: 'bg-orange-500/20 text-orange-600 dark:text-orange-400',
+        containerClass: 'bg-orange-500/10 dark:bg-orange-900/20',
+        icon: AlertCircle,
+        iconClass: 'text-orange-500',
+      }
+    case 'loading':
+    case 'info':
+      return {
+        badgeClass: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
+        containerClass: 'bg-blue-500/10 dark:bg-blue-900/20',
+        icon: Clock,
+        iconClass: 'text-blue-500',
+      }
+    default:
+      return {
+        badgeClass:
+          'bg-surface-high/20 text-content-tertiary dark:text-content-secondary',
+        containerClass: 'bg-surface-high/10 dark:bg-surface-base/20',
+        icon: Bell,
+        iconClass: 'text-content-tertiary',
+      }
+  }
+}
+
+const NotificationItem: React.FC<{
+  notification: Notification
+  onClose: () => void
+  inPanel?: boolean
+  onNotificationClick?: (notification: Notification) => void
+}> = ({ notification, onClose, inPanel = false, onNotificationClick }) => {
+  const {
+    icon: Icon,
+    containerClass,
+    iconClass,
+    badgeClass,
+  } = getNotificationConfig(notification.type)
+  const [progress, setProgress] = useState(100)
+  const progressInterval = useRef<number>()
+
+  const isUpdateNotification = notification.data?.update
+
+  useEffect(() => {
+    if (notification.autoClose && notification.showProgress) {
+      const startTime = Date.now()
+      const endTime = startTime + notification.autoClose
+
+      progressInterval.current = window.setInterval(() => {
+        const now = Date.now()
+        const remaining = endTime - now
+        const percentage = (remaining / (notification.autoClose || 5000)) * 100
+
+        if (percentage <= 0) {
+          if (progressInterval.current) clearInterval(progressInterval.current)
+          onClose()
+        } else {
+          setProgress(percentage)
+        }
+      }, 10)
+
+      return () => {
+        if (progressInterval.current) {
+          clearInterval(progressInterval.current)
+        }
+      }
+    }
+  }, [notification.autoClose, notification.showProgress, onClose])
+
+  return (
+    <div
+      className={`${inPanel ? 'border-b border-divider/10' : 'rounded-xl shadow-lg'} ${
+        isUpdateNotification
+          ? 'bg-gradient-to-r from-amber-900/90 to-orange-900/90 border border-amber-500/30 cursor-pointer hover:from-amber-800/90 hover:to-orange-800/90 transform hover:scale-[1.02] transition-all duration-200'
+          : containerClass
+      } backdrop-blur-md`}
+      onClick={
+        isUpdateNotification && onNotificationClick
+          ? () => onNotificationClick(notification)
+          : undefined
+      }
+      role="alert"
+    >
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            {isUpdateNotification ? (
+              <Download className="text-amber-200 w-5 h-5" />
+            ) : (
+              <Icon className={`${iconClass} w-5 h-5`} />
+            )}
+            <span
+              className={`font-semibold ${isUpdateNotification ? 'text-amber-100' : 'text-gray-700 dark:text-content-primary'}`}
+            >
+              {notification.title || 'Notification'}
+            </span>
+            {isUpdateNotification && (
+              <span className="text-xs bg-amber-500/20 text-amber-200 px-2 py-1 rounded-full font-medium">
+                v{notification.data?.update?.version}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {!isUpdateNotification && (
+              <span
+                className={`px-2.5 py-1 rounded-full text-xs font-medium uppercase ${badgeClass}`}
+              >
+                {notification.type}
+              </span>
+            )}
+            {!inPanel && (
+              <button
+                className="p-1 hover:bg-surface-high/10 rounded-full transition-colors"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onClose()
+                }}
+              >
+                <X
+                  className={`w-4 h-4 ${isUpdateNotification ? 'text-amber-300 hover:text-amber-200' : 'text-content-secondary'}`}
+                />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {notification.showProgress && notification.autoClose && !inPanel && (
+          <div className="h-1 bg-gray-200 dark:bg-surface-high rounded-full overflow-hidden mb-3">
+            <div
+              className="h-full bg-blue-500 dark:bg-blue-400 rounded-full transition-all duration-100"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
+
+        <div
+          className={`text-sm ${isUpdateNotification ? 'text-amber-100/90' : 'text-gray-600 dark:text-content-secondary'}`}
+        >
+          {notification.message}
+          {isUpdateNotification && (
+            <div className="mt-2 text-xs text-amber-200/70 flex items-center gap-1">
+              <span className="inline-block w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
+              Click to open update dialog
+            </div>
+          )}
+        </div>
+
+        {notification.timestamp && inPanel && (
+          <div className="text-xs text-content-tertiary mt-2">
+            {notification.timestamp.toLocaleString()}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const NotificationPanel: React.FC<{
+  notifications: Notification[]
+  onClose: () => void
+  onClearAll: () => void
+  onRemoveNotification: (id: string) => void
+  onNotificationClick: (notification: Notification) => void
+}> = ({
+  notifications,
+  onClose,
+  onClearAll,
+  onRemoveNotification,
+  onNotificationClick,
+}) => {
+  return (
+    <div className="fixed inset-y-0 right-0 w-96 bg-surface-base border-l border-divider/10 shadow-xl z-50">
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between p-4 border-b border-divider/10">
+          <div className="flex items-center gap-2">
+            <Bell className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-white">Notifications</h2>
+          </div>
+          <div className="flex items-center gap-5">
+            <button
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border
+                         border-white/30 hover:border-white/50 bg-transparent hover:bg-surface-high/50
+                         text-white transition-colors"
+              onClick={onClearAll}
+            >
+              <MailOpen className="w-4 h-4" />
+              Clear all
+            </button>
+            <button
+              className="p-1 hover:bg-surface-high/10 rounded-full transition-colors"
+              onClick={onClose}
+            >
+              <X className="w-5 h-5 text-content-secondary" />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-content-secondary">
+              <p>No notifications</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-divider/10">
+              {notifications.map((notification) => (
+                <NotificationItem
+                  inPanel
+                  key={notification.id}
+                  notification={notification}
+                  onClose={() => onRemoveNotification(notification.id)}
+                  onNotificationClick={onNotificationClick}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false)
+  const [selectedUpdateModal, setSelectedUpdateModal] = useState<any>(null)
+  const notificationTimers = useRef<
+    Record<string, ReturnType<typeof setTimeout>>
+  >({})
+
+  const addNotification = (notification: Omit<Notification, 'id'>) => {
+    const id = Math.random().toString(36).substring(2, 9)
+    const resolvedAutoClose =
+      notification.type === 'loading'
+        ? notification.autoClose
+        : (notification.autoClose ?? DEFAULT_NOTIFICATION_AUTO_CLOSE_MS)
+    const newNotification = {
+      ...notification,
+      autoClose: resolvedAutoClose,
+      id,
+      timestamp: new Date(),
+    }
+
+    // If this is an update notification, remove any existing update notifications for the same version
+    if (notification.data?.update) {
+      setNotifications((prev) =>
+        prev.filter(
+          (n) =>
+            !n.data?.update ||
+            n.data.update.version !== notification.data.update.version
+        )
+      )
+    }
+
+    setNotifications((prev) => [...prev, newNotification])
+
+    if (resolvedAutoClose) {
+      const timer = setTimeout(() => {
+        removeNotification(id)
+      }, resolvedAutoClose)
+      notificationTimers.current[id] = timer
+    }
+
+    return id
+  }
+
+  const removeNotification = (id: string) => {
+    setNotifications((prev) =>
+      prev.filter((notification) => notification.id !== id)
+    )
+
+    if (notificationTimers.current[id]) {
+      clearTimeout(notificationTimers.current[id])
+      delete notificationTimers.current[id]
+    }
+
+    const notification = notifications.find((n) => n.id === id)
+    if (notification?.onClose) {
+      notification.onClose()
+    }
+  }
+
+  const clearNotifications = () => {
+    setNotifications([])
+    Object.values(notificationTimers.current).forEach(clearTimeout)
+    notificationTimers.current = {}
+  }
+
+  const toggleNotificationPanel = () => {
+    setIsNotificationPanelOpen((prev) => !prev)
+  }
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (notification.data?.update) {
+      setSelectedUpdateModal(notification.data.update)
+      setIsNotificationPanelOpen(false)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      Object.values(notificationTimers.current).forEach(clearTimeout)
+    }
+  }, [])
+
+  return (
+    <NotificationContext.Provider
+      value={{
+        addNotification,
+        clearNotifications,
+        isNotificationPanelOpen,
+        notifications,
+        removeNotification,
+        toggleNotificationPanel,
+      }}
+    >
+      {children}
+      {createPortal(
+        <>
+          <div className="fixed bottom-4 right-4 z-50 space-y-4">
+            {notifications.slice(-3).map((notification) => (
+              <div
+                className="transition-all duration-300 ease-in-out"
+                key={notification.id}
+              >
+                <NotificationItem
+                  notification={notification}
+                  onClose={() => removeNotification(notification.id)}
+                  onNotificationClick={handleNotificationClick}
+                />
+              </div>
+            ))}
+          </div>
+          {isNotificationPanelOpen && (
+            <>
+              <div
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+                onClick={toggleNotificationPanel}
+              />
+              <NotificationPanel
+                notifications={notifications}
+                onClearAll={clearNotifications}
+                onClose={toggleNotificationPanel}
+                onNotificationClick={handleNotificationClick}
+                onRemoveNotification={removeNotification}
+              />
+            </>
+          )}
+          {/* Update Modal */}
+          {selectedUpdateModal && (
+            <UpdateModal
+              isOpen={true}
+              onClose={() => setSelectedUpdateModal(null)}
+              update={selectedUpdateModal}
+            />
+          )}
+        </>,
+        document.body
+      )}
+    </NotificationContext.Provider>
+  )
+}
+
+export const useNotification = () => {
+  const context = React.useContext(NotificationContext)
+  if (!context) {
+    throw new Error(
+      'useNotification must be used within a NotificationProvider'
+    )
+  }
+  return context
+}

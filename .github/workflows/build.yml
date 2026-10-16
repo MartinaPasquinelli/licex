@@ -1,0 +1,314 @@
+name: 'Build'
+
+on:
+  push:
+    branches:
+      - build
+      - test-build
+    tags:
+      - 'v*'
+      - 'test-v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Draft build tag (vX.Y.Z or build-vX.Y.Z-security)'
+        required: true
+        type: string
+
+jobs:
+  build-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin --bundles app,dmg'
+          - platform: 'macos-15-intel'
+            args: '--target x86_64-apple-darwin --bundles app,dmg'
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: get_version
+        shell: bash
+        env:
+          REQUESTED_TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            [[ "$REQUESTED_TAG" =~ ^(build-)?v[0-9]+\.[0-9]+\.[0-9]+(-security)?$ ]] || exit 1
+            expected_version="$(node -p "require('./package.json').version")"
+            [[ "$REQUESTED_TAG" == "v$expected_version" || "$REQUESTED_TAG" == "build-v$expected_version-security" ]] || exit 1
+          fi
+          echo "VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
+      # macOS Code Signing Setup
+      - name: Import Apple Developer Certificate (macOS)
+        if: startsWith(matrix.platform, 'macos-')
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          # Import certificate from secrets
+          echo -n "$APPLE_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate to keychain
+          security import $CERTIFICATE_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Verify certificate
+          echo "Available certificates:"
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev libappindicator3-1 librsvg2-dev patchelf libglib2.0-dev libgtk-3-dev libdbus-1-dev
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          # Pinned to 10: pnpm 11 stopped reading package.json `pnpm.overrides`,
+          # which breaks --frozen-lockfile against the committed lockfile (same
+          # pin as pr-checks.yml). `version: latest` was failing every build.
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'pnpm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
+          targets: ${{ startsWith(matrix.platform, 'macos-') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Setup MSVC environment (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Verify MSVC compiler (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          echo "Checking for cl.exe compiler..."
+          where cl.exe
+          cl.exe
+          echo "MSVC compiler found and working"
+        shell: cmd
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          cache-on-failure: true
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Initialize the checkout before restoring target/: Makefile treats an
+      # existing directory as a repository.
+      - name: Checkout bundled node
+        if: matrix.platform != 'windows-latest'
+        run: make update_repo
+
+      - name: Cache native node build
+        if: matrix.platform != 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: rgb-lightning-node/target
+          key: native-node-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Makefile') }}
+
+      - name: Build and sign rgb-lightning-node binary (Unix)
+        if: matrix.platform != 'windows-latest'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.platform, 'macos-') && secrets.APPLE_SIGNING_IDENTITY || '' }}
+        run: |
+          echo "Building rgb-lightning-node binary..."
+          make release
+          echo "✓ rgb-lightning-node binary built successfully"
+          file bin/rgb-lightning-node
+          ls -lh bin/rgb-lightning-node
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            expected_arch="${{ contains(matrix.args, 'x86_64') && 'x86_64' || 'arm64' }}"
+            lipo bin/rgb-lightning-node -verify_arch "$expected_arch"
+          fi
+
+      - name: Create placeholder rgb-lightning-node for Windows
+        if: matrix.platform == 'windows-latest'
+        run: |
+          mkdir -p bin
+          echo "# Placeholder file for Windows - RGB Lightning Node not supported on Windows" > bin/rgb-lightning-node
+        shell: bash
+
+      - name: Extract changelog for release
+        id: changelog
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+        shell: bash
+        run: |
+          echo "Extracting changelog for version $VERSION"
+
+          # Extract the changelog section for this version
+          CHANGELOG=$(awk -v heading="## [Version $VERSION]" '
+            index($0, heading) == 1 { found = 1; next }
+            found && /^## \[Version / { exit }
+            found { print }
+          ' CHANGELOG.md)
+
+          # If changelog is empty, provide a default message
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="See the CHANGELOG.md for details about this release."
+          fi
+
+          # Save to file for multiline content
+          echo "$CHANGELOG" > /tmp/changelog.txt
+
+          # Set output using the recommended method for multiline strings
+          {
+            echo 'CHANGELOG<<EOF'
+            cat /tmp/changelog.txt
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Tauri auto-updater signing (keep your existing keys)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          # macOS code signing - only set these for macOS builds
+          APPLE_CERTIFICATE: ${{ startsWith(matrix.platform, 'macos-') && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ startsWith(matrix.platform, 'macos-') && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.platform, 'macos-') && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_ID: ${{ startsWith(matrix.platform, 'macos-') && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ startsWith(matrix.platform, 'macos-') && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ startsWith(matrix.platform, 'macos-') && secrets.APPLE_TEAM_ID || '' }}
+          # Skip rgb-lightning-node build on Windows since it's not supported
+          BUILD_AND_RUN_RGB_LIGHTNING_NODE: ${{ matrix.platform != 'windows-latest' && 'true' || 'false' }}
+        id: tauri_build
+        with:
+          releaseCommitish: ${{ github.sha }}
+          tagName: ${{ inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || (github.ref == 'refs/heads/test-build' && 'test-latest' || 'latest') }}
+          releaseName: ${{ inputs.release_tag && format('KaleidoSwap {0}', inputs.release_tag) || startsWith(github.ref, 'refs/tags/v') && format('KaleidoSwap {0}', github.ref_name) || (github.ref == 'refs/heads/test-build' && 'Test App v__VERSION__' || 'App v__VERSION__') }}
+          releaseBody: |
+            ${{ startsWith(github.ref, 'refs/tags/v') && format('Release {0}', github.ref_name) || format('Release v{0}', env.VERSION) }}
+
+            See the assets to download and install this version.
+
+            ${{ (startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '') && steps.changelog.outputs.CHANGELOG || 'Changes in this version:
+            - Built from test-build or build branch
+            - Includes macOS (Intel + Apple Silicon), Linux, and Windows builds
+            - All macOS builds are signed with Apple Developer ID Certificate and notarized by Apple
+            - Native support for Apple Silicon (M1/M2/M3) - no Rosetta required!
+            - Signed and ready for auto-update' }}
+
+            ---
+
+            **Installation Notes:**
+            - macOS Apple Silicon (aarch64): Download and extract the `.app.tar.gz` asset; native ARM64 build, code signed and notarized
+            - macOS Intel (x86_64): Download and extract the `.app.tar.gz` asset; native Intel build, code signed and notarized
+            - Linux: Use .AppImage or .deb as preferred
+            - Windows: Use the provided installer
+
+            All macOS builds install without security warnings!
+
+            **Verification:**
+            - `SHA256SUMS` and its GPG signature `SHA256SUMS.asc` are added shortly after release. See https://kaleidoswap.com/downloads#verify
+          releaseDraft: ${{ github.event_name == 'workflow_dispatch' || !startsWith(github.ref, 'refs/tags/v') }}
+          prerelease: ${{ startsWith(github.ref, 'refs/tags/test-v') }}
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: false
+          args: ${{ matrix.args }}
+
+      - name: Preserve installers if release upload fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.platform }}-${{ contains(matrix.args, 'x86_64') && 'x64' || 'native' }}
+          path: |
+            src-tauri/target/**/bundle/**/*.tar.gz
+            src-tauri/target/**/bundle/**/*.sig
+            src-tauri/target/**/bundle/**/*.dmg
+            src-tauri/target/**/bundle/**/*.AppImage
+            src-tauri/target/**/bundle/**/*.deb
+            src-tauri/target/**/bundle/**/*.exe
+            src-tauri/target/**/bundle/**/*.msi
+          if-no-files-found: ignore
+
+      - name: Update latest release tag
+        if: startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/test-v')
+        run: |
+          # Delete existing latest tag and recreate it pointing to current tag
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag -d latest || true
+          git push origin :refs/tags/latest || true
+          git tag latest
+          git push origin latest
+
+      - name: Create manifest file
+        if: matrix.platform != 'windows-latest' # Skip on Windows
+        shell: bash # Explicitly use bash for this step
+        run: |
+          echo "Creating manifest.txt for signing..."
+          echo "App version: ${{ env.VERSION }}" > manifest.txt
+          echo "Build timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> manifest.txt
+          echo "Git commit: ${{ github.sha }}" >> manifest.txt
+          echo "Git tag: ${{ github.ref_name }}" >> manifest.txt
+          echo "Build platform: ${{ matrix.platform }}" >> manifest.txt
+          echo "Architecture target: ${{ matrix.args }}" >> manifest.txt
+          echo "" >> manifest.txt
+          echo "File checksums (SHA256):" >> manifest.txt
+
+          artifact_paths="${{ steps.tauri_build.outputs.artifactPaths }}"
+          artifact_paths=$(echo "$artifact_paths" | tr -d '[]' | tr ',' ' ' | tr -d '"')
+
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            CHECKSUM_CMD="sha256sum"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            CHECKSUM_CMD="shasum -a 256"
+          else
+            echo "Unsupported OS: $RUNNER_OS"
+            exit 1
+          fi
+
+          for file in $artifact_paths; do
+            if [ -f "$file" ]; then
+              CHECKSUM=$($CHECKSUM_CMD "$file" | awk '{print $1}')
+              filename=$(basename "$file")
+              echo "$filename: $CHECKSUM" >> manifest.txt
+            fi
+          done
+
+          cat manifest.txt
+
+      - name: Upload manifest.txt
+        if: matrix.platform != 'windows-latest' # Skip on Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest-${{ github.ref_name || 'build' }}-${{ matrix.platform }}-${{ matrix.args != '' && format('{0}', matrix.args) || 'default' }}
+          path: manifest.txt
+          if-no-files-found: error

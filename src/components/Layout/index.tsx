@@ -1,0 +1,1328 @@
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
+import Decimal from 'decimal.js'
+import {
+  ArrowDownLeft,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Upload,
+  Activity,
+  Settings,
+  User,
+  Loader2,
+  RefreshCw,
+  Plus,
+  Server,
+  Brain,
+} from 'lucide-react'
+import React, { useEffect, useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { toast, ToastContainer } from 'react-toastify'
+
+import {
+  SETTINGS_PATH,
+  ROOT_PATH,
+  WALLET_SETUP_PATH,
+  KALEIDO_MIND_PATH,
+} from '../../app/router/paths'
+import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
+import logoFull from '../../assets/logo-full.svg'
+import { isBtcWalletTx } from '../../helpers/walletHistoryUtils'
+import { useNodeLifecycleEvents } from '../../hooks/useNodeLifecycleEvents'
+import { useOnClickOutside } from '../../hooks/useOnClickOutside'
+import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
+import { nodeSettingsActions } from '../../slices/nodeSettings/nodeSettings.slice'
+import {
+  setAppMode,
+  isNodeEnabled,
+  isMindEnabled,
+} from '../../slices/settings/settings.slice'
+import { uiSliceActions } from '../../slices/ui/ui.slice'
+import { AppVersion } from '../AppVersion'
+import { BackupModal } from '../BackupModal'
+import { useBackup } from '../../hooks/useBackup'
+import { useDcaScheduler } from '../../hooks/useDcaScheduler'
+import { useLimitOrderScheduler } from '../../hooks/useLimitOrderScheduler'
+import { useNwcAutostart } from '../../hooks/useNwcAutostart'
+import { useNodeReachabilityMonitor } from '../../hooks/useNodeReachabilityMonitor'
+import { useNodeReconnect } from '../../hooks/useNodeReconnect'
+import { LogoutModal, LogoutButton } from '../LogoutModal'
+import { useNotification } from '../NotificationSystem'
+import { ShutdownAnimation } from '../ShutdownAnimation'
+import { SupportModal } from '../SupportModal'
+
+import 'react-toastify/dist/ReactToastify.min.css'
+import {
+  getNavSections,
+  getMainNavItems,
+  getChannelMenuItems,
+  getTransactionMenuItems,
+  getUserMenuItems,
+  getPageConfig,
+  HIDE_NAVBAR_PATHS,
+  NavItem,
+} from './config'
+
+import { LayoutModal } from './Modal'
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const DEFAULT_TOAST_AUTO_CLOSE_MS = 5000
+
+interface Props {
+  className?: string
+  children: React.ReactNode
+}
+
+// Define types for modal actions
+type ModalActionType = 'deposit' | 'withdraw' | 'none'
+
+// Define types for dropdown menu props
+interface DropdownMenuProps {
+  menuRef: React.RefObject<HTMLDivElement>
+  isOpen: boolean
+  setIsOpen: React.Dispatch<React.SetStateAction<boolean>>
+  title: string
+  icon: React.ReactNode
+  items: NavItem[]
+  onItemClick?: (item: NavItem | string) => void
+}
+
+// Define types for NavItem component props
+interface NavItemProps {
+  item: NavItem
+  isCollapsed: boolean
+  isActive: boolean
+}
+
+// Define types for UserProfile component props
+interface UserProfileProps {
+  isCollapsed: boolean
+  onSupportClick: () => void
+  onLogout: () => void
+  dropdownAlign?: 'left' | 'right'
+}
+
+// NavItem component for sidebar
+const SidebarNavItem = ({ item, isCollapsed, isActive }: NavItemProps) => {
+  const location = useLocation()
+  const hasSubMenu = item.subMenu && item.subMenu.length > 0
+
+  // Keep manual expansion local to the current route; other sections collapse
+  // on navigation without an effect-driven extra render.
+  const [menuOverride, setMenuOverride] = useState<{
+    path: string
+    open: boolean
+  } | null>(null)
+  const isSubMenuOpen =
+    menuOverride?.path === location.pathname
+      ? menuOverride.open
+      : Boolean(isActive && hasSubMenu)
+  const setIsSubMenuOpen = (value: boolean | ((open: boolean) => boolean)) => {
+    setMenuOverride({
+      open: typeof value === 'function' ? value(isSubMenuOpen) : value,
+      path: location.pathname,
+    })
+  }
+
+  const handleChevronClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsSubMenuOpen((open) => !open)
+  }
+
+  return (
+    <div
+      className="relative group"
+      title={isCollapsed ? item.label : undefined}
+    >
+      <div
+        className={`
+          flex items-center rounded-xl transition-all duration-300
+          ${
+            isActive
+              ? 'bg-status-success/10 text-status-success font-semibold border-l-2 border-status-success/60 shadow-lg shadow-status-success/5'
+              : 'text-content-secondary hover:text-white hover:bg-surface-overlay/80 hover:shadow-md'
+          }
+
+        `}
+      >
+        <NavLink
+          className={`flex items-center py-2.5 px-3 flex-1 min-w-0
+            ${isCollapsed ? 'justify-center' : 'justify-start space-x-3'}
+          `}
+          onClick={() => {
+            if (isActive && hasSubMenu) setIsSubMenuOpen(true)
+          }}
+          to={item.to ?? '#'}
+        >
+          <div className={`flex items-center ${!isCollapsed && 'space-x-3'}`}>
+            <div className="transition-transform duration-300 group-hover:scale-110">
+              {item.icon}
+            </div>
+            {!isCollapsed && (
+              <span className="font-medium text-sm">{item.label}</span>
+            )}
+          </div>
+        </NavLink>
+        {hasSubMenu && !isCollapsed && (
+          <button
+            aria-expanded={isSubMenuOpen}
+            aria-label={item.label}
+            className="pr-4 py-3 flex items-center"
+            onClick={handleChevronClick}
+            type="button"
+          >
+            <ChevronRight
+              className={`w-4 h-4 transition-all duration-300 ${isSubMenuOpen ? 'rotate-90' : ''}`}
+            />
+          </button>
+        )}
+      </div>
+
+      {hasSubMenu && isSubMenuOpen && !isCollapsed && (
+        <div className="pl-4 mt-2 space-y-1.5 animate-fadeInUp">
+          {item.subMenu &&
+            item.subMenu
+              .filter((subItem) => subItem.to && !subItem.disabled)
+              .map((subItem) => (
+                <NavLink
+                  className={`
+                flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm cursor-pointer
+                transition-all duration-200
+                ${subItem.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-surface-overlay/80 hover:text-white hover:translate-x-1'}
+                ${location.pathname === subItem.to ? 'bg-status-success/10 text-status-success font-semibold border-l-2 border-status-success/50' : 'text-content-secondary'}
+              `}
+                  end
+                  key={subItem.to}
+                  to={subItem.to!}
+                >
+                  <div className="transition-transform duration-200 hover:scale-110">
+                    {subItem.icon}
+                  </div>
+                  <span className="font-medium">{subItem.label}</span>
+                </NavLink>
+              ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Dropdown menu component
+const DropdownMenu = ({
+  menuRef,
+  isOpen,
+  setIsOpen,
+  title,
+  icon,
+  items,
+  onItemClick,
+}: DropdownMenuProps) => {
+  const dispatch = useAppDispatch()
+  const navigate = useNavigate()
+
+  const handleItemClick = (item: NavItem) => {
+    setIsOpen(false)
+
+    if (item.action) {
+      if (item.action === 'support') {
+        // Handle support modal action
+        if (onItemClick) onItemClick('support')
+      } else {
+        dispatch(
+          uiSliceActions.setModal({
+            assetId: undefined,
+            type: item.action as ModalActionType,
+          })
+        )
+      }
+    } else if (item.to) {
+      navigate(item.to)
+    }
+
+    if (onItemClick && item.action !== 'support') {
+      onItemClick(item)
+    }
+  }
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <div
+        className="px-3 py-2 rounded-lg cursor-pointer flex items-center space-x-2
+                  text-content-secondary hover:text-white hover:bg-surface-elevated/50 transition-all duration-300
+                  transform hover:scale-[1.02] active:scale-[0.98]"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="text-primary transition-transform duration-300 hover:scale-110">
+          {icon}
+        </div>
+        <span className="font-medium">{title}</span>
+        <ChevronRight
+          className={`w-4 h-4 transition-all duration-300 ${isOpen ? 'rotate-90 text-primary' : ''}`}
+        />
+      </div>
+
+      {isOpen && (
+        <div
+          className="absolute top-full right-0 mt-2 bg-surface-elevated/95 backdrop-blur-xl border border-divider/30
+                       rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50 w-56 animate-scaleIn"
+        >
+          <div className="py-1">
+            {items.map((item, index) => (
+              <div
+                className="px-4 py-3 flex items-center space-x-3 cursor-pointer
+                          hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent
+                          transition-all duration-200 group"
+                key={item.label || index}
+                onClick={() => handleItemClick(item)}
+              >
+                <div className="text-primary transition-transform duration-200 group-hover:scale-110">
+                  {item.icon}
+                </div>
+                <span className="text-sm font-medium group-hover:text-white">
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// User profile component
+const UserProfile = ({
+  isCollapsed,
+  onSupportClick,
+  onLogout,
+  dropdownAlign = 'left',
+}: UserProfileProps) => {
+  const { t } = useTranslation()
+  const [isOpen, setIsOpen] = useState(false)
+  const menuRef = useRef(null)
+  const navigate = useNavigate()
+  const nodeInfo = nodeApi.endpoints.nodeInfo.useQueryState()
+  const accountName = useAppSelector((state) => state.nodeSettings.data.name)
+  const nodeSettingsData = useAppSelector((state) => state.nodeSettings.data)
+  const nodeReachability = useAppSelector((state) => state.node.reachability)
+  const { reconnect, isReconnecting } = useNodeReconnect()
+  const isNodeReachable =
+    nodeReachability === 'reachable' ||
+    (nodeReachability === 'unknown' && nodeInfo.isSuccess)
+  // A node is "configured" once an account exists; without one the app is
+  // running KaleidoMind-only and the bar invites connecting a node.
+  const hasNode = !!nodeSettingsData?.name
+  const nameText = hasNode
+    ? accountName || t('userProfile.myWallet')
+    : t('userProfile.noNode', { defaultValue: 'No node connected' })
+  const statusText = hasNode
+    ? isNodeReachable
+      ? t('userProfile.connected')
+      : nodeReachability === 'unknown'
+        ? t('ux.checking')
+        : t('userProfile.disconnected')
+    : t('userProfile.tapToConnect', { defaultValue: 'Tap to connect' })
+  const statusDotClass = !hasNode
+    ? 'bg-content-tertiary'
+    : isNodeReachable
+      ? 'bg-green shadow-lg shadow-green/50 animate-pulse'
+      : 'bg-red shadow-lg shadow-red/50'
+
+  const {
+    showBackupModal,
+    setShowBackupModal,
+    isBackupInProgress,
+    control: backupControl,
+    handleSubmit: handleBackupSubmit,
+    formState: backupFormState,
+    backupPath,
+    handleBackup,
+    selectBackupFolder,
+  } = useBackup({
+    nodeSettings: nodeSettingsData || {
+      indexer_url: '',
+      proxy_endpoint: '',
+      rpc_connection_url: '',
+    },
+  })
+
+  // Get translated menu items
+  const USER_MENU_ITEMS = getUserMenuItems(t)
+
+  useOnClickOutside(menuRef, () => setIsOpen(false))
+
+  const handleMenuItemClick = (item: NavItem) => {
+    setIsOpen(false)
+
+    if (item.action === 'support') {
+      onSupportClick()
+    } else if (item.action === 'backup') {
+      setShowBackupModal(true)
+    } else if (item.to) {
+      navigate(item.to)
+    }
+  }
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <div
+        className={`flex items-center p-3 cursor-pointer rounded-xl hover:bg-gradient-to-r hover:from-surface-overlay hover:to-surface-overlay/50
+          transition-all duration-300 group
+          ${isCollapsed ? 'justify-center' : 'justify-between space-x-2'}
+          transform hover:scale-[1.02] active:scale-[0.98]`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className={`flex items-center ${!isCollapsed && 'space-x-2'}`}>
+          <div className="relative flex-shrink-0 p-0.5">
+            <div
+              className="w-8 h-8 bg-gradient-to-br from-purple via-purple/80 to-cyan/50 rounded-full flex items-center justify-center
+                          shadow-lg shadow-purple/20 ring-2 ring-purple/10 transition-all duration-300
+                          group-hover:shadow-xl group-hover:shadow-purple/30 group-hover:ring-purple/20"
+            >
+              <User className="w-4 h-4 text-white" />
+            </div>
+            <div
+              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-surface-base
+              transition-all duration-300 ${statusDotClass}`}
+            ></div>
+          </div>
+
+          {!isCollapsed && (
+            <>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-white group-hover:text-primary transition-colors duration-300">
+                  {nameText}
+                </span>
+                <span className="text-xs text-content-secondary group-hover:text-content-secondary transition-colors duration-300">
+                  {hasNode
+                    ? `${t('ux.node')}: ${statusText} · ${nodeSettingsData.network === 'SignetCustom' ? 'Mutinynet' : nodeSettingsData.network}`
+                    : statusText}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <BackupModal
+        backupPath={backupPath}
+        control={backupControl}
+        formState={backupFormState}
+        isBackupInProgress={isBackupInProgress}
+        onClose={() => setShowBackupModal(false)}
+        onSelectFolder={selectBackupFolder}
+        onSubmit={handleBackupSubmit(handleBackup)}
+        setValue={backupControl.setValue}
+        showModal={showBackupModal}
+      />
+
+      {isOpen && (
+        <div
+          className={`absolute top-full mt-2 bg-surface-elevated/95 backdrop-blur-xl border border-divider/30
+                      rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50 w-56 animate-scaleIn
+                      ${dropdownAlign === 'right' ? 'right-0' : 'left-0'}`}
+        >
+          <div className="p-3 border-b border-divider/20 bg-gradient-to-br from-surface-overlay/50 to-transparent">
+            <div className="flex items-center space-x-2">
+              <div
+                className="w-10 h-10 bg-gradient-to-br from-purple via-purple/80 to-cyan/50 rounded-full flex items-center justify-center
+                            shadow-lg shadow-purple/30 ring-2 ring-purple/20"
+              >
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-white">{nameText}</div>
+                <div className="text-xs text-content-secondary flex items-center space-x-1">
+                  <div
+                    className={`w-2 h-2 rounded-full ${!hasNode ? 'bg-content-tertiary' : isNodeReachable ? 'bg-green animate-pulse' : 'bg-red'}`}
+                  ></div>
+                  <span>
+                    {hasNode
+                      ? `${t('ux.node')}: ${statusText} · ${nodeSettingsData.network === 'SignetCustom' ? 'Mutinynet' : nodeSettingsData.network}`
+                      : statusText}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {!hasNode && (
+            <div className="py-1 border-b border-divider/20">
+              <div
+                className="px-4 py-3 flex items-center space-x-3 cursor-pointer
+                          hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent
+                          transition-all duration-200 group"
+                onClick={() => {
+                  setIsOpen(false)
+                  navigate(ROOT_PATH)
+                }}
+              >
+                <div className="text-primary transition-transform duration-200 group-hover:scale-110">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-medium group-hover:text-white">
+                  {t('userProfile.connectNode', {
+                    defaultValue: 'Connect a node',
+                  })}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Node configured but not reachable — offer a manual reconnect
+              without waiting for the auto-retry / blocking overlay. */}
+          {hasNode && !isNodeReachable && (
+            <div className="py-1 border-b border-divider/20">
+              <button
+                className="w-full px-4 py-3 flex items-center space-x-3 cursor-pointer
+                          hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent
+                          transition-all duration-200 group
+                          disabled:opacity-60 disabled:cursor-not-allowed"
+                disabled={isReconnecting}
+                onClick={() => {
+                  reconnect()
+                }}
+                type="button"
+              >
+                <div className="text-primary transition-transform duration-200 group-hover:scale-110">
+                  {isReconnecting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                </div>
+                <span className="text-sm font-medium group-hover:text-white">
+                  {isReconnecting
+                    ? t('userProfile.reconnecting', {
+                        defaultValue: 'Reconnecting…',
+                      })
+                    : t('userProfile.reconnect', {
+                        defaultValue: 'Reconnect node',
+                      })}
+                </span>
+              </button>
+            </div>
+          )}
+
+          <div className="py-1">
+            {USER_MENU_ITEMS.map((item) => (
+              <div
+                className="px-4 py-3 flex items-center space-x-3 cursor-pointer
+                          hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent
+                          transition-all duration-200 group"
+                key={item.label}
+                onClick={() => handleMenuItemClick(item)}
+              >
+                <div className="text-primary transition-transform duration-200 group-hover:scale-110">
+                  {item.icon}
+                </div>
+                <span className="text-sm font-medium group-hover:text-white">
+                  {item.label}
+                </span>
+              </div>
+            ))}
+
+            <div className="border-t border-divider/20 mt-1">
+              <LogoutButton onClick={onLogout} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export const Layout = (props: Props) => {
+  const { t } = useTranslation()
+  const [lastDeposit, setLastDeposit] = useState<number | undefined>(undefined)
+  const [isRetrying, setIsRetrying] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    () => localStorage.getItem('sidebarCollapsed') === 'true'
+  )
+  const [isShuttingDown, setIsShuttingDown] = useState(false)
+  const [shutdownStatus, setShutdownStatus] = useState<string>('')
+  const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false)
+  const [isHandlingCloseAction, setIsHandlingCloseAction] = useState(false)
+  const [isChannelMenuOpen, setIsChannelMenuOpen] = useState(false)
+  const [isTransactionMenuOpen, setIsTransactionMenuOpen] = useState(false)
+  const {
+    reconnect: retryNodeConnection,
+    isReconnecting: isRetryingNodeConnection,
+    lastResult: lastReconnectResult,
+  } = useNodeReconnect()
+
+  const [showSupportModal, setShowSupportModal] = useState(false)
+
+  const channelMenuRef = useRef(null)
+  const transactionMenuRef = useRef(null)
+  const toastAutoDismissTimers = useRef<
+    Record<string, ReturnType<typeof setTimeout>>
+  >({})
+
+  const location = useLocation()
+  const navigate = useNavigate()
+  const dispatch = useAppDispatch()
+  const shouldHideNavbar = HIDE_NAVBAR_PATHS.includes(location.pathname)
+  // KaleidoMind does not depend on the node, so the node-offline overlay must
+  // never block it — a node-less or "KaleidoMind only" user can keep using it.
+  const isMindRoute = location.pathname.startsWith(KALEIDO_MIND_PATH)
+
+  // Get translated menu items
+  const NAV_SECTIONS = getNavSections(t)
+  const MAIN_NAV_ITEMS = getMainNavItems(t)
+  const isItemActive = (item: NavItem) => {
+    const path = location.pathname
+    if (
+      item.matchPath &&
+      (path === item.matchPath || path.startsWith(`${item.matchPath}/`))
+    )
+      return true
+    if (item.to && path === item.to) return true
+    if (item.matchPaths?.includes(path)) return true
+    return !!item.subMenu?.some(
+      (sub) => sub.to && (path === sub.to || path.startsWith(`${sub.to}/`))
+    )
+  }
+  const CHANNEL_MENU_ITEMS = getChannelMenuItems(t)
+  const TRANSACTION_MENU_ITEMS = getTransactionMenuItems(t)
+  const PAGE_CONFIG = getPageConfig(t)
+
+  const [lock] = nodeApi.endpoints.lock.useMutation()
+
+  useDcaScheduler()
+  useLimitOrderScheduler()
+  useNwcAutostart()
+  useNodeLifecycleEvents()
+
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  const { addNotification } = useNotification()
+
+  useOnClickOutside(channelMenuRef, () => setIsChannelMenuOpen(false))
+  useOnClickOutside(transactionMenuRef, () => setIsTransactionMenuOpen(false))
+
+  const nodeInfo = nodeApi.endpoints.nodeInfo.useQueryState()
+  const nodeLifecycle = useAppSelector((state) => state.node.lifecycle)
+  const nodeReachability = useAppSelector((state) => state.node.reachability)
+  const nodeReachabilityError = useAppSelector(
+    (state) => state.node.reachabilityError
+  )
+  const nodeSettingsData = useAppSelector((state) => state.nodeSettings.data)
+  const appMode = useAppSelector((state) => state.settings.appMode)
+  // A configured node (local OR remote) must always surface its section.
+  // appMode alone isn't enough: a node connected after a "KaleidoMind only"
+  // onboarding (appMode 'mind') would otherwise stay hidden behind the
+  // "Activate Node" affordance even though it's live — so also enable the
+  // section whenever a node account exists.
+  const nodeSectionEnabled = isNodeEnabled(appMode) || !!nodeSettingsData?.name
+  const mindSectionEnabled = isMindEnabled(appMode)
+  const isNodeReachable =
+    nodeReachability === 'reachable' ||
+    (nodeReachability === 'unknown' && nodeInfo.isSuccess)
+  const isNodeUnreachable =
+    nodeReachability === 'unreachable' || nodeReachability === 'slow'
+  const shouldPoll = isNodeReachable
+  const isNodeActive =
+    nodeLifecycle.status === 'Running' ||
+    nodeLifecycle.status === 'Starting' ||
+    nodeLifecycle.status === 'Stopping'
+
+  useNodeReachabilityMonitor({
+    accountKey: nodeSettingsData?.name,
+    skip: shouldHideNavbar || !nodeSettingsData?.name,
+  })
+
+  // In "Only Node" mode the KaleidoMind sidecar isn't reachable, so make sure
+  // its process (and any loaded model) is stopped to free resources.
+  useEffect(() => {
+    if (!mindSectionEnabled) {
+      invoke('mind_stop').catch(() => {
+        /* sidecar not running — nothing to stop */
+      })
+    }
+  }, [mindSectionEnabled])
+
+  const { data, isFetching, error } = nodeApi.useListTransactionsQuery(
+    undefined,
+    {
+      pollingInterval: 30_000,
+      skip: isRetrying || !shouldPoll,
+    }
+  )
+
+  useEffect(() => {
+    const clearToastTimer = (toastId: string) => {
+      const timer = toastAutoDismissTimers.current[toastId]
+
+      if (timer) {
+        clearTimeout(timer)
+        delete toastAutoDismissTimers.current[toastId]
+      }
+    }
+
+    const unsubscribe = toast.onChange((item) => {
+      const toastId = String(item.id)
+
+      if (item.status === 'removed') {
+        clearToastTimer(toastId)
+        return
+      }
+
+      if (item.isLoading) {
+        clearToastTimer(toastId)
+        return
+      }
+
+      clearToastTimer(toastId)
+      toastAutoDismissTimers.current[toastId] = setTimeout(() => {
+        toast.dismiss(item.id)
+        clearToastTimer(toastId)
+      }, DEFAULT_TOAST_AUTO_CLOSE_MS)
+    })
+
+    return () => {
+      unsubscribe()
+      Object.values(toastAutoDismissTimers.current).forEach(clearTimeout)
+      toastAutoDismissTimers.current = {}
+    }
+  }, [])
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true)
+      const lockResponse = await lock().unwrap()
+      await invoke('stop_node')
+
+      if (lockResponse !== undefined || lockResponse === null) {
+        dispatch(nodeSettingsActions.resetNodeSettings())
+        addNotification({
+          autoClose: 3000,
+          message: t('modals.logoutSuccessMessage'),
+          title: t('modals.logoutSuccess'),
+          type: 'success',
+        })
+        navigate(WALLET_SETUP_PATH)
+      } else {
+        throw new Error('Node lock unsuccessful')
+      }
+    } catch (error) {
+      addNotification({
+        autoClose: 5000,
+        message: t('modals.logoutFailedMessage', {
+          error: error instanceof Error ? error.message : '',
+        }),
+        title: t('modals.logoutFailed'),
+        type: 'error',
+      })
+      navigate(WALLET_SETUP_PATH)
+    } finally {
+      setIsLoggingOut(false)
+      setShowLogoutModal(false)
+    }
+  }
+
+  useEffect(() => {
+    const checkDeposits = async () => {
+      if (!shouldPoll) return
+      if (isFetching) return
+
+      if (error && (error as any).status === 403) {
+        setIsRetrying(true)
+        await sleep(3000)
+        setIsRetrying(false)
+        return
+      }
+
+      const filteredTransactions =
+        (data?.transactions || [])
+          .filter(
+            (tx: any) =>
+              isBtcWalletTx(tx.transaction_type) &&
+              new Decimal(tx.received ?? 0).minus(tx.sent ?? 0).gt(0)
+          )
+          .map((tx: any) => ({
+            amount: new Decimal(tx.received ?? 0)
+              .minus(tx.sent ?? 0)
+              .toString(),
+            asset: 'BTC',
+            confirmation_time: tx.confirmation_time,
+            txId: tx.txid ?? '',
+            type: 'on-chain' as const,
+          })) || []
+
+      const highestBlockDeposit =
+        filteredTransactions && filteredTransactions.length > 0
+          ? filteredTransactions?.reduce((prev: any, current: any) =>
+              (prev?.confirmation_time?.height ?? 0) >
+              (current?.confirmation_time?.height ?? 0)
+                ? prev
+                : current
+            )
+          : undefined
+
+      if (lastDeposit === undefined) {
+        if (highestBlockDeposit) {
+          setLastDeposit(highestBlockDeposit?.confirmation_time?.height ?? 0)
+        } else {
+          setLastDeposit(0)
+        }
+        return
+      }
+
+      if (
+        lastDeposit !== undefined &&
+        highestBlockDeposit &&
+        (highestBlockDeposit?.confirmation_time?.height ?? 0) > lastDeposit
+      ) {
+        addNotification({
+          autoClose: 5000,
+          message: t('notifications.depositReceivedMessage'),
+          title: t('notifications.depositReceived'),
+          type: 'success',
+        })
+        setLastDeposit(highestBlockDeposit?.confirmation_time?.height ?? 0)
+      }
+    }
+
+    checkDeposits()
+  }, [data, error, shouldPoll, lastDeposit, isFetching, addNotification, t])
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      setIsShuttingDown(true)
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    // Listen for Tauri shutdown events
+    const setupShutdownListeners = async () => {
+      const unlistenCloseConfirm = await listen('confirm-app-close', () => {
+        setShowCloseConfirmModal(true)
+      })
+
+      const unlistenTrigger = await listen<string>(
+        'trigger-shutdown',
+        (event) => {
+          setIsShuttingDown(true)
+          setShutdownStatus(event.payload)
+        }
+      )
+
+      const unlistenStatus = await listen<string>(
+        'update-shutdown-status',
+        (event) => {
+          setShutdownStatus(event.payload)
+        }
+      )
+
+      return () => {
+        unlistenCloseConfirm()
+        unlistenTrigger()
+        unlistenStatus()
+      }
+    }
+
+    const cleanup = setupShutdownListeners()
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      cleanup.then((unsubscribe) => unsubscribe())
+    }
+  }, [])
+
+  const handleTransactionAction = (type: string) => {
+    dispatch(
+      uiSliceActions.setModal({
+        assetId: undefined,
+        type: type as ModalActionType,
+      })
+    )
+  }
+
+  const handleKeepRunningInBackground = async () => {
+    setIsHandlingCloseAction(true)
+    try {
+      setShowCloseConfirmModal(false)
+      await invoke('hide_main_window')
+    } finally {
+      setIsHandlingCloseAction(false)
+    }
+  }
+
+  const handleQuitApp = async () => {
+    setIsHandlingCloseAction(true)
+    try {
+      setShowCloseConfirmModal(false)
+      await invoke('quit_app')
+    } finally {
+      setIsHandlingCloseAction(false)
+    }
+  }
+
+  const handleShutdownAndQuit = async () => {
+    setIsHandlingCloseAction(true)
+    setIsShuttingDown(true)
+    setShutdownStatus('Shutting down local node...')
+    setShowCloseConfirmModal(false)
+
+    try {
+      await invoke('nwc_stop_service').catch(() => undefined)
+      await invoke('shutdown_node_and_quit')
+    } finally {
+      setIsHandlingCloseAction(false)
+    }
+  }
+
+  return (
+    <div className={props.className}>
+      <ShutdownAnimation isVisible={isShuttingDown} status={shutdownStatus} />
+
+      {showCloseConfirmModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md bg-surface-base rounded-xl border border-divider/20 shadow-xl p-6">
+            <h3 className="text-xl font-semibold text-white">
+              {isNodeActive ? 'Close KaleidoSwap?' : 'Quit KaleidoSwap?'}
+            </h3>
+            <p className="text-content-secondary mt-3">
+              {isNodeActive
+                ? 'The local node is still running. You can keep it running in the background or stop it before quitting the app.'
+                : 'The app is ready to quit.'}
+            </p>
+
+            <div className="mt-6 flex flex-col gap-3">
+              {isNodeActive ? (
+                <>
+                  <button
+                    className="w-full px-4 py-3 rounded-md bg-primary text-primary-foreground font-medium disabled:opacity-60"
+                    disabled={isHandlingCloseAction}
+                    onClick={handleKeepRunningInBackground}
+                  >
+                    Keep Running In Background
+                  </button>
+                  <button
+                    className="w-full px-4 py-3 rounded-md bg-red-500/15 text-red-300 border border-red-500/30 font-medium disabled:opacity-60 flex items-center justify-center gap-2"
+                    disabled={isHandlingCloseAction}
+                    onClick={handleShutdownAndQuit}
+                  >
+                    {isHandlingCloseAction ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Stopping Node...</span>
+                      </>
+                    ) : (
+                      'Stop Node And Quit'
+                    )}
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="w-full px-4 py-3 rounded-md bg-primary text-primary-foreground font-medium disabled:opacity-60"
+                  disabled={isHandlingCloseAction}
+                  onClick={handleQuitApp}
+                >
+                  Quit App
+                </button>
+              )}
+
+              <button
+                className="w-full px-4 py-3 rounded-md bg-surface-overlay text-content-secondary font-medium disabled:opacity-60"
+                disabled={isHandlingCloseAction}
+                onClick={() => setShowCloseConfirmModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!shouldHideNavbar && isNodeUnreachable && !isMindRoute && (
+        <div className="fixed bottom-4 right-4 left-4 sm:left-auto z-40 pointer-events-none">
+          <div
+            aria-live="polite"
+            className="pointer-events-auto w-full sm:w-96 max-h-[50vh] overflow-y-auto bg-surface-base rounded-lg border border-red-500/30 shadow-2xl p-4"
+            role="status"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 rounded-lg bg-red-500/15 border border-red-500/25 flex items-center justify-center flex-shrink-0">
+                <Activity className="w-5 h-5 text-red-300" />
+              </div>
+
+              <div className="min-w-0">
+                <h3 className="text-xl font-semibold text-white">
+                  {t('nodeReachability.unresponsiveTitle', {
+                    defaultValue: 'Node response unavailable',
+                  })}
+                </h3>
+                <p className="text-content-secondary mt-2">
+                  {t('nodeReachability.unresponsiveMessage', {
+                    defaultValue:
+                      'The node may be busy processing wallet operations or disconnected. You can keep navigating; balances may be outdated. Check operation history before repeating a payment or asset operation.',
+                  })}
+                </p>
+
+                {nodeReachabilityError && (
+                  <p className="mt-4 text-xs text-red-300 break-words bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                    {nodeReachabilityError}
+                  </p>
+                )}
+
+                <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                  <button
+                    className="px-4 py-3 rounded-md bg-primary text-primary-foreground font-medium disabled:opacity-60 flex items-center justify-center gap-2"
+                    disabled={isRetryingNodeConnection}
+                    onClick={() => {
+                      retryNodeConnection()
+                    }}
+                  >
+                    {isRetryingNodeConnection ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    <span>
+                      {isRetryingNodeConnection
+                        ? t('nodeReachability.checking', {
+                            defaultValue: 'Checking connection…',
+                          })
+                        : t('nodeReachability.retry', {
+                            defaultValue: 'Retry connection',
+                          })}
+                    </span>
+                  </button>
+
+                  <button
+                    className="px-4 py-3 rounded-md bg-surface-overlay text-content-secondary font-medium"
+                    onClick={() => navigate(WALLET_SETUP_PATH)}
+                  >
+                    {t('nodeReachability.changeNode', {
+                      defaultValue: 'Change node',
+                    })}
+                  </button>
+                </div>
+
+                {lastReconnectResult && lastReconnectResult !== 'reachable' && (
+                  <p className="mt-3 text-sm text-content-secondary">
+                    {t('nodeReachability.retryIncomplete', {
+                      defaultValue:
+                        'Check completed without a response. The node may still be busy; automatic checks continue.',
+                    })}
+                  </p>
+                )}
+                <p className="mt-4 flex items-center gap-2 text-xs text-content-tertiary">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  {t('nodeReachability.autoRetrying', {
+                    defaultValue:
+                      'Reconnecting automatically — this will clear as soon as the node responds.',
+                  })}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!shouldHideNavbar ? (
+        <div className="min-h-screen flex m-0 p-0 overflow-x-hidden">
+          {/* Sidebar Navigation */}
+          <div
+            className={`flex flex-col fixed left-0 top-0 h-screen bg-surface-base border-r border-divider/30
+                        transition-all duration-300 ease-in-out z-30 shadow-2xl shadow-black/30
+                        ${isSidebarCollapsed ? 'w-20' : 'w-60'}`}
+          >
+            {/* Logo and collapse button */}
+            <div
+              className={`flex items-center bg-surface-base py-3 px-3 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}
+            >
+              {!isSidebarCollapsed && (
+                <img
+                  alt="KaleidoSwap"
+                  className="h-8 w-auto cursor-pointer transition-all duration-300 hover:scale-105 active:scale-95"
+                  onClick={() => {
+                    navigate(ROOT_PATH)
+                  }}
+                  src={logoFull}
+                />
+              )}
+
+              <button
+                className="p-3 rounded-lg text-content-secondary hover:text-primary
+                           hover:bg-surface-overlay/50 transition-all duration-300
+                           transform hover:scale-110 active:scale-95
+                           ring-1 ring-divider/10 hover:ring-primary/30 flex-shrink-0"
+                onClick={() => {
+                  const next = !isSidebarCollapsed
+                  setIsSidebarCollapsed(next)
+                  localStorage.setItem('sidebarCollapsed', String(next))
+                }}
+              >
+                {isSidebarCollapsed ? (
+                  <ChevronRight size={18} />
+                ) : (
+                  <ChevronLeft size={18} />
+                )}
+              </button>
+            </div>
+
+            {/* Main navigation — grouped into Node / Mind categories */}
+            <div className="flex-1 overflow-y-auto pt-3 px-3">
+              {NAV_SECTIONS.map((section, sectionIndex) => {
+                const sectionEnabled =
+                  section.key === 'node'
+                    ? nodeSectionEnabled
+                    : mindSectionEnabled
+                const activate = () => {
+                  if (section.key === 'mind') {
+                    // Mind needs no setup — enable it and jump straight in.
+                    dispatch(setAppMode('both'))
+                    navigate(KALEIDO_MIND_PATH)
+                  } else {
+                    // Node needs onboarding — send the user to the welcome.
+                    navigate(ROOT_PATH)
+                  }
+                }
+                const ActivateIcon = section.key === 'node' ? Server : Brain
+                return (
+                  <div
+                    className={sectionIndex > 0 ? 'mt-6' : ''}
+                    key={section.label}
+                  >
+                    {isSidebarCollapsed ? (
+                      sectionIndex > 0 && (
+                        <div className="my-3 mx-2 border-t border-divider/20" />
+                      )
+                    ) : (
+                      <div className="px-4 mb-2 text-[0.68rem] font-bold uppercase tracking-wider text-content-tertiary">
+                        {section.label}
+                      </div>
+                    )}
+                    {sectionEnabled ? (
+                      <div className="space-y-1.5">
+                        {section.items.map((item) => (
+                          <SidebarNavItem
+                            isActive={isItemActive(item)}
+                            isCollapsed={isSidebarCollapsed}
+                            item={item}
+                            key={item.to ?? item.label}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <button
+                        className={`group flex w-full items-center rounded-xl border border-dashed border-border-strong py-3 px-4 text-content-secondary transition-all duration-300 hover:border-primary/40 hover:text-white hover:bg-surface-overlay/60
+                          ${isSidebarCollapsed ? 'justify-center' : 'justify-start space-x-3'}`}
+                        onClick={activate}
+                        title={
+                          isSidebarCollapsed
+                            ? t('navigation.activate', {
+                                defaultValue: 'Activate {{name}}',
+                                name: section.label,
+                              })
+                            : undefined
+                        }
+                        type="button"
+                      >
+                        <ActivateIcon className="w-5 h-5 flex-shrink-0" />
+                        {!isSidebarCollapsed && (
+                          <span className="text-sm font-semibold">
+                            {t('navigation.activate', {
+                              defaultValue: 'Activate {{name}}',
+                              name: section.label,
+                            })}
+                          </span>
+                        )}
+                        {!isSidebarCollapsed && (
+                          <Plus className="w-4 h-4 ml-auto opacity-60 group-hover:opacity-100" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="px-4 py-3 border-t border-divider/20">
+              <SidebarNavItem
+                isActive={location.pathname.startsWith(SETTINGS_PATH)}
+                isCollapsed={isSidebarCollapsed}
+                item={{
+                  icon: <Settings className="w-5 h-5" />,
+                  label: t('navigation.settings'),
+                  to: SETTINGS_PATH,
+                }}
+              />
+            </div>
+
+            {/* Quick action buttons — node-only, hidden in KaleidoMind-only mode */}
+            {!isSidebarCollapsed && Boolean(nodeSettingsData?.name) && (
+              <div className="px-4 pb-6 pt-[25px] bg-surface-base">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    className="flex items-center justify-center gap-2 py-3 px-3 rounded-lg
+                               bg-status-success/15 hover:bg-status-success/25
+                               border border-status-success/30 text-status-success
+                               font-semibold text-sm transition-all duration-200
+                               transform hover:scale-[1.02] active:scale-[0.98]"
+                    onClick={() => handleTransactionAction('deposit')}
+                  >
+                    <Download className="w-4 h-4 flex-shrink-0" />
+                    {t('actions.deposit')}
+                  </button>
+                  <button
+                    className="flex items-center justify-center gap-2 py-3 px-3 rounded-lg
+                               bg-violet-500/15 hover:bg-violet-500/25
+                               border border-violet-500/30 text-violet-400
+                               font-semibold text-sm transition-all duration-200
+                               transform hover:scale-[1.02] active:scale-[0.98]"
+                    onClick={() => handleTransactionAction('withdraw')}
+                  >
+                    <Upload className="w-4 h-4 flex-shrink-0" />
+                    {t('actions.withdraw')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* App version info */}
+            <div className="px-4 pb-4 relative bg-surface-base">
+              <AppVersion
+                className="border-t border-divider/10 pt-3"
+                isCollapsed={isSidebarCollapsed}
+              />
+            </div>
+          </div>
+
+          {/* Main content */}
+          <main
+            className={`flex-1 flex flex-col ${isMindRoute ? 'h-screen min-h-0' : 'min-h-screen'} max-w-full overflow-x-hidden bg-surface-raised transition-all duration-300
+                        ${isSidebarCollapsed ? 'ml-20' : 'ml-60'}`}
+          >
+            {/* Top bar with page title and user profile */}
+            <div
+              className="sticky top-0 z-30 shrink-0 bg-surface-base border-b border-divider/20 px-4 py-2
+                          shadow-lg shadow-black/20"
+            >
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4 animate-fadeInUp">
+                  {(() => {
+                    // Get the current page icon and title
+                    const mainNavItem = MAIN_NAV_ITEMS.find((item) =>
+                      isItemActive(item)
+                    )
+
+                    const pageConfig = PAGE_CONFIG[location.pathname]
+                    const icon = pageConfig?.icon || mainNavItem?.icon
+                    const title =
+                      pageConfig?.title || mainNavItem?.label || 'Dashboard'
+
+                    return (
+                      <>
+                        <div
+                          className="p-3 bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl text-primary
+                                      shadow-lg shadow-primary/10 ring-1 ring-primary/20"
+                        >
+                          {icon}
+                        </div>
+                        <h1 className="text-xl font-semibold text-white tracking-tight">
+                          {title}
+                        </h1>
+                      </>
+                    )
+                  })()}
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  {/* User profile */}
+                  <UserProfile
+                    dropdownAlign="right"
+                    isCollapsed={false}
+                    onLogout={() => setShowLogoutModal(true)}
+                    onSupportClick={() => setShowSupportModal(true)}
+                  />
+
+                  {/* Quick action dropdown menus - only show on smaller screens */}
+                  <div className="md:hidden flex items-center space-x-2">
+                    <DropdownMenu
+                      icon={<Activity className="w-5 h-5" />}
+                      isOpen={isChannelMenuOpen}
+                      items={CHANNEL_MENU_ITEMS}
+                      menuRef={channelMenuRef}
+                      onItemClick={() => {}} // Add empty function to satisfy the type
+                      setIsOpen={setIsChannelMenuOpen}
+                      title={t('navigation.channels')}
+                    />
+
+                    <DropdownMenu
+                      icon={<ArrowDownLeft className="w-5 h-5" />}
+                      isOpen={isTransactionMenuOpen}
+                      items={TRANSACTION_MENU_ITEMS}
+                      menuRef={transactionMenuRef}
+                      onItemClick={(item: any) =>
+                        handleTransactionAction(item.action)
+                      }
+                      setIsOpen={setIsTransactionMenuOpen}
+                      title={t('actions.quickActions')}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Main content area */}
+            <div
+              className={`relative isolate flex-1 overflow-hidden ${isMindRoute ? 'min-h-0 p-3' : 'p-4'}`}
+              id="content-area"
+            >
+              {/* Portal target for modals — absolute inset-0 so modals cover only this area.
+                  When empty it must not intercept clicks on the content underneath; the
+                  `#modal-portal:empty` rule in styles.css disables pointer events until a
+                  modal is portaled in. */}
+              <div className="absolute inset-0 z-50" id="modal-portal" />
+              {props.children}
+            </div>
+          </main>
+        </div>
+      ) : (
+        // For setup and other paths that hide the navbar
+        <div className="h-screen flex flex-col overflow-hidden">
+          {props.children}
+        </div>
+      )}
+
+      {/* Support Modal */}
+      <SupportModal
+        isOpen={showSupportModal}
+        onClose={() => setShowSupportModal(false)}
+      />
+
+      {/* Logout Modal */}
+      <LogoutModal
+        isLoggingOut={isLoggingOut}
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleLogout}
+      />
+
+      <ToastContainer
+        autoClose={5000}
+        closeOnClick={false}
+        draggable={false}
+        hideProgressBar={false}
+        limit={3}
+        newestOnTop={false}
+        pauseOnFocusLoss={false}
+        pauseOnHover={false}
+        position="bottom-right"
+        rtl={false}
+        theme="dark"
+      />
+
+      {/* Add LayoutModal for deposit/withdraw functionality */}
+      <LayoutModal />
+    </div>
+  )
+}

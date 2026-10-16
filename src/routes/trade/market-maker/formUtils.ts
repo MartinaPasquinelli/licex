@@ -1,0 +1,184 @@
+import { ChangeEvent } from 'react'
+import { UseFormReturn } from 'react-hook-form'
+
+import { formatNumberInput } from '../../../helpers/number'
+
+import { Fields } from './types'
+
+/** Creates a handler function for from amount changes */
+export const createFromAmountChangeHandler = (
+  form: UseFormReturn<Fields>,
+  getAssetPrecision: (asset: string) => number,
+  setDebouncedFromAmount?: (value: string) => void,
+  _maxAmount?: number
+) => {
+  return (e: ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target
+    const fromAsset = form.getValues().fromAsset
+    const precision = getAssetPrecision(fromAsset)
+
+    // Get current cursor position before formatting
+    const cursorPosition = e.target.selectionStart || 0
+
+    // Count commas before cursor position to adjust cursor later
+    const commasBeforeCursor = (
+      value.substring(0, cursorPosition).match(/,/g) || []
+    ).length
+
+    // First, remove any non-numeric characters except decimal point
+    let cleanValue = value.replace(/[^\d.]/g, '')
+
+    // Ensure only one decimal point
+    const decimalPoints = cleanValue.match(/\./g)
+    if (decimalPoints && decimalPoints.length > 1) {
+      cleanValue = cleanValue.replace(/\./g, (match, index) =>
+        index === cleanValue.indexOf('.') ? match : ''
+      )
+    }
+
+    // Split into integer and decimal parts
+    const parts = cleanValue.split('.')
+    const integerPart = parts[0]
+    let decimalPart = parts[1] || ''
+
+    // Limit decimal places to asset precision
+    if (decimalPart.length > precision) {
+      decimalPart = decimalPart.slice(0, precision)
+    }
+
+    // Reconstruct the value
+    cleanValue = integerPart + (decimalPart ? '.' + decimalPart : '')
+
+    // Convert to number for comparison and validation
+    const numericValue = parseFloat(cleanValue) || 0
+
+    // Prevent negative values explicitly
+    if (numericValue < 0) {
+      cleanValue = '0'
+    }
+
+    // Format the value with proper number formatting (no clamping — warnings shown separately)
+    const formattedValue = formatNumberInput(cleanValue, precision)
+
+    // Set the formatted value in the form
+    form.setValue('from', formattedValue, { shouldValidate: true })
+
+    // Store the debounced value for later processing if provided
+    if (setDebouncedFromAmount) {
+      setDebouncedFromAmount(formattedValue)
+    }
+
+    // Schedule cursor position adjustment for after React re-renders the input
+    setTimeout(() => {
+      const input = document.querySelector(
+        'input[value="' + formattedValue + '"]'
+      ) as HTMLInputElement
+      if (input) {
+        // Count new commas before the original cursor position
+        const newCommasBeforeCursor = (
+          formattedValue.substring(0, cursorPosition).match(/,/g) || []
+        ).length
+
+        // Adjust cursor position based on difference in commas
+        const newPosition =
+          cursorPosition + (newCommasBeforeCursor - commasBeforeCursor)
+
+        // Set cursor position
+        input.setSelectionRange(newPosition, newPosition)
+      }
+    }, 0)
+  }
+}
+
+/** Creates a handler function for to amount changes */
+export const createToAmountChangeHandler = (
+  form: UseFormReturn<Fields>,
+  getAssetPrecision: (asset: string) => number,
+  maxAmount?: number
+) => {
+  return (e: ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target
+    const toAsset = form.getValues().toAsset
+    const precision = getAssetPrecision(toAsset)
+
+    // Allow empty value (user clearing the field)
+    if (!value || value.trim() === '') {
+      form.setValue('to', '', { shouldValidate: true })
+      return
+    }
+
+    // Remove any non-numeric characters except decimal point
+    let cleanValue = value.replace(/[^\d.]/g, '')
+
+    // Ensure only one decimal point
+    const decimalPoints = cleanValue.match(/\./g)
+    if (decimalPoints && decimalPoints.length > 1) {
+      cleanValue = cleanValue.replace(/\./g, (match, index) =>
+        index === cleanValue.indexOf('.') ? match : ''
+      )
+    }
+
+    // Split into integer and decimal parts
+    const parts = cleanValue.split('.')
+    const integerPart = parts[0]
+    let decimalPart = parts[1]
+
+    // Limit decimal places to asset precision (but allow typing decimal point)
+    if (decimalPart !== undefined && precision > 0) {
+      if (decimalPart.length > precision) {
+        decimalPart = decimalPart.slice(0, precision)
+      }
+      cleanValue = integerPart + '.' + decimalPart
+    } else if (decimalPart !== undefined && precision === 0) {
+      // No decimals allowed for this asset
+      cleanValue = integerPart
+    } else {
+      cleanValue = integerPart
+    }
+
+    // Preserve trailing decimal point while typing
+    if (value.endsWith('.') && precision > 0 && !cleanValue.includes('.')) {
+      cleanValue += '.'
+    }
+
+    const numericValue = parseFloat(cleanValue) || 0
+
+    if (numericValue < 0) {
+      cleanValue = '0'
+    }
+
+    // Clamp to max amount if set (maxAmount is in base units, convert to display)
+    if (maxAmount !== undefined && maxAmount > 0) {
+      const maxInDisplayUnits = maxAmount / Math.pow(10, precision)
+      if (numericValue > maxInDisplayUnits) {
+        const formattedMax = formatNumberInput(
+          maxInDisplayUnits.toFixed(precision),
+          precision
+        )
+        form.setValue('to', formattedMax, { shouldValidate: true })
+        return
+      }
+    }
+
+    const formattedValue = formatNumberInput(cleanValue, precision)
+    form.setValue('to', formattedValue, { shouldValidate: true })
+  }
+}
+
+/** Format a number with commas for better display (like 1,000,000) */
+export const formatNumberWithCommas = (value: number | string): string => {
+  if (typeof value === 'string' && !value) return ''
+
+  // Parse to ensure we're working with a number
+  const numValue = typeof value === 'string' ? parseFloat(value) : value
+  if (isNaN(numValue)) return ''
+
+  // Format with comma separators
+  return numValue.toLocaleString('en-US')
+}
+
+/** Parse a display value with commas back to a numeric string format */
+export const parseFormattedNumber = (value: string): string => {
+  // Remove all non-numeric characters except decimal point
+  return value.replace(/[^\d.]/g, '')
+}

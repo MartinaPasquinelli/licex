@@ -1,0 +1,481 @@
+import { FetchBaseQueryError } from '@reduxjs/toolkit/query'
+
+/**
+ * Shared utilities for channel ordering
+ * Used by both order-new-channel and market-maker pages
+ */
+
+export interface AssetInfo {
+  name: string
+  ticker: string
+  asset_id: string
+  precision: number
+  min_initial_client_amount: number
+  max_initial_client_amount: number
+  min_initial_lsp_amount: number
+  max_initial_lsp_amount: number
+  min_channel_amount: number
+  max_channel_amount: number
+}
+
+export interface LspOptions {
+  min_required_channel_confirmations: number
+  min_funding_confirms_within_blocks: number
+  min_onchain_payment_confirmations?: number | null
+  supports_zero_channel_reserve: boolean
+  min_onchain_payment_size_sat?: number | null
+  max_channel_expiry_blocks: number
+  min_initial_client_balance_sat?: number | null
+  max_initial_client_balance_sat?: number | null
+  min_initial_lsp_balance_sat?: number | null
+  max_initial_lsp_balance_sat?: number | null
+  min_channel_balance_sat?: number | null
+  max_channel_balance_sat?: number | null
+}
+
+export interface ChannelOrderPayload {
+  announce_channel: boolean
+  channel_expiry_blocks: number
+  client_balance_sat: number
+  client_pubkey: string
+  funding_confirms_within_blocks: number
+  lsp_balance_sat: number
+  refund_onchain_address: string
+  required_channel_confirmations: number
+  asset_id?: string
+  lsp_asset_amount?: number
+  client_asset_amount?: number
+  rfq_id?: string
+}
+
+export interface CreateChannelOrderParams {
+  capacitySat: number
+  clientBalanceSat: number
+  channelExpireBlocks: number
+  assetId?: string
+  lspAssetAmount?: number // LSP's asset amount (inbound liquidity for receiving)
+  clientAssetAmount?: number // Client's asset amount (for buying assets in market maker)
+  clientPubKey: string
+  addressRefund: string
+  lspOptions?: LspOptions
+  rfqId?: string
+}
+
+export type ChannelOrderPaymentMethod = 'lightning' | 'onchain'
+/**
+ * `funded`: the LSP reported a failure but already funded the channel on-chain.
+ * The channel finishes opening once the LSP is back online, so the user must
+ * not be told the order failed or be offered to pay again.
+ */
+export type ChannelOrderTerminalStatus =
+  'success' | 'error' | 'expired' | 'funded'
+
+interface ChannelOrderPaymentLike {
+  expires_at?: string | null
+  state?: string | null
+}
+
+export interface ChannelOrderStatusLike {
+  access_token?: string | null
+  channel?: unknown | null
+  created_at?: string | null
+  order_state?: string | null
+  state?: string | null
+  status?: string | null
+  token?: string | null
+  payment?: {
+    bolt11?: ChannelOrderPaymentLike | null
+    onchain?: ChannelOrderPaymentLike | null
+  } | null
+}
+
+export interface ChannelOrderPaymentSnapshot {
+  actualPaymentState: string | null
+  bolt11State: string | null
+  onchainState: string | null
+  paymentMethod: ChannelOrderPaymentMethod | null
+  paymentReceived: boolean
+}
+
+const PAYMENT_RECEIVED_STATES = ['HOLD', 'PAID'] as const
+const NO_PAYMENT_MADE_STATES = ['EXPECT_PAYMENT', 'TIMEOUT', 'EXPIRED'] as const
+
+const normalizeOrderState = (state?: string | null): string | null =>
+  state ? state.trim().toUpperCase() : null
+
+const isPaymentReceivedState = (state?: string | null): boolean =>
+  PAYMENT_RECEIVED_STATES.includes(normalizeOrderState(state) as any)
+
+const getChannelOrderState = (
+  order: ChannelOrderStatusLike | null | undefined
+): string | null =>
+  normalizeOrderState(order?.order_state ?? order?.state ?? order?.status)
+
+export const getChannelOrderAccessToken = (
+  order: ChannelOrderStatusLike | null | undefined
+): string | null => order?.access_token || order?.token || null
+
+/** Helper function to extract meaningful error messages */
+export const extractErrorMessage = (error: any): string => {
+  // Handle string errors
+  if (typeof error === 'string') {
+    return error
+  }
+
+  // Handle object errors with nested structures
+  if (typeof error === 'object' && error !== null) {
+    // Common error message fields
+    const possibleFields = ['error', 'message', 'detail', 'description', 'msg']
+
+    for (const field of possibleFields) {
+      if (error[field] && typeof error[field] === 'string') {
+        return error[field]
+      }
+    }
+
+    // Check for nested error objects
+    if (error.error && typeof error.error === 'object') {
+      return extractErrorMessage(error.error)
+    }
+
+    // If it's an array, try to extract from the first element
+    if (Array.isArray(error) && error.length > 0) {
+      return extractErrorMessage(error[0])
+    }
+
+    // Last resort: stringify the object but limit length
+    const stringified = JSON.stringify(error)
+    return stringified.length > 200
+      ? stringified.substring(0, 200) + '...'
+      : stringified
+  }
+
+  return 'Unknown error format'
+}
+
+/** Builds a channel order payload from parameters */
+export const buildChannelOrderPayload = (
+  params: CreateChannelOrderParams
+): ChannelOrderPayload => {
+  const {
+    capacitySat,
+    clientBalanceSat,
+    channelExpireBlocks,
+    assetId,
+    lspAssetAmount,
+    clientAssetAmount,
+    clientPubKey,
+    addressRefund,
+    lspOptions,
+    rfqId,
+  } = params
+
+  const payload: ChannelOrderPayload = {
+    announce_channel: true,
+    channel_expiry_blocks: channelExpireBlocks,
+    client_balance_sat: clientBalanceSat,
+    client_pubkey: clientPubKey,
+    funding_confirms_within_blocks:
+      lspOptions?.min_funding_confirms_within_blocks || 1,
+    lsp_balance_sat: capacitySat - clientBalanceSat,
+    refund_onchain_address: addressRefund,
+    required_channel_confirmations:
+      lspOptions?.min_required_channel_confirmations || 3,
+  }
+
+  if (assetId) {
+    payload.asset_id = assetId
+
+    // LSP's portion (inbound liquidity for receiving/buying)
+    if (lspAssetAmount && lspAssetAmount > 0) {
+      payload.lsp_asset_amount = lspAssetAmount
+    }
+
+    // Client asset amount (for buying assets in market maker)
+    if (clientAssetAmount && clientAssetAmount > 0) {
+      payload.client_asset_amount = clientAssetAmount
+    }
+
+    // Add rfq_id if provided (required when buying assets)
+    if (rfqId) {
+      payload.rfq_id = rfqId
+    }
+  }
+
+  return payload
+}
+
+/** Formats error message from RTK Query error */
+export const formatRtkQueryError = (error: FetchBaseQueryError): string => {
+  let errorMessage = 'An error occurred while creating the channel order'
+
+  if ('status' in error) {
+    const fetchError = error as FetchBaseQueryError
+
+    // Handle different status codes and error structures
+    if (fetchError.status === 'FETCH_ERROR') {
+      errorMessage =
+        'Network error: Unable to connect to the LSP server. Please check your internet connection and LSP server status.'
+    } else if (fetchError.status === 'TIMEOUT_ERROR') {
+      errorMessage =
+        'Request timeout: The LSP server took too long to respond. Please try again.'
+    } else if (fetchError.status === 'PARSING_ERROR') {
+      errorMessage =
+        'Response parsing error: Invalid data received from the LSP server.'
+    } else if (typeof fetchError.status === 'number') {
+      // HTTP status errors with improved error extraction
+      const extractedError = fetchError.data
+        ? extractErrorMessage(fetchError.data)
+        : null
+
+      if (fetchError.status >= 400 && fetchError.status < 500) {
+        // Client errors (4xx)
+        const baseMessage = `Request error (${fetchError.status})`
+        if (extractedError && extractedError !== 'Unknown error format') {
+          errorMessage = `${baseMessage}: ${extractedError}`
+        } else {
+          // Provide specific messages for common 4xx errors
+          switch (fetchError.status) {
+            case 400:
+              errorMessage = `${baseMessage}: Invalid request parameters. Please check your input and try again.`
+              break
+            case 401:
+              errorMessage = `${baseMessage}: Authentication required. Please check your LSP credentials.`
+              break
+            case 403:
+              errorMessage = `${baseMessage}: Access forbidden. You may not have permission to create orders.`
+              break
+            case 404:
+              errorMessage = `${baseMessage}: LSP endpoint not found. Please check the LSP server configuration.`
+              break
+            case 422:
+              errorMessage = `${baseMessage}: Invalid order data. Please verify your channel parameters.`
+              break
+            case 429:
+              errorMessage = `${baseMessage}: Too many requests. Please wait a moment and try again.`
+              break
+            default:
+              errorMessage = `${baseMessage}: Client request error. Please check your input.`
+          }
+        }
+      } else if (fetchError.status >= 500) {
+        // Server errors (5xx)
+        errorMessage = `Server error (${fetchError.status}): The LSP server is experiencing issues. Please try again later.`
+        if (extractedError && extractedError !== 'Unknown error format') {
+          errorMessage += ` Details: ${extractedError}`
+        }
+      } else {
+        errorMessage = `HTTP error (${fetchError.status}): An unexpected error occurred`
+        if (extractedError && extractedError !== 'Unknown error format') {
+          errorMessage += `: ${extractedError}`
+        }
+      }
+    } else {
+      // Non-numeric status (FETCH_ERROR, etc.)
+      errorMessage = `Network error: ${fetchError.status || 'Unknown network issue'}`
+    }
+  }
+
+  return errorMessage
+}
+
+export const getChannelOrderPaymentSnapshot = (
+  order: ChannelOrderStatusLike | null | undefined
+): ChannelOrderPaymentSnapshot => {
+  const bolt11State = order?.payment?.bolt11?.state ?? null
+  const onchainState = order?.payment?.onchain?.state ?? null
+
+  const actualPaymentState = isPaymentReceivedState(bolt11State)
+    ? bolt11State
+    : isPaymentReceivedState(onchainState)
+      ? onchainState
+      : bolt11State || onchainState
+
+  const paymentMethod = isPaymentReceivedState(bolt11State)
+    ? 'lightning'
+    : isPaymentReceivedState(onchainState)
+      ? 'onchain'
+      : null
+
+  return {
+    actualPaymentState,
+    bolt11State,
+    onchainState,
+    paymentMethod,
+    paymentReceived: isPaymentReceivedState(actualPaymentState),
+  }
+}
+
+export const getChannelOrderFailureStatus = (
+  order: ChannelOrderStatusLike | null | undefined,
+  now = Date.now()
+): Extract<ChannelOrderTerminalStatus, 'error' | 'expired'> => {
+  const bolt11ExpiresAt = order?.payment?.bolt11?.expires_at
+    ? new Date(order.payment.bolt11.expires_at).getTime()
+    : 0
+  const onchainExpiresAt = order?.payment?.onchain?.expires_at
+    ? new Date(order.payment.onchain.expires_at).getTime()
+    : 0
+
+  const { bolt11State, onchainState } = getChannelOrderPaymentSnapshot(order)
+  const bolt11NoPayment = bolt11State
+    ? NO_PAYMENT_MADE_STATES.includes(normalizeOrderState(bolt11State) as any)
+    : true
+  const onchainNoPayment = onchainState
+    ? NO_PAYMENT_MADE_STATES.includes(normalizeOrderState(onchainState) as any)
+    : true
+
+  const noPaymentMade = bolt11NoPayment && onchainNoPayment
+  const isPastExpiry =
+    (bolt11ExpiresAt > 0 && now > bolt11ExpiresAt) ||
+    (onchainExpiresAt > 0 && now > onchainExpiresAt)
+
+  return noPaymentMade || isPastExpiry ? 'expired' : 'error'
+}
+
+/** Whether the LSP reports a channel that already has a funding transaction. */
+export const hasFundedChannel = (
+  order: ChannelOrderStatusLike | null | undefined
+): boolean => {
+  const channel = order?.channel as
+    | { funding_outpoint?: string | null; funded_at?: string | null }
+    | null
+    | undefined
+  return Boolean(channel?.funding_outpoint || channel?.funded_at)
+}
+
+/** LSP order state, with a failed order whose channel is funded reported as FUNDED. */
+export const getChannelOrderDisplayState = (
+  order: ChannelOrderStatusLike | null | undefined
+): string | null => {
+  const orderState = getChannelOrderState(order)
+  return orderState === 'FAILED' && hasFundedChannel(order)
+    ? 'FUNDED'
+    : orderState
+}
+
+export const getChannelOrderTerminalStatus = (
+  order: ChannelOrderStatusLike | null | undefined,
+  now = Date.now()
+): ChannelOrderTerminalStatus | null => {
+  const orderState = getChannelOrderState(order)
+
+  if (
+    orderState === 'COMPLETED' ||
+    orderState === 'COMPLETE' ||
+    orderState === 'SUCCESS' ||
+    orderState === 'SUCCEEDED'
+  ) {
+    return 'success'
+  }
+
+  if (
+    orderState === 'FAILED' ||
+    orderState === 'ERROR' ||
+    orderState === 'EXPIRED'
+  ) {
+    if (hasFundedChannel(order)) return 'funded'
+    return getChannelOrderFailureStatus(order, now)
+  }
+
+  return null
+}
+
+/** Validates channel parameters against LSP options */
+export const validateChannelParams = (
+  params: CreateChannelOrderParams,
+  assets: AssetInfo[],
+  effectiveMinCapacity: number,
+  effectiveMaxCapacity: number
+): { isValid: boolean; error?: string } => {
+  const {
+    capacitySat,
+    clientBalanceSat,
+    channelExpireBlocks,
+    assetId,
+    lspAssetAmount,
+    lspOptions,
+  } = params
+
+  // Validate channel capacity
+  if (capacitySat < effectiveMinCapacity) {
+    return {
+      error: `Channel capacity must be at least ${effectiveMinCapacity.toLocaleString()} sats`,
+      isValid: false,
+    }
+  }
+  if (capacitySat > effectiveMaxCapacity) {
+    return {
+      error: `Channel capacity cannot exceed ${effectiveMaxCapacity.toLocaleString()} sats`,
+      isValid: false,
+    }
+  }
+
+  // Validate client balance
+  if (
+    lspOptions &&
+    clientBalanceSat < (lspOptions.min_initial_client_balance_sat ?? 0)
+  ) {
+    return {
+      error: `Your channel liquidity must be at least ${lspOptions.min_initial_client_balance_sat} sats`,
+      isValid: false,
+    }
+  }
+  if (
+    lspOptions &&
+    clientBalanceSat > (lspOptions.max_initial_client_balance_sat ?? 0)
+  ) {
+    return {
+      error: `Your channel liquidity cannot exceed ${lspOptions.max_initial_client_balance_sat} sats`,
+      isValid: false,
+    }
+  }
+  if (clientBalanceSat > capacitySat) {
+    return {
+      error: 'Client balance cannot be greater than capacity',
+      isValid: false,
+    }
+  }
+
+  // Validate channel expiry
+  if (
+    lspOptions &&
+    channelExpireBlocks > lspOptions.max_channel_expiry_blocks
+  ) {
+    return {
+      error: `Channel expiry cannot exceed ${lspOptions.max_channel_expiry_blocks} blocks`,
+      isValid: false,
+    }
+  }
+
+  // Validate asset if selected
+  if (assetId) {
+    const selectedAsset = assets.find((asset) => asset.asset_id === assetId)
+
+    // Check if asset is supported by LSP
+    if (!selectedAsset) {
+      return {
+        error: `Asset ${assetId} is not supported by this LSP. Please select a different asset or check the LSP's supported assets list.`,
+        isValid: false,
+      }
+    }
+
+    // Validate LSP asset amount if provided
+    if (lspAssetAmount && lspAssetAmount > 0) {
+      if (lspAssetAmount < selectedAsset.min_channel_amount) {
+        return {
+          error: `Asset amount must be at least ${selectedAsset.min_channel_amount / Math.pow(10, selectedAsset.precision)} ${selectedAsset.ticker}`,
+          isValid: false,
+        }
+      }
+      if (lspAssetAmount > selectedAsset.max_channel_amount) {
+        return {
+          error: `Asset amount cannot exceed ${selectedAsset.max_channel_amount / Math.pow(10, selectedAsset.precision)} ${selectedAsset.ticker}`,
+          isValid: false,
+        }
+      }
+    }
+  }
+
+  return { isValid: true }
+}

@@ -1,0 +1,459 @@
+import { TFunction } from 'i18next'
+import { ChangeEvent } from 'react'
+import { UseFormReturn } from 'react-hook-form'
+import { toast } from 'react-toastify'
+
+import { webSocketService } from '../../../app/hubs/websocketService'
+import { TradingPair } from '../../../slices/makerApi/makerApi.slice'
+import { NiaAsset } from './types'
+import { logger } from '../../../utils/logger'
+
+import { mapAssetIdToTicker, mapTickerToAssetId } from './assetUtils'
+import { Fields } from './types'
+
+// Timing control variables for quote requests - updated to 500ms as requested
+let lastQuoteRequestTime = 0
+let lastRequestedQuoteKey = ''
+let lastQuoteErrorToastTime = 0
+let quoteRequestTimer: any = null
+let globalDebouncedQuoteTimer: any = null
+const QUOTE_REQUEST_DEBOUNCE_MS = 500 // Changed from 1000ms to 500ms as requested
+const QUOTE_REQUEST_RATE_LIMIT_MS = 2000 // Increased from 1000ms to 2000ms for rate limiting
+const ERROR_TOAST_COOLDOWN_MS = 8000 // Increased from 5000ms to 8000ms for less toast spam
+
+/**
+ * Global debounced quote request function that ensures all quote requests
+ * are properly debounced regardless of where they originate
+ */
+export const debouncedQuoteRequest = (
+  requestQuoteFn: () => Promise<void>,
+  delay: number = QUOTE_REQUEST_DEBOUNCE_MS
+) => {
+  // Clear any existing timer
+  if (globalDebouncedQuoteTimer) {
+    clearTimeout(globalDebouncedQuoteTimer)
+  }
+
+  // Set new timer
+  globalDebouncedQuoteTimer = setTimeout(() => {
+    requestQuoteFn().catch((error) => {
+      logger.error('Error in debounced quote request:', error)
+    })
+  }, delay)
+}
+
+/** Clear any pending debounced quote requests */
+export const clearDebouncedQuoteRequest = () => {
+  if (globalDebouncedQuoteTimer) {
+    clearTimeout(globalDebouncedQuoteTimer)
+    globalDebouncedQuoteTimer = null
+  }
+}
+
+/**
+ * Creates a function to handle requesting quotes from the market maker
+ * with built-in debouncing and duplicate request prevention
+ */
+export const createQuoteRequestHandler = (
+  form: UseFormReturn<Fields>,
+  parseAssetAmount: (
+    amount: string | undefined | null,
+    asset: string
+  ) => number,
+  assets: NiaAsset[],
+  tradingPairs: TradingPair[],
+  setIsQuoteLoading?: (loading: boolean) => void,
+  setIsToAmountLoading?: (loading: boolean) => void,
+  hasValidQuote?: () => boolean,
+  maxFromAmount?: number,
+  minFromAmount?: number,
+  t?: TFunction
+) => {
+  return async () => {
+    // Skip if trading pairs haven't been loaded yet - prevents race condition on initialization
+    // Trading pairs are needed for asset mapping, especially for assets the user doesn't own yet
+    if (!tradingPairs || tradingPairs.length === 0) {
+      logger.debug('Trading pairs not yet loaded, skipping quote request')
+      return
+    }
+
+    const fromAssetTicker = form.getValues().fromAsset
+    const toAssetTicker = form.getValues().toAsset
+    const fromAmountStr = form.getValues().from
+
+    // Skip if either asset is not set
+    if (!fromAssetTicker || !toAssetTicker) {
+      return
+    }
+
+    // Skip if assets are the same (prevents "Cannot swap an asset for itself" errors)
+    if (fromAssetTicker === toAssetTicker) {
+      return
+    }
+
+    // Skip if amount is not set or is zero
+    if (!fromAmountStr || fromAmountStr === '0') {
+      form.setValue('to', '') // Clear 'to' field if 'from' is empty
+      return
+    }
+
+    // Parse the amount
+    const fromAmount = parseAssetAmount(fromAmountStr, fromAssetTicker)
+    if (fromAmount <= 0) {
+      return
+    }
+
+    // Check if available balance is zero - don't request quote
+    if (maxFromAmount !== undefined && maxFromAmount === 0) {
+      logger.debug(
+        `Available balance is zero for ${fromAssetTicker}, skipping quote request`
+      )
+      if (setIsQuoteLoading) {
+        setIsQuoteLoading(false)
+      }
+      if (setIsToAmountLoading) {
+        setIsToAmountLoading(false)
+      }
+      form.setValue('to', '') // Clear 'to' field since we can't trade
+      return
+    }
+
+    // Check if amount is below minimum or if balance is insufficient
+    if (minFromAmount !== undefined) {
+      if (fromAmount < minFromAmount) {
+        // Amount is below minimum - don't request quote
+        logger.debug(
+          `Amount (${fromAmount}) is below minimum required (${minFromAmount}), skipping quote request`
+        )
+        if (setIsQuoteLoading) {
+          setIsQuoteLoading(false)
+        }
+        if (setIsToAmountLoading) {
+          setIsToAmountLoading(false)
+        }
+        form.setValue('to', '') // Clear 'to' field since we can't trade
+        return
+      }
+    }
+
+    // Check if the user's balance is below the minimum required amount
+    if (maxFromAmount !== undefined && minFromAmount !== undefined) {
+      if (maxFromAmount < minFromAmount) {
+        // User's balance is below minimum - don't request quote
+        logger.debug(
+          `Available balance (${maxFromAmount}) is below minimum required (${minFromAmount}), skipping quote request`
+        )
+        if (setIsQuoteLoading) {
+          setIsQuoteLoading(false)
+        }
+        if (setIsToAmountLoading) {
+          setIsToAmountLoading(false)
+        }
+        form.setValue('to', '') // Clear 'to' field since we can't trade
+        return
+      }
+    }
+
+    // Create a unique key for this quote request (using tickers for consistency with previous logic)
+    const quoteKey = `${fromAssetTicker}/${toAssetTicker}/${fromAmount}/from`
+
+    // Skip if this is the exact same quote we just requested
+    if (quoteKey === lastRequestedQuoteKey) {
+      const timeSinceLastRequest = Date.now() - lastQuoteRequestTime
+      if (timeSinceLastRequest < QUOTE_REQUEST_RATE_LIMIT_MS) {
+        // Rate limiting - no need to log this frequently
+        return
+      }
+    }
+
+    // Only set loading states if we don't already have a valid quote
+    // This prevents blocking users who have valid quotes while background updates happen
+    const currentlyHasValidQuote = hasValidQuote ? hasValidQuote() : false
+
+    if (!currentlyHasValidQuote) {
+      if (setIsQuoteLoading) {
+        setIsQuoteLoading(true)
+      }
+      if (setIsToAmountLoading) {
+        setIsToAmountLoading(true)
+      }
+    }
+
+    // Send the request immediately, passing tickers, assets, and trading pairs
+    // Handle async request without blocking
+    const sent = await sendQuoteRequest(
+      fromAssetTicker,
+      toAssetTicker,
+      fromAmount,
+      assets,
+      tradingPairs,
+      t
+    )
+    if (!sent) {
+      setIsQuoteLoading?.(false)
+      setIsToAmountLoading?.(false)
+    }
+  }
+}
+
+/** Helper function to actually send the quote request */
+const sendQuoteRequest = async (
+  fromAssetTicker: string,
+  toAssetTicker: string,
+  amount: number, // Amount in standard units (e.g., sats for BTC, base units for RGB)
+  assets: NiaAsset[],
+  tradingPairs: TradingPair[],
+  t?: TFunction,
+  direction: 'from' | 'to' = 'from' // 'to' sends to_amount (reverse quote)
+) => {
+  // The UI uses tickers but the websocket needs asset IDs; trading pairs are
+  // consulted too so assets the user doesn't own yet still resolve.
+  const fromAssetId = mapTickerToAssetId(fromAssetTicker, tradingPairs)
+  const toAssetId = mapTickerToAssetId(toAssetTicker, tradingPairs)
+
+  // Get display tickers for logging/errors
+  const fromDisplayTicker = mapAssetIdToTicker(
+    fromAssetId,
+    assets,
+    tradingPairs
+  )
+  const toDisplayTicker = mapAssetIdToTicker(toAssetId, assets, tradingPairs)
+
+  // Update tracking variables for request rate limiting
+  const requestTime = Date.now() // Capture current time before updating lastQuoteRequestTime
+  lastQuoteRequestTime = requestTime
+  // Key based on tickers, amount, and direction
+  lastRequestedQuoteKey = `${fromAssetTicker}/${toAssetTicker}/${amount}/${direction}`
+
+  // Determine the amount to send in the request.
+  // Convert to millisats for BTC depending on direction.
+  let amountForRequest = amount
+  const amountAssetTicker =
+    direction === 'from' ? fromAssetTicker : toAssetTicker
+  if (amountAssetTicker === 'BTC') {
+    amountForRequest = amount * 1000
+  }
+
+  try {
+    // Only log if assets are different to avoid spam during swapping
+    if (fromAssetTicker !== toAssetTicker) {
+      logger.debug(
+        `Requesting ${direction === 'to' ? 'reverse ' : ''}quote: ${fromDisplayTicker} -> ${toDisplayTicker}, Amount: ${amountForRequest}`
+      )
+    }
+
+    // Send the quote request using resolved asset IDs and the potentially adjusted amount
+    // Now using await since requestQuote is async and includes connection readiness checking
+    const success = await webSocketService.requestQuote(
+      fromAssetId,
+      toAssetId,
+      amountForRequest,
+      direction
+    )
+
+    if (!success) {
+      logger.warn('Failed to send quote request via WebSocket service')
+
+      // Check if WebSocket is not ready for communication
+      if (!webSocketService.isConnectionReadyForCommunication()) {
+        logger.debug('WebSocket connection not ready for quote requests')
+        // The form must clear its loading state even when disconnected.
+        return false
+      }
+
+      // Show error toast only if it's been enough time since the last similar error toast
+      if (Date.now() - lastQuoteErrorToastTime > ERROR_TOAST_COOLDOWN_MS) {
+        const errorMsg = t
+          ? t('tradeMarketMaker.toast.connectionError')
+          : 'Failed to send quote request. Connection may be unstable.'
+        toast.error(errorMsg, {
+          autoClose: 4000, // Increased from 3000ms to 4000ms
+          toastId: 'quote-request-failed',
+        })
+        lastQuoteErrorToastTime = Date.now()
+      }
+    }
+    return success
+  } catch (error) {
+    logger.error('Error in sendQuoteRequest:', error)
+    if (Date.now() - lastQuoteErrorToastTime > ERROR_TOAST_COOLDOWN_MS) {
+      const errorMsg = t
+        ? t('tradeMarketMaker.error.unableToGetQuote')
+        : 'An unexpected error occurred while requesting the quote.'
+      toast.error(errorMsg, {
+        autoClose: 4000, // Increased from 3000ms to 4000ms
+        toastId: 'quote-request-exception',
+      })
+      lastQuoteErrorToastTime = Date.now()
+    }
+    return false
+  }
+}
+
+/**
+ * Creates a function to handle requesting reverse quotes (setting to_amount to get from_amount)
+ * Mirrors createQuoteRequestHandler but reads the 'to' field and sends direction='to'
+ */
+export const createReverseQuoteRequestHandler = (
+  form: UseFormReturn<Fields>,
+  parseAssetAmount: (
+    amount: string | undefined | null,
+    asset: string
+  ) => number,
+  assets: NiaAsset[],
+  tradingPairs: TradingPair[],
+  setIsQuoteLoading?: (loading: boolean) => void,
+  setIsFromAmountLoading?: (loading: boolean) => void,
+  hasValidQuote?: () => boolean,
+  maxToAmount?: number,
+  t?: TFunction
+) => {
+  return async () => {
+    if (!tradingPairs || tradingPairs.length === 0) {
+      return
+    }
+
+    const fromAssetTicker = form.getValues().fromAsset
+    const toAssetTicker = form.getValues().toAsset
+    const toAmountStr = form.getValues().to
+
+    if (
+      !fromAssetTicker ||
+      !toAssetTicker ||
+      fromAssetTicker === toAssetTicker
+    ) {
+      return
+    }
+
+    if (!toAmountStr || toAmountStr === '0') {
+      form.setValue('from', '')
+      return
+    }
+
+    const toAmount = parseAssetAmount(toAmountStr, toAssetTicker)
+    if (toAmount <= 0) {
+      return
+    }
+
+    // Validate against max receive amount (balance/channel limit)
+    if (
+      maxToAmount !== undefined &&
+      maxToAmount > 0 &&
+      toAmount > maxToAmount
+    ) {
+      logger.debug(
+        `[ReverseQuote] to_amount (${toAmount}) exceeds max (${maxToAmount}), skipping`
+      )
+      if (setIsQuoteLoading) setIsQuoteLoading(false)
+      if (setIsFromAmountLoading) setIsFromAmountLoading(false)
+      return
+    }
+
+    const quoteKey = `${fromAssetTicker}/${toAssetTicker}/${toAmount}/to`
+
+    if (quoteKey === lastRequestedQuoteKey) {
+      const timeSinceLastRequest = Date.now() - lastQuoteRequestTime
+      if (timeSinceLastRequest < QUOTE_REQUEST_RATE_LIMIT_MS) {
+        return
+      }
+    }
+
+    const currentlyHasValidQuote = hasValidQuote ? hasValidQuote() : false
+
+    if (!currentlyHasValidQuote) {
+      if (setIsQuoteLoading) {
+        setIsQuoteLoading(true)
+      }
+      if (setIsFromAmountLoading) {
+        setIsFromAmountLoading(true)
+      }
+    }
+
+    logger.debug(
+      `[ReverseQuote] Sending: ${fromAssetTicker}->${toAssetTicker}, to_amount=${toAmount}`
+    )
+    const sent = await sendQuoteRequest(
+      fromAssetTicker,
+      toAssetTicker,
+      toAmount,
+      assets,
+      tradingPairs,
+      t,
+      'to'
+    )
+    if (!sent) {
+      setIsQuoteLoading?.(false)
+      setIsFromAmountLoading?.(false)
+    }
+  }
+}
+
+/** Starts a timer to request quotes periodically */
+export const startQuoteRequestTimer = (
+  requestQuote: () => Promise<void>,
+  intervalMs: number = 15000 // Increased from 10000ms to 15000ms for less aggressive refreshing
+): void => {
+  // Clear any existing timer
+  if (quoteRequestTimer) {
+    clearInterval(quoteRequestTimer)
+  }
+
+  // Start a new timer
+  quoteRequestTimer = setInterval(requestQuote, intervalMs)
+}
+
+/** Stops the quote request timer */
+export const stopQuoteRequestTimer = (): void => {
+  if (quoteRequestTimer) {
+    clearInterval(quoteRequestTimer)
+    quoteRequestTimer = null
+  }
+}
+
+/**
+ * Creates a function to handle form amount changes and request a quote
+ * with debouncing to avoid excessive requests while typing
+ */
+export const createAmountChangeQuoteHandler = (
+  requestQuote: () => Promise<void>,
+  setIsQuoteLoading?: (loading: boolean) => void,
+  setIsToAmountLoading?: (loading: boolean) => void,
+  hasValidQuote?: () => boolean
+) => {
+  let debounceTimer: any = null
+
+  return (e: ChangeEvent<HTMLInputElement>) => {
+    // Cancel any pending debounced request
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+    }
+
+    // Request a quote whenever the amount changes
+    const value = e.target.value
+    if (value && value !== '0') {
+      // Only set loading states if we don't have a valid quote
+      // This allows users to keep trading with current quotes while new ones load
+      const currentlyHasValidQuote = hasValidQuote ? hasValidQuote() : false
+
+      if (!currentlyHasValidQuote) {
+        if (setIsQuoteLoading) {
+          setIsQuoteLoading(true)
+        }
+        if (setIsToAmountLoading) {
+          setIsToAmountLoading(true)
+        }
+      }
+
+      // Use the defined constant for consistent debouncing
+      debounceTimer = setTimeout(requestQuote, QUOTE_REQUEST_DEBOUNCE_MS)
+    } else {
+      // If amount is cleared, also clear loading states
+      if (setIsQuoteLoading) {
+        setIsQuoteLoading(false)
+      }
+      if (setIsToAmountLoading) {
+        setIsToAmountLoading(false)
+      }
+    }
+  }
+}

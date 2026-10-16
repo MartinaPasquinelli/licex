@@ -1,0 +1,138 @@
+import { FetchBaseQueryError } from '@reduxjs/toolkit/query'
+
+import { logger } from '../../../utils/logger'
+
+/** Handles API errors and extracts readable error messages */
+export const handleApiError = (error: FetchBaseQueryError): string => {
+  if (!error) return 'Unknown error occurred'
+
+  if (typeof error === 'string') return error
+
+  // Check for timeout/network errors (including CORS failures which appear as Load failed)
+  if (error.status === 'TIMEOUT_ERROR' || error.status === 'FETCH_ERROR') {
+    if (
+      error.status === 'TIMEOUT_ERROR' ||
+      (error.error && error.error.includes('timeout'))
+    ) {
+      return 'Request timed out. The maker server is taking too long to respond. Please check your connection and try again.'
+    }
+    const errorStr = error.error || ''
+    if (
+      errorStr.includes('Load failed') ||
+      errorStr.includes('Failed to fetch') ||
+      errorStr.includes('NetworkError')
+    ) {
+      return 'The quote may have expired or the amounts are invalid. Please get a fresh quote and try again.'
+    }
+    return 'Network error. Please check your connection and try again.'
+  }
+
+  // For 400 with a detail object: log and strip status code prefix, then return
+  if (
+    typeof error.status === 'number' &&
+    error.status === 400 &&
+    error.data &&
+    typeof error.data === 'object' &&
+    'detail' in error.data
+  ) {
+    const detail = (error.data as any).detail as string
+    logger.error(`[Swap] Server rejected request (400): ${detail}`)
+    const match = detail.match(/\d{3}:\s*(.+)/)
+    return match ? match[1].trim() : detail
+  }
+
+  const errorData = error.data
+  if (!errorData) return 'No error details available'
+
+  // Handle string error responses
+  if (typeof errorData === 'string') return errorData
+
+  // Handle object error responses
+  if (typeof errorData === 'object') {
+    // First check for detail field which is common in API errors
+    if ('detail' in errorData && typeof errorData.detail === 'string') {
+      // Extract just the error message without the status code if possible
+      const match = errorData.detail.match(/\d{3}:\s*(.+)/)
+      return match ? match[1].trim() : errorData.detail
+    }
+    // Fallback to error field
+    if ('error' in errorData && typeof errorData.error === 'string') {
+      // Strip SDK class prefixes and "API Error (N): " wrappers to show only the core message
+      const stripped = errorData.error
+        .replace(/^[A-Za-z]*Error:\s*/i, '')
+        .replace(/^API Error \(\d+\):\s*/i, '')
+        .trim()
+      return stripped || errorData.error
+    }
+    // If no recognized error format, stringify the object
+    return JSON.stringify(errorData)
+  }
+
+  return String(errorData)
+}
+
+/** Creates a handler for refreshing data (channels, pairs, etc.) */
+export const createRefreshDataHandler = (
+  listChannels: any,
+  getPairs: any,
+  dispatch: any,
+  form: any,
+  assetsData: any,
+  formatAmount: (amount: number, asset: string) => string,
+  updateMinMaxAmounts: () => Promise<void>,
+  refreshAmounts: () => Promise<void>,
+  setTradingPairs: (pairs: any[]) => void,
+  setTradablePairs: (pairs: any[]) => void,
+  setSelectedPair: (pair: any) => void,
+  setChannels: (channels: any[]) => void,
+  setAssets: (assets: any[]) => void,
+  setIsLoading: (isLoading: boolean) => void
+) => {
+  return async () => {
+    setIsLoading(true)
+    try {
+      const [listChannelsResponse, getPairsResponse] = await Promise.all([
+        listChannels(),
+        getPairs(),
+      ])
+
+      if ('data' in listChannelsResponse && listChannelsResponse.data) {
+        setChannels(listChannelsResponse.data.channels)
+      }
+
+      if (assetsData) {
+        setAssets(assetsData.nia)
+      }
+
+      if ('data' in getPairsResponse && getPairsResponse.data) {
+        dispatch(setTradingPairs(getPairsResponse.data.pairs))
+        // Show all pairs from maker - don't filter based on channels
+        const allPairs = getPairsResponse.data.pairs
+        setTradablePairs(allPairs)
+
+        if (allPairs.length > 0) {
+          setSelectedPair(allPairs[0])
+          form.setValue('fromAsset', allPairs[0].base_asset)
+          form.setValue('toAsset', allPairs[0].quote_asset)
+          const defaultMinAmount = allPairs[0].min_order_size
+          form.setValue(
+            'from',
+            formatAmount(defaultMinAmount, allPairs[0].base_asset)
+          )
+        }
+      }
+
+      await updateMinMaxAmounts()
+      await refreshAmounts()
+
+      logger.info('Data refreshed successfully')
+    } catch (error) {
+      logger.error('Error refreshing data:', error)
+      throw new Error('Failed to refresh data. Please try again.', {
+        cause: error,
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+}

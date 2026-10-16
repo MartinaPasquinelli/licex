@@ -1,0 +1,360 @@
+import { FetchBaseQueryError } from '@reduxjs/toolkit/query'
+import { TFunction } from 'i18next'
+import { toast } from 'react-toastify'
+
+import {
+  TradingPair,
+  getAssetId,
+} from '../../../slices/makerApi/makerApi.slice'
+import type { AssetNIA as NiaAsset } from 'kaleido-sdk/rln'
+import { logger } from '../../../utils/logger'
+
+import { handleApiError } from './apiUtils'
+import { Fields } from './types'
+
+/** Type for swap recap details */
+export interface SwapDetails {
+  fromAmount: string
+  fromAsset: string
+  toAmount: string
+  toAsset: string
+  price: number
+  timestamp: string
+  payment_hash: string
+  selectedPair: TradingPair | null
+}
+
+/** Copies error details to clipboard */
+export const copyToClipboard = (text: string, t: TFunction) => {
+  navigator.clipboard.write([
+    new ClipboardItem({
+      'text/plain': new Blob([text], { type: 'text/plain' }),
+    }),
+  ])
+  toast.success(t('tradeMarketMaker.swap.errorDetailsClipboard'))
+}
+
+/** Normalize asset ID for comparison (case-insensitive for BTC) */
+const normalizeAssetIdForComparison = (assetId: string): string => {
+  // BTC should be case-insensitive
+  if (assetId.toLowerCase() === 'btc') {
+    return 'btc'
+  }
+  // All other assets (including RGB protocol IDs) are case-sensitive
+  return assetId
+}
+
+/** Validates the swapstring format and contents */
+export const validateSwapString = (
+  swapstring: string,
+  fromAmount: number,
+  fromAssetId: string,
+  toAmount: number,
+  toAssetId: string,
+  payment_hash: string
+): boolean => {
+  // Validate swapstring format
+  const swap_parts = swapstring.split('/')
+  if (swap_parts.length !== 6) {
+    logger.error(`Invalid swap string format: ${swapstring}`)
+    return false
+  }
+
+  const [
+    swapFromAmount,
+    swapFromAsset,
+    swapToAmount,
+    swapToAsset,
+    _,
+    swapPaymentHash,
+  ] = swap_parts
+
+  // Normalize asset IDs for comparison (case-insensitive for BTC)
+  const normalizedFromAssetId = normalizeAssetIdForComparison(fromAssetId)
+  const normalizedToAssetId = normalizeAssetIdForComparison(toAssetId)
+  const normalizedSwapFromAsset = normalizeAssetIdForComparison(swapFromAsset)
+  const normalizedSwapToAsset = normalizeAssetIdForComparison(swapToAsset)
+
+  // Validate swap string contents
+  if (
+    parseInt(swapFromAmount) !== fromAmount ||
+    normalizedSwapFromAsset !== normalizedFromAssetId ||
+    parseInt(swapToAmount) !== toAmount ||
+    normalizedSwapToAsset !== normalizedToAssetId ||
+    swapPaymentHash !== payment_hash
+  ) {
+    logger.error('Swap string contents do not match the payload')
+    logger.error(
+      `Expected: ${fromAmount}/${fromAssetId}/${toAmount}/${toAssetId}/${payment_hash}`
+    )
+    logger.error(
+      `Received: ${swapFromAmount}/${swapFromAsset}/${swapToAmount}/${swapToAsset}/${swapPaymentHash}`
+    )
+    return false
+  }
+
+  return true
+}
+
+/** Creates a function to execute a swap */
+export const createSwapExecutor = (
+  assets: NiaAsset[],
+  pubKey: string,
+  price: number,
+  selectedPair: TradingPair | null,
+  parseAssetAmount: (
+    amount: string | undefined | null,
+    asset: string
+  ) => number,
+  formatAmount: (amount: number, asset: string) => string,
+  tradablePairs: TradingPair[],
+  initSwap: any,
+  whitelistTrade: any,
+  execSwap: any,
+  setSwapRecapDetails: (details: SwapDetails) => void,
+  setShowRecap: (show: boolean) => void,
+  setErrorMessage: (message: string | null) => void,
+  t: TFunction
+) => {
+  return async (data: Fields): Promise<void> => {
+    let toastId: string | number | null = null
+    let timeoutId: any | null = null
+    let errorMessage: string | null = null
+
+    const clearToastAndTimeout = () => {
+      if (toastId !== null) {
+        toast.dismiss(toastId)
+        toastId = null
+      }
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+    }
+
+    try {
+      toastId = toast.loading('(1/3) Initializing swap...', {
+        autoClose: false,
+      })
+
+      // Set a timeout for the entire swap process (e.g., 60 seconds)
+      timeoutId = setTimeout(() => {
+        throw new Error('Swap operation timed out')
+      }, 60000)
+
+      logger.info('Initiating swap', data)
+
+      const pair = tradablePairs.find(
+        (p) =>
+          (p.base_asset === data.fromAsset && p.quote_asset === data.toAsset) ||
+          (p.base_asset === data.toAsset && p.quote_asset === data.fromAsset)
+      )
+
+      if (!pair) {
+        throw new Error('Invalid trading pair')
+      }
+
+      // Use asset_id from form (which was set from quote response) if available
+      // This ensures we use the protocol ID that the maker returned in the quote
+      const fromAssetId =
+        data.fromAssetId ||
+        (assets.find((asset) => asset.ticker === data.fromAsset)
+          ? getAssetId(
+              assets.find((asset) => asset.ticker === data.fromAsset)! as any
+            )
+          : 'btc')
+      const toAssetId =
+        data.toAssetId ||
+        (assets.find((asset) => asset.ticker === data.toAsset)
+          ? getAssetId(
+              assets.find((asset) => asset.ticker === data.toAsset)! as any
+            )
+          : 'btc')
+
+      if (!fromAssetId || !toAssetId) {
+        throw new Error('Invalid asset ID')
+      }
+      if (fromAssetId === toAssetId) {
+        throw new Error('Cannot swap the same asset')
+      }
+
+      let toAmount = parseAssetAmount(data.to, data.toAsset)
+      let fromAmount = parseAssetAmount(data.from, data.fromAsset)
+
+      // Validate amounts before sending
+      if (!fromAmount || fromAmount <= 0) {
+        throw new Error(
+          'Send amount is not set. Please wait for the quote to populate both amounts before swapping.'
+        )
+      }
+      if (!toAmount || toAmount <= 0) {
+        throw new Error(
+          'Receive amount is not set. Please wait for the quote to populate both amounts before swapping.'
+        )
+      }
+
+      // Multiply by 1000 if the asset is BTC
+      if (data.fromAsset.toLowerCase() === 'btc') {
+        fromAmount *= 1000
+      }
+      if (data.toAsset.toLowerCase() === 'btc') {
+        toAmount *= 1000
+      }
+      const rfq_id = data.rfq_id
+      if (!rfq_id) {
+        throw new Error(
+          'No valid quote available. Please wait for a quote before swapping.'
+        )
+      }
+      const payload = {
+        from_amount: fromAmount,
+        from_asset: fromAssetId,
+        rfq_id: rfq_id,
+        to_amount: toAmount,
+        to_asset: toAssetId,
+      }
+      logger.debug('Swap payload:', payload)
+
+      logger.debug(
+        `[Swap] Initiating swap: rfq_id=${rfq_id}, from=${fromAmount} ${data.fromAsset}, to=${toAmount} ${data.toAsset}`
+      )
+      const initSwapResponse = await initSwap(payload)
+      if ('error' in initSwapResponse) {
+        logger.error('[Swap] Init error object:', initSwapResponse.error)
+        const errorMessage = handleApiError(
+          initSwapResponse.error as FetchBaseQueryError
+        )
+        logger.error(`[Swap] Init failed: ${errorMessage}`)
+        setErrorMessage(errorMessage)
+        throw new Error(errorMessage)
+      }
+
+      if (!initSwapResponse.data) {
+        throw new Error('No data received from swap initialization')
+      }
+
+      const { swapstring, payment_hash } = initSwapResponse.data
+
+      toast.update(toastId, {
+        isLoading: true,
+        render: '(2/3) Processing taker whitelisting...',
+      })
+
+      // Check if the swapstring is valid
+      if (!swapstring) {
+        throw new Error('Invalid swapstring')
+      }
+
+      // Validate swapstring
+      if (
+        !validateSwapString(
+          swapstring,
+          fromAmount,
+          fromAssetId,
+          toAmount,
+          toAssetId,
+          payment_hash
+        )
+      ) {
+        throw new Error('Invalid swap string validation')
+      }
+
+      const whitelistResponse = await whitelistTrade({ swapstring })
+      if ('error' in whitelistResponse) {
+        throw new Error(
+          handleApiError(whitelistResponse.error as FetchBaseQueryError)
+        )
+      }
+
+      const confirmSwapPayload = {
+        payment_hash,
+        swapstring,
+        taker_pubkey: pubKey,
+      }
+      toast.update(toastId, {
+        isLoading: true,
+        render: '(3/3) Waiting for maker to execute swap...',
+      })
+
+      const confirmSwapResponse = await execSwap(confirmSwapPayload)
+      if ('error' in confirmSwapResponse) {
+        throw new Error(
+          handleApiError(confirmSwapResponse.error as FetchBaseQueryError)
+        )
+      }
+
+      logger.info('Swap executed successfully!')
+      toast.update(toastId, {
+        autoClose: 5000,
+        closeOnClick: true,
+        isLoading: false,
+        render: 'Swap executed successfully!',
+        type: 'success',
+      })
+
+      // Prepare and show the swap recap
+      const recapDetails: SwapDetails = {
+        fromAmount: formatAmount(
+          parseAssetAmount(data.from, data.fromAsset),
+          data.fromAsset
+        ),
+        fromAsset: data.fromAsset,
+        payment_hash: payment_hash,
+        price: price || 0,
+        selectedPair: selectedPair,
+        timestamp: new Date().toISOString(),
+        toAmount: formatAmount(
+          parseAssetAmount(data.to, data.toAsset),
+          data.toAsset
+        ),
+        toAsset: data.toAsset,
+      }
+      setSwapRecapDetails(recapDetails)
+      setShowRecap(true)
+    } catch (error) {
+      logger.error('Error executing swap', error)
+
+      // Extract error message — replace unhelpful browser errors with user-friendly text
+      const rawMessage =
+        error instanceof Error ? error.message : 'An unknown error occurred'
+      if (
+        rawMessage === 'Load failed' ||
+        rawMessage === 'Failed to fetch' ||
+        rawMessage === 'NetworkError when attempting to fetch resource.'
+      ) {
+        errorMessage =
+          'The quote may have expired or the amounts are invalid. Please get a fresh quote and try again.'
+      } else {
+        errorMessage = rawMessage
+      }
+      setErrorMessage(errorMessage)
+
+      // Clear any existing toasts first
+      toast.dismiss()
+
+      toast.error(
+        t('tradeMarketMaker.swap.swapFailed', { error: errorMessage }),
+        {
+          autoClose: 5000,
+          closeButton: true,
+          closeOnClick: false,
+          draggable: false,
+          isLoading: false,
+          onClick: (e) => e.stopPropagation(),
+          pauseOnFocusLoss: false,
+          pauseOnHover: true,
+        }
+      )
+
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+      return
+    } finally {
+      if (!errorMessage) {
+        clearToastAndTimeout()
+      }
+    }
+  }
+}

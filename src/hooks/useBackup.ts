@@ -1,0 +1,230 @@
+import { open } from '@tauri-apps/plugin-dialog'
+import { exists } from '@tauri-apps/plugin-fs'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'react-toastify'
+
+import { buildUnlockRequest, DESKTOP_ANNOUNCE_ALIAS } from '../helpers/unlock'
+import { nodeApi } from '../slices/nodeApi/nodeApi.slice'
+import { logger } from '../utils/logger'
+
+interface BackupFormFields {
+  backupPath: string
+  nodePassword: string
+}
+
+interface NodeSettings {
+  rpc_connection_url: string
+  indexer_url: string
+  proxy_endpoint: string
+  default_lsp_url?: string
+}
+
+interface UseBackupProps {
+  nodeSettings: NodeSettings
+}
+
+interface UseBackupReturn {
+  showBackupModal: boolean
+  setShowBackupModal: (show: boolean) => void
+  isBackupInProgress: boolean
+  control: any
+  handleSubmit: any
+  formState: any
+  backupPath: string
+  handleBackup: (data: BackupFormFields) => Promise<void>
+  selectBackupFolder: () => Promise<void>
+  isBackupLoading: boolean
+}
+
+export const useBackup = ({
+  nodeSettings,
+}: UseBackupProps): UseBackupReturn => {
+  const { t } = useTranslation()
+  const [showBackupModal, setShowBackupModal] = useState(false)
+  const [isBackupInProgress, setIsBackupInProgress] = useState(false)
+
+  const { control, handleSubmit, formState, reset, watch, setValue } =
+    useForm<BackupFormFields>({
+      defaultValues: {
+        backupPath: '',
+        nodePassword: '',
+      },
+    })
+
+  const [backup, { isLoading: isBackupLoading }] = nodeApi.useBackupMutation()
+  const [lock] = nodeApi.endpoints.lock.useMutation()
+  const [unlock] = nodeApi.endpoints.unlock.useMutation()
+
+  const backupPath = watch('backupPath')
+
+  const attemptLock = async () => {
+    try {
+      await lock().unwrap()
+      return { data: {}, status: 200 }
+    } catch (err) {
+      logger.error('Lock attempt failed:', err)
+      return err as { status: number; data: { error?: string; code?: number } }
+    }
+  }
+
+  const attemptUnlock = async (password: string) => {
+    try {
+      await unlock(
+        buildUnlockRequest({
+          announceAlias: DESKTOP_ANNOUNCE_ALIAS,
+          nodeSettings,
+          password,
+        })
+      ).unwrap()
+      return { data: {}, status: 200 }
+    } catch (err) {
+      logger.error('Unlock attempt failed:', err)
+      return err as { status: number; data: { error?: string; code?: number } }
+    }
+  }
+
+  const attemptBackup = async (backupPath: string, password: string) => {
+    try {
+      await backup({ backup_path: backupPath, password }).unwrap()
+      return { data: {}, status: 200 }
+    } catch (err) {
+      logger.error('Backup attempt failed:', err)
+      return err as { status: number; data: { error?: string; code?: number } }
+    }
+  }
+
+  const handleBackup = async (data: BackupFormFields) => {
+    const { backupPath: pathToBackup } = data
+
+    if (!pathToBackup.trim()) {
+      toast.error(
+        t(
+          'backupModal.toasts.invalidPath',
+          'Choose a valid folder for the backup'
+        )
+      )
+      return
+    }
+
+    if (await exists(pathToBackup)) {
+      toast.error(
+        t(
+          'backupModal.toasts.fileExists',
+          'A backup file already exists there. Choose a different folder.'
+        )
+      )
+      return
+    }
+
+    try {
+      setIsBackupInProgress(true)
+      const lockResponse = await attemptLock()
+
+      if (lockResponse.status === 200) {
+        await performBackupSequence(data)
+      } else if (lockResponse.status === 403) {
+        await handleLockedBackup(data)
+      } else {
+        toast.error(
+          t(
+            'backupModal.toasts.lockFailed',
+            'Could not lock the wallet for the backup'
+          )
+        )
+      }
+    } catch (err) {
+      logger.error('Backup failed:', err)
+      toast.error(t('backupModal.toasts.failed', 'Backup failed'))
+    } finally {
+      handleBackupCompletion(pathToBackup)
+    }
+  }
+
+  const performBackupSequence = async (data: BackupFormFields) => {
+    const backupResponse = await attemptBackup(
+      data.backupPath,
+      data.nodePassword
+    )
+    if (backupResponse.status === 200) {
+      await handleSuccessfulBackup(data)
+    } else if (backupResponse.status === 401) {
+      toast.error(t('backupModal.toasts.wrongPassword', 'Wrong password'))
+    } else {
+      toast.error(t('backupModal.toasts.failed', 'Backup failed'))
+    }
+  }
+
+  const handleLockedBackup = async (data: BackupFormFields) => {
+    const unlockResponse = await attemptUnlock(data.nodePassword)
+    if (unlockResponse.status === 200) {
+      await lock().unwrap()
+      await performBackupSequence(data)
+    } else if (unlockResponse.status === 401) {
+      toast.error(t('backupModal.toasts.wrongPassword', 'Wrong password'))
+    } else {
+      toast.error(
+        t(
+          'backupModal.toasts.unlockFailed',
+          'Could not unlock the wallet after the backup'
+        )
+      )
+    }
+  }
+
+  const handleSuccessfulBackup = async (data: BackupFormFields) => {
+    await unlock(
+      buildUnlockRequest({
+        announceAlias: DESKTOP_ANNOUNCE_ALIAS,
+        nodeSettings,
+        password: data.nodePassword,
+      })
+    ).unwrap()
+    toast.success(t('backupModal.toasts.success', 'Backup saved'))
+  }
+
+  const handleBackupCompletion = (pathToBackup: string) => {
+    const lastSep = Math.max(
+      pathToBackup.lastIndexOf('/'),
+      pathToBackup.lastIndexOf('\\')
+    )
+    const directoryPath =
+      lastSep >= 0 ? pathToBackup.substring(0, lastSep) : pathToBackup
+    const sep = pathToBackup.includes('\\') ? '\\' : '/'
+    const timestamp = new Date()
+      .toLocaleString()
+      .replace(/[/, ]/g, '_')
+      .replace(/:/g, '')
+    const newBackupPath = `${directoryPath}${sep}backup_${timestamp}.enc`
+
+    reset({ backupPath: newBackupPath, nodePassword: '' })
+    setShowBackupModal(false)
+    setIsBackupInProgress(false)
+  }
+
+  const selectBackupFolder = async () => {
+    const selected = await open({ directory: true, multiple: false })
+    if (typeof selected === 'string') {
+      const sep = selected.includes('\\') ? '\\' : '/'
+      const timestamp = new Date()
+        .toLocaleString()
+        .replace(/[/, ]/g, '_')
+        .replace(/:/g, '')
+      setValue('backupPath', `${selected}${sep}backup_${timestamp}.enc`)
+    }
+  }
+
+  return {
+    backupPath,
+    control,
+    formState,
+    handleBackup,
+    handleSubmit,
+    isBackupInProgress,
+    isBackupLoading,
+    selectBackupFolder,
+    setShowBackupModal,
+    showBackupModal,
+  }
+}
