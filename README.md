@@ -87,32 +87,36 @@ Install the prerequisites required by the existing Tauri application.
 Use a compatible Node.js version, pnpm, and the platform-specific
 Tauri/Rust prerequisites.
 
-## Installation
-
 ```bash
+brew update
+brew install node pnpm rustup llvm ninja cmake openssl@3
+rustup-init
+```
+
+### 2. Environment Variables & Intel Paths Fix
+Add the following exports to your shell profile (`~/.zshrc` or `~/.bash_profile`) [1.12]:
+```bash
+export PATH="/usr/local/opt/llvm/bin:\$PATH"
+export LDFLAGS="-L/usr/local/opt/llvm/lib"
+export CPPFLAGS="-I/usr/local/opt/llvm/include"
+export CC="/usr/local/opt/llvm/bin/clang"
+export CXX="/usr/local/opt/llvm/bin/clang++"
+export OPENSSL_DIR="/usr/local/opt/openssl@3"
+export OPENSSL_INCLUDE_DIR="/usr/local/opt/openssl@3/include"
+export OPENSSL_LIB_DIR="/usr/local/opt/openssl@3/lib"
+source \$HOME/.cargo/env
+```
+Create a symbolic link if needed:
+```bash
+sudo mkdir -p /opt/homebrew/opt
+sudo ln -s /usr/local/opt/openssl@3 /opt/homebrew/opt/openssl@3
+```
+
+### 3. Compilation & Execution
+```bash
+git clone https://github.com
+cd licex
 pnpm install --frozen-lockfile
-```
-
-## Development
-
-Start the frontend development server:
-
-```bash
-pnpm run dev
-```
-
-Run the available checks:
-
-```bash
-pnpm run type-check
-pnpm run test:run
-pnpm run build
-```
-
-To start the desktop application, after installing the required
-platform prerequisites and configuring any necessary local services:
-
-```bash
 pnpm run tauri:dev
 ```
 
