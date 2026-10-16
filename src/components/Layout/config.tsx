@@ -23,6 +23,11 @@ import {
   Upload,
   Coins,
   ArrowDownUp,
+  Package,
+  Heart,
+  Sparkles,
+  Bot,
+  Building2,
 } from 'lucide-react'
 import React from 'react'
 
@@ -52,6 +57,11 @@ import {
   ORDER_CHANNEL_PATH,
   KALEIDO_MIND_PATH,
   KALEIDO_MIND_BRAIN_PATH,
+  LICEX_MARKETPLACE_PATH,
+  LICEX_WATCHLIST_PATH,
+  LICEX_WISHLIST_PATH,
+  LICEX_ASSISTANT_PATH,
+  LICEX_COMPANY_DASHBOARD_PATH,
 } from '../../app/router/paths'
 
 // Define types for navigation items
@@ -74,13 +84,49 @@ export interface NavItem {
 
 // A labeled group of nav items shown as a category in the sidebar.
 export interface NavSection {
-  key: 'node' | 'mind'
+  key: 'node' | 'mind' | 'licex'
   label: string
   items: NavItem[]
 }
 
-// Sidebar navigation, grouped into the two co-equal sections: Node and Mind.
+// Sidebar navigation, grouped into sections: LICEX, Node, Mind.
 export const getNavSections = (t: TFunction): NavSection[] => [
+  {
+    items: [
+      {
+        icon: <Package className="w-5 h-5" />,
+        label: t('navigation.marketplace', 'Marketplace'),
+        matchPath: LICEX_MARKETPLACE_PATH,
+        to: LICEX_MARKETPLACE_PATH,
+      },
+      {
+        icon: <Heart className="w-5 h-5" />,
+        label: t('navigation.watchlist', 'Watchlist & Alerts'),
+        matchPath: LICEX_WATCHLIST_PATH,
+        to: LICEX_WATCHLIST_PATH,
+      },
+      {
+        icon: <Sparkles className="w-5 h-5" />,
+        label: t('navigation.wishlist', 'Software Wishlist'),
+        matchPath: LICEX_WISHLIST_PATH,
+        to: LICEX_WISHLIST_PATH,
+      },
+      {
+        icon: <Bot className="w-5 h-5" />,
+        label: t('navigation.assistant', 'LICEX Assistant'),
+        matchPath: LICEX_ASSISTANT_PATH,
+        to: LICEX_ASSISTANT_PATH,
+      },
+      {
+        icon: <Building2 className="w-5 h-5" />,
+        label: t('navigation.publisherDashboard', 'Publisher Dashboard'),
+        matchPath: LICEX_COMPANY_DASHBOARD_PATH,
+        to: LICEX_COMPANY_DASHBOARD_PATH,
+      },
+    ],
+    key: 'licex',
+    label: 'LICEX',
+  },
   {
     items: [
       {
