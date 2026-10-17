@@ -10,6 +10,7 @@ import {
   Clock,
   Rocket,
   Settings,
+  Sparkles,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -23,6 +24,7 @@ import { formatBitcoinAmount } from '../../helpers/number'
 import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { uiSliceActions } from '../../slices/ui/ui.slice'
 import { getAssignmentAmount } from '../../utils/rgbUtils'
+import { saveDemoUtxos, getDemoUtxos, DemoUtxo } from '../../utils/demoAssets'
 import { Modal } from '../ui/Modal'
 import { logger } from '../../utils/logger'
 
@@ -53,6 +55,8 @@ export const UTXOManagementModal = ({
   const { t } = useTranslation()
   const dispatch = useAppDispatch()
   const [step, setStep] = useState<'list' | 'create'>('list')
+  const [isDemoMode, setIsDemoMode] = useState(true)
+  const [demoUtxos, setDemoUtxos] = useState<DemoUtxo[]>(() => getDemoUtxos())
 
   // ── List step state ──────────────────────────────────────────────────────
   const [listUnspents, { data: unspentsData, isLoading }] =
@@ -65,7 +69,19 @@ export const UTXOManagementModal = ({
   }, [listUnspents])
 
   const { colorableUtxos, coloredUtxos, normalUtxos, summary } = useMemo(() => {
-    if (!unspentsData?.unspents) {
+    // In demo mode, build the list from localStorage demo UTXOs instead
+    const baseUnspents = isDemoMode
+      ? demoUtxos.map((u) => ({
+          rgb_allocations: u.rgb_allocations,
+          utxo: {
+            btc_amount: u.btc_amount,
+            colorable: u.colorable,
+            outpoint: u.outpoint,
+          },
+        }))
+      : (unspentsData?.unspents ?? [])
+
+    if (!baseUnspents.length) {
       return {
         colorableUtxos: [],
         coloredUtxos: [],
@@ -81,18 +97,18 @@ export const UTXOManagementModal = ({
       }
     }
 
-    const colored = unspentsData.unspents.filter(
+    const colored = baseUnspents.filter(
       (u: any) =>
         u.utxo?.colorable &&
         Array.isArray(u.rgb_allocations) &&
         u.rgb_allocations.length > 0
     )
-    const colorable = unspentsData.unspents.filter(
+    const colorable = baseUnspents.filter(
       (u: any) =>
         u.utxo?.colorable &&
         (!Array.isArray(u.rgb_allocations) || u.rgb_allocations.length <= 0)
     )
-    const normal = unspentsData.unspents.filter((u: any) => !u.utxo?.colorable)
+    const normal = baseUnspents.filter((u: any) => !u.utxo?.colorable)
 
     const summary: UTXOSummary = {
       colorableCount: colorable.length,
@@ -118,7 +134,7 @@ export const UTXOManagementModal = ({
       normalUtxos: normal,
       summary,
     }
-  }, [unspentsData])
+  }, [isDemoMode, demoUtxos, unspentsData])
 
   const [activeFilter, setActiveFilter] = useState<
     'all' | 'colorable' | 'colored' | 'normal'
@@ -312,8 +328,21 @@ export const UTXOManagementModal = ({
   }
 
   const onSubmitCreate = (data: CreateFormFields) => {
-    if (insufficientBalance || !sizeValid) return
+    if (!isDemoMode && (insufficientBalance || !sizeValid)) return
     setIsCreating(true)
+
+    if (isDemoMode) {
+      // Simulate UTXO creation via localStorage
+      setTimeout(() => {
+        saveDemoUtxos(data.num, data.size || DEFAULT_UTXO_SIZE)
+        setDemoUtxos(getDemoUtxos())
+        toast.success(t('createUtxos.toastSuccess'))
+        setIsCreating(false)
+        setStep('list')
+      }, 800)
+      return
+    }
+
     createutxos({
       fee_rate: Math.round(
         data.fee_rate === 'slow'
@@ -366,6 +395,36 @@ export const UTXOManagementModal = ({
       </div>
 
       {/* Body */}
+      {/* Demo Mode Banner */}
+      <div className="px-6 pt-4">
+        <div className="flex items-center justify-between p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-purple-400 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-purple-200">
+                {t('issueAssetModal.demoModeToggle', 'Simulazione Demo')}
+              </p>
+              <p className="text-[11px] text-purple-300/80">
+                {t(
+                  'utxoManagement.demoModeDescription',
+                  'UTXO simulati per la demo (senza BTC reale)'
+                )}
+              </p>
+            </div>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-3">
+            <input
+              checked={isDemoMode}
+              className="sr-only peer"
+              onChange={(e) => setIsDemoMode(e.target.checked)}
+              type="checkbox"
+            />
+            <div className="w-9 h-5 bg-surface-overlay peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+          </label>
+        </div>
+      </div>
+
+      {/* Original body */}
       {step === 'list' ? (
         <div className="p-6 space-y-6">
           {/* Summary Cards */}
@@ -508,7 +567,7 @@ export const UTXOManagementModal = ({
             </p>
           </div>
 
-          {insufficientBalance && (
+          {insufficientBalance && !isDemoMode && (
             <div
               className="flex flex-col gap-3 rounded-lg bg-status-danger/10 border border-status-danger/30 p-4"
               role="alert"
@@ -544,7 +603,7 @@ export const UTXOManagementModal = ({
                 {...register('num', { valueAsNumber: true })}
                 className="w-full bg-surface-overlay/50 text-white px-4 py-2.5 rounded-lg border border-border-default
                          focus:border-primary/50 focus:ring-1 focus:ring-primary/20 focus:outline-none text-sm"
-                disabled={insufficientBalance}
+                disabled={!isDemoMode && insufficientBalance}
                 max={10}
                 min={1}
                 placeholder={t('createUtxos.fields.numberPlaceholder')}
@@ -562,8 +621,8 @@ export const UTXOManagementModal = ({
                   {...register('size', { valueAsNumber: true })}
                   className="flex-1 bg-surface-overlay/50 text-white px-4 py-2.5 rounded-lg border border-border-default
                            focus:border-primary/50 focus:ring-1 focus:ring-primary/20 focus:outline-none text-sm"
-                  disabled={insufficientBalance}
-                  max={maxSize}
+                  disabled={!isDemoMode && insufficientBalance}
+                  max={isDemoMode ? 1000000 : maxSize}
                   min={DEFAULT_UTXO_SIZE}
                   placeholder={t('createUtxos.fields.sizePlaceholder')}
                   type="number"
@@ -582,23 +641,28 @@ export const UTXOManagementModal = ({
                 type="range"
                 value={Number.isFinite(size) ? size : DEFAULT_UTXO_SIZE}
               />
-              {!insufficientBalance && balanceLoaded && !sizeValid && (
-                <p className="text-xs text-status-danger" role="alert">
-                  {t('createUtxos.fields.sizeOutOfRange', {
-                    max: maxSize.toLocaleString(),
-                    min: DEFAULT_UTXO_SIZE.toLocaleString(),
-                  })}
-                </p>
-              )}
+              {!isDemoMode &&
+                !insufficientBalance &&
+                balanceLoaded &&
+                !sizeValid && (
+                  <p className="text-xs text-status-danger" role="alert">
+                    {t('createUtxos.fields.sizeOutOfRange', {
+                      max: maxSize.toLocaleString(),
+                      min: DEFAULT_UTXO_SIZE.toLocaleString(),
+                    })}
+                  </p>
+                )}
             </div>
 
             {/* Available balance */}
-            <p className="text-sm text-content-secondary">
-              {t('createUtxos.fields.availableBalance')}:{' '}
-              <span className="text-white font-semibold">
-                {balanceLoaded ? spendable.toLocaleString() : '...'} sats
-              </span>
-            </p>
+            {!isDemoMode && (
+              <p className="text-sm text-content-secondary">
+                {t('createUtxos.fields.availableBalance')}:{' '}
+                <span className="text-white font-semibold">
+                  {balanceLoaded ? spendable.toLocaleString() : '...'} sats
+                </span>
+              </p>
+            )}
 
             {/* Fee Rate */}
             <div className="space-y-2">
@@ -652,9 +716,8 @@ export const UTXOManagementModal = ({
                          text-primary-foreground rounded-lg transition-colors flex items-center gap-1.5 text-sm font-semibold"
                 disabled={
                   isCreating ||
-                  !balanceLoaded ||
-                  insufficientBalance ||
-                  !sizeValid
+                  (!isDemoMode &&
+                    (!balanceLoaded || insufficientBalance || !sizeValid))
                 }
                 type="submit"
               >

@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import {
   ArrowLeft,
   Shield,
@@ -23,6 +24,7 @@ import {
   addToWatchlist,
   removeFromWatchlist,
   addPriceAlert,
+  recordDemoPurchase,
 } from '../../slices/licex/licex.slice'
 import type { TransferPolicy } from '../../types/licex'
 import {

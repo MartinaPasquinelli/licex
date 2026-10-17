@@ -1411,7 +1411,11 @@
     "submit": "发行资产",
     "submitting": "发行中...",
     "success": "资产发行成功！",
-    "failure": "资产发行失败"
+    "failure": "资产发行失败",
+    "demoModeToggle": "演示模拟",
+    "demoModeDescription": "用于演示的模拟发行（无需真实比特币节点或UTXO）",
+    "demoSuccess": "已在演示模式下成功发行资产！",
+    "demoFallbackNotice": "未检测到节点或UTXO：已在演示模式下成功发行资产以供测试！"
   },
   "updater": {
     "checkingTitle": "检查更新中",

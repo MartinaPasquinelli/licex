@@ -6,6 +6,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import type { NostrLicenseOffer } from '../../types/licexNostr'
 
 import type {
+  LicenseAssetReference,
   LicenseListing,
   WatchlistItem,
   PriceAlert,
@@ -15,6 +16,7 @@ import type {
   LicenseRecord,
   Order,
   MarketplaceFilters,
+  TransferPolicy,
 } from '../../types/licex'
 import {
   MOCK_LISTINGS,
@@ -143,11 +145,6 @@ export const licexSlice = createSlice({
   initialState,
   name: 'licex',
   reducers: {
-    // ── AI Chat ────────────────────────────────────────────────────────
-    addChatMessage(state, action: PayloadAction<ChatMessage>) {
-      state.chatMessages.push(action.payload)
-    },
-
     // ── Price Alerts ───────────────────────────────────────────────────
     addPriceAlert(
       state,
@@ -251,6 +248,7 @@ export const licexSlice = createSlice({
     },
 
     // ── Filters ────────────────────────────────────────────────────────
+
     setFilters(state, action: PayloadAction<Partial<MarketplaceFilters>>) {
       state.filters = { ...state.filters, ...action.payload }
       state.filteredListings = applyFilters(state.listings, state.filters)
@@ -272,7 +270,6 @@ export const {
   removePriceAlert,
   addWishlistItem,
   removeWishlistItem,
-  addChatMessage,
   setChatLoading,
   completePurchase,
 } = licexSlice.actions
