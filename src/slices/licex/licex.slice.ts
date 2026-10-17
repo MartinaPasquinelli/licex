@@ -3,6 +3,7 @@
 // AI chat, and company dashboard. Uses mock data as initial state.
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import type { NostrLicenseOffer } from '../../types/licexNostr'
 
 import type {
   LicenseListing,
@@ -24,6 +25,7 @@ import {
   MOCK_COMPANY_STATS,
   MOCK_OWNED_LICENSES,
   MOCK_ORDERS,
+  MOCK_NOSTR_OFFERS,
 } from '../../constants/licex-mock-data'
 
 interface LicexState {
@@ -38,6 +40,7 @@ interface LicexState {
   companyStats: CompanyDashboardStats
   ownedLicenses: LicenseRecord[]
   orders: Order[]
+  p2pOffers: NostrLicenseOffer[]
   filters: MarketplaceFilters
   viewMode: 'grid' | 'list'
 }
@@ -62,6 +65,7 @@ const initialState: LicexState = {
   listings: MOCK_LISTINGS,
   orders: MOCK_ORDERS,
   ownedLicenses: MOCK_OWNED_LICENSES,
+  p2pOffers: MOCK_NOSTR_OFFERS,
   priceAlerts: MOCK_PRICE_ALERTS,
   selectedListing: null,
   viewMode: 'grid',
@@ -139,16 +143,13 @@ export const licexSlice = createSlice({
   initialState,
   name: 'licex',
   reducers: {
-    
-// ── AI Chat ────────────────────────────────────────────────────────
-addChatMessage(state, action: PayloadAction<ChatMessage>) {
+    // ── AI Chat ────────────────────────────────────────────────────────
+    addChatMessage(state, action: PayloadAction<ChatMessage>) {
       state.chatMessages.push(action.payload)
     },
 
-    
-    
-// ── Price Alerts ───────────────────────────────────────────────────
-addPriceAlert(
+    // ── Price Alerts ───────────────────────────────────────────────────
+    addPriceAlert(
       state,
       action: PayloadAction<{ listingId: string; thresholdSats: number }>
     ) {
@@ -167,9 +168,8 @@ addPriceAlert(
       }
     },
 
-    
     // ── Watchlist ──────────────────────────────────────────────────────
-addToWatchlist(state, action: PayloadAction<string>) {
+    addToWatchlist(state, action: PayloadAction<string>) {
       const listing = state.listings.find((l) => l.id === action.payload)
       if (
         listing &&
@@ -184,9 +184,8 @@ addToWatchlist(state, action: PayloadAction<string>) {
       }
     },
 
-    
     // ── Wishlist ───────────────────────────────────────────────────────
-addWishlistItem(
+    addWishlistItem(
       state,
       action: PayloadAction<
         Omit<
@@ -211,7 +210,6 @@ addWishlistItem(
       })
     },
 
-    
     clearFilters(state) {
       state.filters = initialFilters
       state.filteredListings = applyFilters(state.listings, state.filters)

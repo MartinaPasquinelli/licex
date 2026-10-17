@@ -72,7 +72,7 @@ export async function executeLicenseSwap(
         listing.company.name +
         '...'
     )
-    const challenge = generateProofOfHolding(listing.id, mockBuyerPubkey)
+    void generateProofOfHolding(listing.id, mockBuyerPubkey)
     await new Promise((resolve) => setTimeout(resolve, 900))
 
     // creazione certificato

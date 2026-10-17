@@ -13,7 +13,6 @@ import {
   Globe,
   FileText,
   CheckCircle,
-  AlertTriangle,
   Info,
 } from 'lucide-react'
 
@@ -26,7 +25,7 @@ import {
 import type { TransferPolicy } from '../../types/licex'
 import { LICEX_MARKETPLACE_PATH } from '../../app/router/paths'
 
-import { calculatePaymentQuote, formatUstd } from '../../helpers/licexPayments'
+import { calculatePaymentQuote } from '../../helpers/licexPayments'
 import {
   executeLicenseSwap,
   type SwapStep,
@@ -585,7 +584,7 @@ export function Component() {
                               order: result.order,
                             })
                           )
-                        } catch (e) {
+                        } catch (_e) {
                           setSwapStep('error')
                         }
                       }}
