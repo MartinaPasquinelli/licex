@@ -36,6 +36,7 @@ import {
   KALEIDO_MIND_AGENT_PATH,
   LICEX_MARKETPLACE_PATH,
   LICEX_LICENSE_DETAIL_PATH,
+  LICEX_MY_LICENSES_PATH,
   LICEX_WATCHLIST_PATH,
   LICEX_WISHLIST_PATH,
   LICEX_ASSISTANT_PATH,
@@ -176,6 +177,10 @@ export const router = createBrowserRouter([
       {
         lazy: () => import('../../routes/licex-marketplace/detail'),
         path: LICEX_LICENSE_DETAIL_PATH,
+      },
+      {
+        lazy: () => import('../../routes/licex-my-licenses'),
+        path: LICEX_MY_LICENSES_PATH,
       },
       {
         lazy: () => import('../../routes/licex-watchlist'),

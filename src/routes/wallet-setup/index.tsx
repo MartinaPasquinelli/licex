@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core'
 import {
   Wallet,
   ArrowLeftRight,
@@ -6,10 +5,8 @@ import {
   Server,
   Container,
   ArrowLeft,
-  Boxes,
-  Brain,
 } from 'lucide-react'
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
@@ -18,7 +15,6 @@ import {
   WALLET_INIT_PATH,
   WALLET_REMOTE_PATH,
   WALLET_RESTORE_PATH,
-  KALEIDO_MIND_PATH,
 } from '../../app/router/paths'
 import logoFull from '../../assets/logo-full.svg'
 import logoIcon from '../../assets/logo.svg'
@@ -30,45 +26,14 @@ import {
   WalletAction,
   IconWrapper,
 } from '../../components/wallet-setup'
-import { setAppMode, type AppMode } from '../../slices/settings/settings.slice'
+import { setAppMode } from '../../slices/settings/settings.slice'
 import { useLocalNodeCapabilities } from './useLocalNodeCapabilities'
-import { nodeSettingsActions } from '../../slices/nodeSettings/nodeSettings.slice'
-import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
-
-const MODE_OPTIONS: {
-  mode: AppMode
-  icon: React.ReactNode
-  labelKey: string
-  label: string
-}[] = [
-  {
-    icon: <Boxes className="w-4 h-4" />,
-    label: 'Node + Mind',
-    labelKey: 'launcher.modes.both.title',
-    mode: 'both',
-  },
-  {
-    icon: <Server className="w-4 h-4" />,
-    label: 'Only Node',
-    labelKey: 'launcher.modes.node.title',
-    mode: 'node',
-  },
-  {
-    icon: <Brain className="w-4 h-4" />,
-    label: 'Only Mind',
-    labelKey: 'launcher.modes.mind.title',
-    mode: 'mind',
-  },
-]
 
 export const Component = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const [nodeType, setNodeType] = useState<'local' | 'remote' | null>(null)
-  // Which capabilities the user wants. 'both' (Node + Mind) is the default;
-  // 'mind' skips node setup entirely and opens KaleidoMind.
-  const [selectedMode, setSelectedMode] = useState<AppMode>('both')
   const [isTransitioning, setIsTransitioning] = useState(false)
   const {
     isNativeSupported,
@@ -112,22 +77,6 @@ export const Component = () => {
     }
   }
 
-  const [mindLaunchError, setMindLaunchError] = useState<string | null>(null)
-  const openMindOnly = async () => {
-    setMindLaunchError(null)
-    try {
-      await invoke('set_current_account', { accountName: null })
-      dispatch(nodeSettingsActions.resetNodeSettings())
-      dispatch(nodeApi.util.resetApiState())
-      dispatch(setAppMode('mind'))
-      navigate(KALEIDO_MIND_PATH)
-    } catch {
-      setMindLaunchError(
-        'Could not disconnect the node from Mind. Please try again.'
-      )
-    }
-  }
-
   const navigateToWalletInit = (path: string) => {
     if (localNodeMode === 'docker') {
       // Docker env will be auto-created in wallet-init based on account name
@@ -142,13 +91,21 @@ export const Component = () => {
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar with Toolbar */}
         <div className="w-72 h-full bg-surface-base border-r border-divider/10 flex flex-col">
-          <div className="flex items-center p-4 border-b border-divider/10">
+          <div className="flex items-center gap-2.5 p-4 border-b border-divider/10 select-none">
             <img
-              alt="KaleidoSwap"
-              className="h-8 cursor-pointer"
+              alt="LicEX"
+              className="h-7 cursor-pointer"
               onClick={() => {}}
               src={logoFull}
             />
+            <div className="flex flex-col leading-tight">
+              <span className="font-black text-sm tracking-widest bg-gradient-to-r from-emerald-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                LicEX
+              </span>
+              <span className="text-[8px] uppercase tracking-wider text-content-tertiary font-semibold">
+                Wallet Onboarding
+              </span>
+            </div>
           </div>
 
           {/* Toolbar */}
@@ -176,91 +133,39 @@ export const Component = () => {
               >
                 {!nodeType || nodeType === 'remote' ? (
                   <>
-                    <div className="text-center mb-12 slide-in">
+                    <div className="text-center mb-10 slide-in">
                       <div className="relative inline-flex mb-6">
-                        {/* Purple ripple rings */}
-                        <div className="absolute inset-0 rounded-2xl bg-purple/15 animate-ripple-1 pointer-events-none" />
-                        <div className="absolute inset-0 rounded-2xl bg-purple/10 animate-ripple-2 pointer-events-none" />
-                        <div className="absolute inset-0 rounded-2xl bg-purple/8 animate-ripple-3 pointer-events-none" />
+                        {/* Ripple rings */}
+                        <div className="absolute inset-0 rounded-2xl bg-primary/15 animate-ripple-1 pointer-events-none" />
+                        <div className="absolute inset-0 rounded-2xl bg-primary/10 animate-ripple-2 pointer-events-none" />
                         <div
                           className={`${IconWrapper} bg-gradient-to-br from-primary/20 via-primary/10 to-purple/10 border-2 border-primary/40
                           rounded-2xl shadow-2xl shadow-primary/20
                           relative z-10`}
                         >
                           <img
-                            alt="KaleidoSwap"
+                            alt="LicEX"
                             className="w-8 h-8 brightness-0 invert"
                             src={logoIcon}
                           />
                         </div>
-                        {/* Green glow */}
+                        {/* Glow */}
                         <div className="absolute inset-0 bg-primary/10 rounded-2xl blur-xl scale-150 opacity-30 [animation:pulse_6s_ease-in-out_infinite]" />
                       </div>
-                      <h1 className="text-3xl md:text-5xl font-bold mb-4 text-white tracking-tight leading-tight py-2">
+                      <h1 className="text-3xl md:text-5xl font-bold mb-3 text-white tracking-tight leading-tight py-2">
                         {t('walletSetup.welcomeTo')}{' '}
-                        <span className="bg-gradient-to-r from-primary to-purple bg-clip-text text-transparent">
-                          KaleidoSwap
+                        <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                          LicEX
                         </span>
                       </h1>
-                    </div>
-
-                    {/* Mode selector — Node + Mind (default) / Only Node / Only Mind */}
-                    <div className="flex justify-center mb-8 slide-in">
-                      <div className="flex gap-1 rounded-xl bg-surface-base/35 p-1">
-                        {MODE_OPTIONS.map((m) => {
-                          const active = selectedMode === m.mode
-                          return (
-                            <button
-                              className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 focus:outline-none ${
-                                active
-                                  ? 'bg-primary/15 text-primary border border-primary/30'
-                                  : 'text-content-secondary hover:text-white border border-transparent'
-                              }`}
-                              key={m.mode}
-                              onClick={() => setSelectedMode(m.mode)}
-                              type="button"
-                            >
-                              {m.icon}
-                              <span>
-                                {t(m.labelKey, { defaultValue: m.label })}
-                              </span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    {mindLaunchError && (
-                      <p className="text-sm text-red-400" role="alert">
-                        {mindLaunchError}
+                      <p className="text-sm md:text-base text-content-secondary max-w-lg mx-auto">
+                        Collega o avvia il tuo nodo Bitcoin Lightning/RGB per
+                        gestire il tuo LicEX Wallet e scambiare licenze
+                        software.
                       </p>
-                    )}
-                    {selectedMode === 'mind' ? (
-                      <div className="flex justify-center slide-in">
-                        <div
-                          className="relative overflow-hidden transition-all duration-300 border-2 rounded-2xl backdrop-blur-sm
-                            hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1 cursor-pointer fade-in
-                            bg-surface-elevated/40 hover:bg-surface-elevated/60 border-divider/20 w-full max-w-sm"
-                          onClick={() => void openMindOnly()}
-                        >
-                          <div className="p-6">
-                            <div className="flex items-center gap-4 mb-4">
-                              <div className="p-4 rounded-xl backdrop-blur-sm bg-primary/5 text-primary/80 flex items-center justify-center">
-                                <Brain className="w-6 h-6" strokeWidth={2} />
-                              </div>
-                              <h2 className="text-2xl font-bold text-white">
-                                KaleidoMind
-                              </h2>
-                            </div>
-                            <p className="text-content-secondary text-sm leading-relaxed">
-                              Run local AI models on this desktop. You can
-                              connect the app to a RGB Lightning node any time
-                              later.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : !capabilitiesLoaded ? (
+                    </div>
+
+                    {!capabilitiesLoaded ? (
                       <div className="flex justify-center py-12">
                         <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                       </div>
@@ -270,28 +175,20 @@ export const Component = () => {
                           description={t('walletSetup.remoteNodeDescription')}
                           icon={<Cloud className="w-6 h-6" />}
                           onClick={() => {
-                            dispatch(setAppMode(selectedMode))
+                            dispatch(setAppMode('node'))
                             navigate(WALLET_REMOTE_PATH)
                           }}
                           recommended={true}
-                          title={
-                            selectedMode === 'both'
-                              ? 'Remote Node + Mind'
-                              : t('walletSetup.remoteNodeTitle')
-                          }
+                          title={t('walletSetup.remoteNodeTitle')}
                         />
                         <NodeOption
                           description={t('walletSetup.localNodeDescription')}
                           icon={<Server className="w-6 h-6" />}
                           onClick={() => {
-                            dispatch(setAppMode(selectedMode))
+                            dispatch(setAppMode('node'))
                             handleNodeTypeChange('local')
                           }}
-                          title={
-                            selectedMode === 'both'
-                              ? 'Local Node + Mind'
-                              : t('walletSetup.localNodeTitle')
-                          }
+                          title={t('walletSetup.localNodeTitle')}
                         />
                       </div>
                     )}

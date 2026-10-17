@@ -58,7 +58,7 @@ export function Component() {
       ) {
         reply =
           '**Analisi Politiche di Trasferimento LICEX (Layer 1 + 2):**\n\n' +
-          '• **Freely Transferable**: Il token RGB su Bitcoin può essere scambiato atomicamente su DEX (come KaleidoSwap). Al termine dello swap, il server di autenticazione del vendor riceve il consignment RGB, invalida la chiave precedente e rilascia un nuovo token JWT o licenza hardware-bound.\n' +
+          '• **Freely Transferable**: Il token RGB su Bitcoin può essere scambiato atomicamente su LicEX Marketplace o via swap RGB peer-to-peer. Al termine del transfer, il server di autenticazione del vendor valida il consignment RGB, invalida la chiave precedente e rilascia un nuovo token JWT o licenza hardware-bound.\n' +
           "• **Transferable with Approval**: Richiede firma crittografica bilaterale prima del broadcast. Consente ai vendor enterprise di verificare la compliance dell'acquirente.\n" +
           '• **Royalty on Resale**: Il venditore imposta una percentuale (es. 5-10%) che viene pagata automaticamente al mint creator in satoshi.'
       } else if (

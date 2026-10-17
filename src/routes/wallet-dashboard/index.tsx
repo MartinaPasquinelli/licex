@@ -3,7 +3,6 @@ import {
   Zap,
   ArrowUpRight,
   ArrowDownRight,
-  ArrowLeftRight,
   Plus,
   Loader as LoaderIcon,
   Database,
@@ -17,10 +16,11 @@ import {
   Download,
   Upload,
   History,
-  Brain,
+  Bot,
   ArrowRight,
   ZapOff,
   Info,
+  Package,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -30,12 +30,11 @@ import {
   CHANNELS_PATH,
   CREATE_NEW_CHANNEL_PATH,
   ORDER_CHANNEL_PATH,
-  TRADE_PATH,
   WALLET_HISTORY_DEPOSITS_PATH,
-  KALEIDO_MIND_PATH,
+  LICEX_MARKETPLACE_PATH,
+  LICEX_ASSISTANT_PATH,
 } from '../../app/router/paths'
-import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
-import { setAppMode, isMindEnabled } from '../../slices/settings/settings.slice'
+import { useAppDispatch } from '../../app/store/hooks'
 import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
 import { useSettings } from '../../hooks/useSettings'
 import { AssetRow } from '../../components/AssetRow'
@@ -120,12 +119,7 @@ export const Component = () => {
   const { t } = useTranslation()
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
-  const appMode = useAppSelector((state) => state.settings.appMode)
-  const mindActive = isMindEnabled(appMode)
-  const activateMind = () => {
-    dispatch(setAppMode('both'))
-    navigate(KALEIDO_MIND_PATH)
-  }
+
   const [assets, assetsResponse] = nodeApi.endpoints.listAssets.useLazyQuery()
   const [btcBalance, btcBalanceResponse] =
     nodeApi.endpoints.btcBalance.useLazyQuery()
@@ -353,7 +347,7 @@ export const Component = () => {
           <button
             className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
             onClick={() => {
-              if (hasUsableChannel) navigate(TRADE_PATH)
+              if (hasUsableChannel) navigate(LICEX_MARKETPLACE_PATH)
               else if (channels.length > 0) navigate(CHANNELS_PATH)
               else if (totalBalance > 0) navigate(ORDER_CHANNEL_PATH)
               else
@@ -366,15 +360,13 @@ export const Component = () => {
             }}
             type="button"
           >
-            {t(
-              hasUsableChannel
-                ? 'dashboard.swap'
-                : channels.length > 0
-                  ? 'channels.manageChannels'
-                  : totalBalance > 0
-                    ? 'channels.buyAChannel'
-                    : 'dashboard.deposit'
-            )}
+            {hasUsableChannel
+              ? 'Marketplace Licenze'
+              : channels.length > 0
+                ? t('channels.manageChannels')
+                : totalBalance > 0
+                  ? t('channels.buyAChannel')
+                  : t('dashboard.deposit')}
           </button>
         </section>
       )}
@@ -507,10 +499,10 @@ export const Component = () => {
               </button>
               <button
                 className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/30 text-white text-xs font-semibold transition-all overflow-hidden"
-                onClick={() => navigate(TRADE_PATH)}
+                onClick={() => navigate(LICEX_MARKETPLACE_PATH)}
               >
-                <ArrowLeftRight className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="truncate">{t('dashboard.swap', 'Swap')}</span>
+                <Package className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">Marketplace</span>
               </button>
               <button
                 className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 hover:border-violet-500/50 text-violet-400 text-xs font-semibold transition-all overflow-hidden"
@@ -1011,32 +1003,31 @@ export const Component = () => {
           </div>
         </div>
       </div>
-      {/* KaleidoMind not active in this mode — offer a way to activate it */}
-      {!mindActive && (
-        <button
-          className="group mt-5 flex w-full items-center gap-4 rounded-xl border border-purple/30 bg-gradient-to-r from-purple/10 to-transparent px-5 py-4 text-left transition-all duration-300 hover:border-purple/50 hover:from-purple/15"
-          onClick={activateMind}
-          type="button"
-        >
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-purple/15 text-purple">
-            <Brain className="h-6 w-6" />
+      {/* LICEX AI Assistant banner */}
+      <button
+        className="group mt-5 flex w-full items-center gap-4 rounded-xl border border-purple/30 bg-gradient-to-r from-purple/10 via-cyan-500/5 to-transparent px-5 py-4 text-left transition-all duration-300 hover:border-purple/50 hover:from-purple/15 hover:shadow-lg hover:shadow-purple/5"
+        onClick={() => navigate(LICEX_ASSISTANT_PATH)}
+        type="button"
+      >
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-purple/15 text-purple border border-purple/25 group-hover:scale-105 transition-transform">
+          <Bot className="h-6 w-6 text-purple" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-white">
+              LICEX AI Assistant
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider bg-purple/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple/30">
+              Agent
+            </span>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-bold text-white">
-              {t('dashboard.activateMindTitle', {
-                defaultValue: 'Add KaleidoMind',
-              })}
-            </div>
-            <div className="text-xs text-content-secondary">
-              {t('dashboard.activateMindDesc', {
-                defaultValue:
-                  'Run a local AI brain alongside your node — chat, models and skills.',
-              })}
-            </div>
+          <div className="text-xs text-content-secondary mt-0.5">
+            Analizza termini di trasferimento licenze, revoche crittografiche
+            RGB su Bitcoin e calcolo fair value.
           </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-purple transition-transform duration-300 group-hover:translate-x-1" />
-        </button>
-      )}
+        </div>
+        <ArrowRight className="h-5 w-5 flex-shrink-0 text-purple transition-transform duration-300 group-hover:translate-x-1" />
+      </button>
     </div>
   )
 }

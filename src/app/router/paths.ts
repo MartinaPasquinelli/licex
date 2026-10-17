@@ -79,6 +79,7 @@ export const LICEX_LICENSE_DETAIL_PATH = makePath([
   LICEX_MARKETPLACE_PATH,
   ':licenseId',
 ])
+export const LICEX_MY_LICENSES_PATH = makePath(['my-licenses'])
 export const LICEX_WATCHLIST_PATH = makePath(['watchlist'])
 export const LICEX_WISHLIST_PATH = makePath(['wishlist'])
 export const LICEX_ASSISTANT_PATH = makePath(['licex-assistant'])

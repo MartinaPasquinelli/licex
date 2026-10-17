@@ -3,44 +3,29 @@ import {
   FileText,
   HelpCircle,
   MessageCircle,
-  MessageSquare,
   Github,
   Plus,
   ShoppingCart,
   Settings,
-  Zap,
-  Home,
   Clock,
   ArrowDownLeft,
   ArrowUpRight,
   HardDriveDownload,
   Link as LinkIcon,
-  Brain,
   Droplets,
-  ArrowLeftRight,
-  LayoutDashboard,
-  Download,
-  Upload,
-  Coins,
-  ArrowDownUp,
   Package,
   Heart,
   Sparkles,
   Bot,
   Building2,
+  Wallet,
+  Key,
 } from 'lucide-react'
 import React from 'react'
 
 import {
-  TRADE_PATH,
-  TRADE_MARKET_MAKER_PATH,
-  TRADE_MANUAL_PATH,
-  TRADE_NOSTR_P2P_PATH,
-  TRADE_DCA_PATH,
-  TRADE_LIMIT_PATH,
   WALLET_HISTORY_DEPOSITS_PATH,
   WALLET_HISTORY_WITHDRAWALS_PATH,
-  WALLET_HISTORY_TRADES_PATH,
   WALLET_HISTORY_ASSETS_PATH,
   WALLET_HISTORY_CHANNEL_ORDERS_PATH,
   WALLET_HISTORY_PATH,
@@ -55,9 +40,8 @@ import {
   CHANNELS_PATH,
   CREATE_NEW_CHANNEL_PATH,
   ORDER_CHANNEL_PATH,
-  KALEIDO_MIND_PATH,
-  KALEIDO_MIND_BRAIN_PATH,
   LICEX_MARKETPLACE_PATH,
+  LICEX_MY_LICENSES_PATH,
   LICEX_WATCHLIST_PATH,
   LICEX_WISHLIST_PATH,
   LICEX_ASSISTANT_PATH,
@@ -84,12 +68,12 @@ export interface NavItem {
 
 // A labeled group of nav items shown as a category in the sidebar.
 export interface NavSection {
-  key: 'node' | 'mind' | 'licex'
+  key: 'wallet' | 'licex'
   label: string
   items: NavItem[]
 }
 
-// Sidebar navigation, grouped into sections: LICEX, Node, Mind.
+// Sidebar navigation, grouped into sections: LICEX and Wallet.
 export const getNavSections = (t: TFunction): NavSection[] => [
   {
     items: [
@@ -98,6 +82,12 @@ export const getNavSections = (t: TFunction): NavSection[] => [
         label: t('navigation.marketplace', 'Marketplace'),
         matchPath: LICEX_MARKETPLACE_PATH,
         to: LICEX_MARKETPLACE_PATH,
+      },
+      {
+        icon: <Key className="w-5 h-5" />,
+        label: t('navigation.myLicenses', 'Le Mie Licenze & Ordini'),
+        matchPath: LICEX_MY_LICENSES_PATH,
+        to: LICEX_MY_LICENSES_PATH,
       },
       {
         icon: <Heart className="w-5 h-5" />,
@@ -130,95 +120,13 @@ export const getNavSections = (t: TFunction): NavSection[] => [
   {
     items: [
       {
-        icon: <Home className="w-5 h-5" />,
-        label: t('navigation.dashboard'),
+        icon: <Wallet className="w-5 h-5" />,
+        label: t('navigation.walletDashboard', 'LicEX Wallet'),
         to: WALLET_DASHBOARD_PATH,
       },
-      {
-        icon: <Zap className="w-5 h-5" />,
-        label: t('navigation.trade'),
-        matchPath: TRADE_PATH,
-        matchPaths: [
-          TRADE_MANUAL_PATH,
-          TRADE_DCA_PATH,
-          TRADE_LIMIT_PATH,
-          TRADE_NOSTR_P2P_PATH,
-        ],
-        to: TRADE_MARKET_MAKER_PATH,
-      },
-      {
-        icon: <Clock className="w-5 h-5" />,
-        label: t('navigation.history'),
-        matchPath: WALLET_HISTORY_PATH,
-        subMenu: [
-          {
-            icon: <Download className="w-4 h-4" />,
-            label: t('history.deposits'),
-            to: WALLET_HISTORY_DEPOSITS_PATH,
-          },
-          {
-            icon: <Upload className="w-4 h-4" />,
-            label: t('history.paymentsWithdrawals'),
-            to: WALLET_HISTORY_WITHDRAWALS_PATH,
-          },
-          {
-            icon: <ArrowLeftRight className="w-4 h-4" />,
-            label: t('history.swaps'),
-            to: WALLET_HISTORY_TRADES_PATH,
-          },
-          {
-            icon: <Coins className="w-4 h-4" />,
-            label: t('history.assets'),
-            to: WALLET_HISTORY_ASSETS_PATH,
-          },
-          {
-            icon: <ArrowDownUp className="w-4 h-4" />,
-            label: t('history.channelOrders'),
-            to: WALLET_HISTORY_CHANNEL_ORDERS_PATH,
-          },
-        ],
-        to: WALLET_HISTORY_DEPOSITS_PATH,
-      },
-      {
-        icon: <Droplets className="w-5 h-5" />,
-        label: t('navigation.channels'),
-        matchPath: CHANNELS_PATH,
-        matchPaths: [CREATE_NEW_CHANNEL_PATH, ORDER_CHANNEL_PATH],
-        to: CHANNELS_PATH,
-      },
-      {
-        icon: <LinkIcon className="w-5 h-5" />,
-        label: t('navigation.nwc', 'App Connections'),
-        to: NWC_PATH,
-      },
     ],
-    key: 'node',
-    label: t('navigation.node', 'Node'),
-  },
-  {
-    items: [
-      {
-        icon: <Brain className="w-5 h-5" />,
-        label: t('navigation.kaleidoMind', 'KaleidoMind'),
-        matchPath: KALEIDO_MIND_PATH,
-        subMenu: [
-          {
-            icon: <MessageSquare className="w-4 h-4" />,
-            label: t('navigation.chat', 'Chat'),
-            to: KALEIDO_MIND_PATH,
-          },
-          {
-            // Brain hosts Models + Skills management inline.
-            icon: <LayoutDashboard className="w-4 h-4" />,
-            label: t('navigation.brain', 'Brain'),
-            to: KALEIDO_MIND_BRAIN_PATH,
-          },
-        ],
-        to: KALEIDO_MIND_PATH,
-      },
-    ],
-    key: 'mind',
-    label: t('navigation.mind', 'Mind'),
+    key: 'wallet',
+    label: 'WALLET',
   },
 ]
 
@@ -334,75 +242,71 @@ export const SUPPORT_RESOURCES = getSupportResources(
 export const getPageConfig = (t: TFunction) => ({
   [CHANNELS_PATH]: {
     icon: <Droplets className="w-5 h-5" />,
-    title: t('navigation.channels'),
+    title: t('navigation.channels', 'Canali Lightning'),
   },
   [CREATE_NEW_CHANNEL_PATH]: {
     icon: <Droplets className="w-5 h-5" />,
-    title: t('navigation.channels'),
+    title: t('navigation.channels', 'Nuovo Canale'),
+  },
+  [LICEX_ASSISTANT_PATH]: {
+    icon: <Bot className="w-5 h-5" />,
+    title: t('navigation.assistant', 'LICEX Assistant'),
+  },
+  [LICEX_COMPANY_DASHBOARD_PATH]: {
+    icon: <Building2 className="w-5 h-5" />,
+    title: t('navigation.publisherDashboard', 'Publisher Dashboard'),
+  },
+  [LICEX_MARKETPLACE_PATH]: {
+    icon: <Package className="w-5 h-5" />,
+    title: t('navigation.marketplace', 'Marketplace'),
+  },
+  [LICEX_MY_LICENSES_PATH]: {
+    icon: <Key className="w-5 h-5" />,
+    title: t('navigation.myLicenses', 'Le Mie Licenze & Ordini'),
+  },
+  [LICEX_WATCHLIST_PATH]: {
+    icon: <Heart className="w-5 h-5" />,
+    title: t('navigation.watchlist', 'Watchlist & Alerts'),
+  },
+  [LICEX_WISHLIST_PATH]: {
+    icon: <Sparkles className="w-5 h-5" />,
+    title: t('navigation.wishlist', 'Software Wishlist'),
   },
   [NWC_PATH]: {
     icon: <LinkIcon className="w-5 h-5" />,
-    title: t('navigation.nwc', 'App Connections'),
+    title: t('navigation.nwc', 'App Connections (NWC)'),
   },
   [ORDER_CHANNEL_PATH]: {
     icon: <Droplets className="w-5 h-5" />,
-    title: t('navigation.channels'),
+    title: t('navigation.channels', 'Acquista Canale'),
   },
   [SETTINGS_PATH]: {
     icon: <Settings className="w-5 h-5" />,
-    title: t('navigation.settings'),
-  },
-  [TRADE_DCA_PATH]: {
-    icon: <Zap className="w-5 h-5" />,
-    title: t('navigation.trading', 'Trading'),
-  },
-  [TRADE_LIMIT_PATH]: {
-    icon: <Zap className="w-5 h-5" />,
-    title: t('navigation.trading', 'Trading'),
-  },
-  [TRADE_MANUAL_PATH]: {
-    icon: <Zap className="w-5 h-5" />,
-    title: t('navigation.trading', 'Trading'),
-  },
-  [TRADE_MARKET_MAKER_PATH]: {
-    icon: <Zap className="w-5 h-5" />,
-    title: t('navigation.trading', 'Trading'),
-  },
-  [TRADE_NOSTR_P2P_PATH]: {
-    icon: <Zap className="w-5 h-5" />,
-    title: t('navigation.trading', 'Trading'),
-  },
-  [TRADE_PATH]: {
-    icon: <Zap className="w-5 h-5" />,
-    title: t('navigation.trading', 'Trading'),
+    title: t('navigation.settings', 'Impostazioni'),
   },
   [WALLET_DASHBOARD_PATH]: {
-    icon: <Home className="w-5 h-5" />,
-    title: t('navigation.dashboard'),
+    icon: <Wallet className="w-5 h-5" />,
+    title: t('navigation.walletDashboard', 'Wallet & Saldi'),
   },
   [WALLET_HISTORY_ASSETS_PATH]: {
     icon: <Clock className="w-5 h-5" />,
-    title: t('navigation.history'),
+    title: t('navigation.history', 'Transazioni'),
   },
   [WALLET_HISTORY_CHANNEL_ORDERS_PATH]: {
     icon: <Clock className="w-5 h-5" />,
-    title: t('navigation.history'),
+    title: t('navigation.history', 'Transazioni'),
   },
   [WALLET_HISTORY_DEPOSITS_PATH]: {
     icon: <Clock className="w-5 h-5" />,
-    title: t('navigation.history'),
+    title: t('navigation.history', 'Transazioni'),
   },
   [WALLET_HISTORY_PATH]: {
     icon: <Clock className="w-5 h-5" />,
-    title: t('navigation.history'),
-  },
-  [WALLET_HISTORY_TRADES_PATH]: {
-    icon: <Clock className="w-5 h-5" />,
-    title: t('navigation.history'),
+    title: t('navigation.history', 'Transazioni'),
   },
   [WALLET_HISTORY_WITHDRAWALS_PATH]: {
     icon: <Clock className="w-5 h-5" />,
-    title: t('navigation.history'),
+    title: t('navigation.history', 'Transazioni'),
   },
 })
 

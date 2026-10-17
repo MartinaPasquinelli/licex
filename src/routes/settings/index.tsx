@@ -49,12 +49,10 @@ import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { nodeSettingsActions } from '../../slices/nodeSettings/nodeSettings.slice'
 import { waitForNodeReady } from '../../utils/nodeState'
 import {
-  setAppMode,
   setBitcoinUnit,
   setFiatCurrency,
   setLanguage,
   setNodeConnectionString,
-  type AppMode,
   // setTheme, // temporarily unused — light mode disabled
 } from '../../slices/settings/settings.slice'
 import {
@@ -177,30 +175,8 @@ export const Component: React.FC = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const dispatch = useDispatch()
-  const { bitcoinUnit, fiatCurrency, nodeConnectionString, language, appMode } =
+  const { bitcoinUnit, fiatCurrency, nodeConnectionString, language } =
     useSelector((state: RootState) => state.settings)
-
-  const APP_MODE_OPTIONS: {
-    mode: AppMode
-    labelKey: string
-    fallback: string
-  }[] = [
-    {
-      fallback: 'Node + Mind',
-      labelKey: 'launcher.modes.both.title',
-      mode: 'both',
-    },
-    {
-      fallback: 'Only Node',
-      labelKey: 'launcher.modes.node.title',
-      mode: 'node',
-    },
-    {
-      fallback: 'Only Mind',
-      labelKey: 'launcher.modes.mind.title',
-      mode: 'mind',
-    },
-  ]
   const currentAccount = useAppSelector((state) => state.nodeSettings.data)
   const nodeSettings = useAppSelector((state) => state.nodeSettings.data)
 
@@ -597,13 +573,13 @@ export const Component: React.FC = () => {
       >
         {tabs.map((x) => (
           <button
+            aria-selected={activeTab === x.id}
             className={`inline-flex flex-shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               activeTab === x.id
                 ? 'bg-surface-high text-white shadow-sm'
                 : 'text-content-secondary hover:bg-surface-overlay hover:text-white'
             }`}
             key={x.id}
-            aria-selected={activeTab === x.id}
             onClick={() => setTab(x.id)}
             role="tab"
             type="button"
@@ -624,34 +600,6 @@ export const Component: React.FC = () => {
         {activeTab === 'general' && (
           <>
             <SettingsCard title={t('settings.applicationSettings')}>
-              <SettingRow
-                description={t('settings.capabilitiesDescription', {
-                  defaultValue:
-                    'Choose which parts of KaleidoSwap are shown — the node, the AI brain, or both.',
-                })}
-                label={t('settings.capabilities', {
-                  defaultValue: 'Capabilities',
-                })}
-              >
-                <div className="grid grid-cols-3 gap-1 rounded-lg border border-border-default bg-surface-base/60 p-1">
-                  {APP_MODE_OPTIONS.map((opt) => (
-                    <button
-                      aria-pressed={appMode === opt.mode}
-                      className={`whitespace-nowrap rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                        appMode === opt.mode
-                          ? 'bg-primary/15 text-primary'
-                          : 'text-content-secondary hover:text-white'
-                      }`}
-                      key={opt.mode}
-                      onClick={() => dispatch(setAppMode(opt.mode))}
-                      type="button"
-                    >
-                      {t(opt.labelKey, { defaultValue: opt.fallback })}
-                    </button>
-                  ))}
-                </div>
-              </SettingRow>
-
               <Controller
                 control={control}
                 name="bitcoinUnit"

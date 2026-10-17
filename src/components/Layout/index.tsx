@@ -13,8 +13,7 @@ import {
   Loader2,
   RefreshCw,
   Plus,
-  Server,
-  Brain,
+  Wallet,
 } from 'lucide-react'
 import React, { useEffect, useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -25,7 +24,6 @@ import {
   SETTINGS_PATH,
   ROOT_PATH,
   WALLET_SETUP_PATH,
-  KALEIDO_MIND_PATH,
 } from '../../app/router/paths'
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
 import logoFull from '../../assets/logo-full.svg'
@@ -34,17 +32,11 @@ import { useNodeLifecycleEvents } from '../../hooks/useNodeLifecycleEvents'
 import { useOnClickOutside } from '../../hooks/useOnClickOutside'
 import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { nodeSettingsActions } from '../../slices/nodeSettings/nodeSettings.slice'
-import {
-  setAppMode,
-  isNodeEnabled,
-  isMindEnabled,
-} from '../../slices/settings/settings.slice'
+import { isNodeEnabled } from '../../slices/settings/settings.slice'
 import { uiSliceActions } from '../../slices/ui/ui.slice'
 import { AppVersion } from '../AppVersion'
 import { BackupModal } from '../BackupModal'
 import { useBackup } from '../../hooks/useBackup'
-import { useDcaScheduler } from '../../hooks/useDcaScheduler'
-import { useLimitOrderScheduler } from '../../hooks/useLimitOrderScheduler'
 import { useNwcAutostart } from '../../hooks/useNwcAutostart'
 import { useNodeReachabilityMonitor } from '../../hooks/useNodeReachabilityMonitor'
 import { useNodeReconnect } from '../../hooks/useNodeReconnect'
@@ -566,9 +558,13 @@ export const Layout = (props: Props) => {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const shouldHideNavbar = HIDE_NAVBAR_PATHS.includes(location.pathname)
-  // KaleidoMind does not depend on the node, so the node-offline overlay must
-  // never block it — a node-less or "KaleidoMind only" user can keep using it.
-  const isMindRoute = location.pathname.startsWith(KALEIDO_MIND_PATH)
+  // LicEX routes don't depend on the node being reachable, so the overlay must not block them
+  const isLicexRoute =
+    location.pathname.startsWith('/marketplace') ||
+    location.pathname.startsWith('/watchlist') ||
+    location.pathname.startsWith('/wishlist') ||
+    location.pathname.startsWith('/licex-assistant') ||
+    location.pathname.startsWith('/company-dashboard')
 
   // Get translated menu items
   const NAV_SECTIONS = getNavSections(t)
@@ -592,8 +588,6 @@ export const Layout = (props: Props) => {
 
   const [lock] = nodeApi.endpoints.lock.useMutation()
 
-  useDcaScheduler()
-  useLimitOrderScheduler()
   useNwcAutostart()
   useNodeLifecycleEvents()
 
@@ -613,13 +607,8 @@ export const Layout = (props: Props) => {
   )
   const nodeSettingsData = useAppSelector((state) => state.nodeSettings.data)
   const appMode = useAppSelector((state) => state.settings.appMode)
-  // A configured node (local OR remote) must always surface its section.
-  // appMode alone isn't enough: a node connected after a "KaleidoMind only"
-  // onboarding (appMode 'mind') would otherwise stay hidden behind the
-  // "Activate Node" affordance even though it's live — so also enable the
-  // section whenever a node account exists.
+  // A configured node (local OR remote) surfaces the wallet section
   const nodeSectionEnabled = isNodeEnabled(appMode) || !!nodeSettingsData?.name
-  const mindSectionEnabled = isMindEnabled(appMode)
   const isNodeReachable =
     nodeReachability === 'reachable' ||
     (nodeReachability === 'unknown' && nodeInfo.isSuccess)
@@ -635,16 +624,6 @@ export const Layout = (props: Props) => {
     accountKey: nodeSettingsData?.name,
     skip: shouldHideNavbar || !nodeSettingsData?.name,
   })
-
-  // In "Only Node" mode the KaleidoMind sidecar isn't reachable, so make sure
-  // its process (and any loaded model) is stopped to free resources.
-  useEffect(() => {
-    if (!mindSectionEnabled) {
-      invoke('mind_stop').catch(() => {
-        /* sidecar not running — nothing to stop */
-      })
-    }
-  }, [mindSectionEnabled])
 
   const { data, isFetching, error } = nodeApi.useListTransactionsQuery(
     undefined,
@@ -885,11 +864,11 @@ export const Layout = (props: Props) => {
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-md bg-surface-base rounded-xl border border-divider/20 shadow-xl p-6">
             <h3 className="text-xl font-semibold text-white">
-              {isNodeActive ? 'Close KaleidoSwap?' : 'Quit KaleidoSwap?'}
+              {isNodeActive ? 'Close LicEX?' : 'Quit LicEX?'}
             </h3>
             <p className="text-content-secondary mt-3">
               {isNodeActive
-                ? 'The local node is still running. You can keep it running in the background or stop it before quitting the app.'
+                ? 'The local node/wallet is still running. You can keep it running in the background or stop it before quitting the app.'
                 : 'The app is ready to quit.'}
             </p>
 
@@ -940,7 +919,7 @@ export const Layout = (props: Props) => {
         </div>
       )}
 
-      {!shouldHideNavbar && isNodeUnreachable && !isMindRoute && (
+      {!shouldHideNavbar && isNodeUnreachable && !isLicexRoute && (
         <div className="fixed bottom-4 right-4 left-4 sm:left-auto z-40 pointer-events-none">
           <div
             aria-live="polite"
@@ -1039,14 +1018,26 @@ export const Layout = (props: Props) => {
               className={`flex items-center bg-surface-base py-3 px-3 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}
             >
               {!isSidebarCollapsed && (
-                <img
-                  alt="KaleidoSwap"
-                  className="h-8 w-auto cursor-pointer transition-all duration-300 hover:scale-105 active:scale-95"
+                <div
+                  className="flex items-center gap-2 cursor-pointer select-none group"
                   onClick={() => {
                     navigate(ROOT_PATH)
                   }}
-                  src={logoFull}
-                />
+                >
+                  <img
+                    alt="LicEX"
+                    className="h-7 w-auto transition-all duration-300 group-hover:scale-105 active:scale-95"
+                    src={logoFull}
+                  />
+                  <div className="flex flex-col leading-tight">
+                    <span className="font-black text-sm tracking-widest bg-gradient-to-r from-emerald-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                      LicEX
+                    </span>
+                    <span className="text-[8px] uppercase tracking-wider text-content-tertiary font-semibold">
+                      License Exchange
+                    </span>
+                  </div>
+                </div>
               )}
 
               <button
@@ -1068,24 +1059,15 @@ export const Layout = (props: Props) => {
               </button>
             </div>
 
-            {/* Main navigation — grouped into Node / Mind categories */}
+            {/* Main navigation — grouped into LICEX and Wallet categories */}
             <div className="flex-1 overflow-y-auto pt-3 px-3">
               {NAV_SECTIONS.map((section, sectionIndex) => {
                 const sectionEnabled =
-                  section.key === 'node'
-                    ? nodeSectionEnabled
-                    : mindSectionEnabled
+                  section.key === 'wallet' ? nodeSectionEnabled : true
                 const activate = () => {
-                  if (section.key === 'mind') {
-                    // Mind needs no setup — enable it and jump straight in.
-                    dispatch(setAppMode('both'))
-                    navigate(KALEIDO_MIND_PATH)
-                  } else {
-                    // Node needs onboarding — send the user to the welcome.
-                    navigate(ROOT_PATH)
-                  }
+                  navigate(ROOT_PATH)
                 }
-                const ActivateIcon = section.key === 'node' ? Server : Brain
+                const ActivateIcon = Wallet
                 return (
                   <div
                     className={sectionIndex > 0 ? 'mt-6' : ''}
@@ -1130,7 +1112,7 @@ export const Layout = (props: Props) => {
                         {!isSidebarCollapsed && (
                           <span className="text-sm font-semibold">
                             {t('navigation.activate', {
-                              defaultValue: 'Activate {{name}}',
+                              defaultValue: 'Connect {{name}}',
                               name: section.label,
                             })}
                           </span>
@@ -1198,7 +1180,7 @@ export const Layout = (props: Props) => {
 
           {/* Main content */}
           <main
-            className={`flex-1 flex flex-col ${isMindRoute ? 'h-screen min-h-0' : 'min-h-screen'} max-w-full overflow-x-hidden bg-surface-raised transition-all duration-300
+            className={`flex-1 flex flex-col ${isLicexRoute ? 'h-screen min-h-0' : 'min-h-screen'} max-w-full overflow-x-hidden bg-surface-raised transition-all duration-300
                         ${isSidebarCollapsed ? 'ml-20' : 'ml-60'}`}
           >
             {/* Top bar with page title and user profile */}
@@ -1274,7 +1256,7 @@ export const Layout = (props: Props) => {
 
             {/* Main content area */}
             <div
-              className={`relative isolate flex-1 overflow-hidden ${isMindRoute ? 'min-h-0 p-3' : 'p-4'}`}
+              className={`relative isolate flex-1 overflow-hidden ${isLicexRoute ? 'min-h-0 p-3' : 'p-4'}`}
               id="content-area"
             >
               {/* Portal target for modals — absolute inset-0 so modals cover only this area.
