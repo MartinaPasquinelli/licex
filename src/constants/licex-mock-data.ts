@@ -2,6 +2,8 @@
 // Demo catalog using real software brands/products. Prices are illustrative sats, NOT official prices.
 // IMPORTANT: These are mock listings for UI testing, not authorized resale offers. Verify vendor terms before listing/transferring any license.
 
+import type { NostrLicenseOffer } from '../types/licexNostr'
+
 import type {
   Company,
   LicenseListing,
@@ -574,3 +576,20 @@ export const CATEGORIES = [
   'Productivity',
   'Gaming',
 ] as const
+
+export const MOCK_NOSTR_OFFERS: NostrLicenseOffer[] = [
+  {
+    createdAt: '2026-10-16T18:00:00Z',
+    id: 'p2p-nostr-001',
+    licenseRecordId: 'lr-demo-p2p',
+    listing: MOCK_LISTINGS[2], // Licenza DevFlow Cloud/Desktop
+    nostrEventId: 'e4d8a1f9b3c2...nostr77a',
+    resalePriceUsdt: 65, // Prezzo di seconda mano scontato a 65 USDT
+    royaltyPercent: 5,
+    sellerName: 'SatoshiDev (npub1q8...)',
+    sellerNpub: 'npub1q892klnw9283hxmnv9823klnsdf923',
+    status: 'active',
+    transferCount: 1,
+    transferPolicy: 'transferable_free',
+  },
+]

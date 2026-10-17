@@ -12,6 +12,7 @@ import {
   Check,
   Search,
   Sparkles,
+  Zap,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -24,6 +25,14 @@ export function Component() {
   const [activeTab, setActiveTab] = useState<'licenses' | 'orders'>('licenses')
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [testedHandshakeId, setTestedHandshakeId] = useState<string | null>(
+    null
+  )
+
+  const handleTestHandshake = (id: string) => {
+    setTestedHandshakeId(id)
+    setTimeout(() => setTestedHandshakeId(null), 3500)
+  }
 
   const handleCopy = (key: string, id: string) => {
     navigator.clipboard.writeText(key)
@@ -146,8 +155,9 @@ export function Component() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredLicenses.map((lic) => {
+                const contractId = `rgb1${lic.id.replace(/-/g, '').slice(0, 10)}...licex`
+                const sealUtxo = `txid:${lic.id.replace(/-/g, '').slice(0, 8)}...:1`
                 const isCopied = copiedKey === lic.id
-                const displayKey = `LICEX-${lic.id.replace(/-/g, '').slice(0, 16).toUpperCase()}-RGB25`
                 return (
                   <div
                     className="group relative flex flex-col justify-between p-5 rounded-2xl bg-surface-overlay border border-border-default hover:border-primary/50 transition-all duration-300 shadow-md hover:shadow-xl"
@@ -173,29 +183,68 @@ export function Component() {
                         </div>
                       </div>
 
-                      {/* License Key Box */}
-                      <div className="mt-4 p-3 rounded-xl bg-surface-elevated/60 border border-border-subtle">
-                        <div className="flex items-center justify-between text-xs text-content-secondary mb-1">
-                          <span>Chiave di Licenza</span>
-                          <span className="text-[10px] text-primary font-semibold">
-                            Single-Use Seal RGB
+                      {/* Codeless RGB25 Asset & Software Handshake Card */}
+                      <div className="mt-4 p-3.5 rounded-xl bg-surface-elevated/70 border border-border-subtle space-y-2.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-content-primary flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            Asset RGB25 (Codeless)
+                          </span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+                            Wallet Linked
                           </span>
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <code className="text-xs font-mono font-bold text-content-primary truncate">
-                            {displayKey}
-                          </code>
+
+                        <div className="space-y-1.5 text-[11px] font-mono bg-surface-overlay/80 p-2.5 rounded-lg border border-border-subtle">
+                          <div className="flex justify-between items-center text-content-secondary">
+                            <span>Contract ID:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-content-primary font-bold">
+                                {contractId}
+                              </span>
+                              <button
+                                className="p-1 hover:text-primary transition-colors"
+                                onClick={() => handleCopy(contractId, lic.id)}
+                                title="Copia Contract ID"
+                                type="button"
+                              >
+                                {isCopied ? (
+                                  <Check className="w-3 h-3 text-green-500" />
+                                ) : (
+                                  <Copy className="w-3 h-3 text-content-tertiary" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center text-content-secondary">
+                            <span>Single-Use Seal:</span>
+                            <span className="text-primary font-bold">
+                              {sealUtxo}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-subtle/40">
+                          <div className="text-[11px]">
+                            {testedHandshakeId === lic.id ? (
+                              <span className="text-emerald-500 font-semibold flex items-center gap-1 animate-fadeIn">
+                                <Check className="w-3.5 h-3.5" />
+                                Handshake Software OK! Licenza Attiva
+                              </span>
+                            ) : (
+                              <span className="text-content-secondary">
+                                Attivazione automatica via wallet
+                              </span>
+                            )}
+                          </div>
                           <button
-                            className="p-1.5 rounded-lg text-content-secondary hover:text-content-primary hover:bg-surface-elevated transition-colors flex-shrink-0"
-                            onClick={() => handleCopy(displayKey, lic.id)}
-                            title="Copia chiave"
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all flex items-center gap-1"
+                            onClick={() => handleTestHandshake(lic.id)}
+                            title="Simula l'interrogazione del software locale al wallet per verificare il possesso dell'asset"
                             type="button"
                           >
-                            {isCopied ? (
-                              <Check className="w-3.5 h-3.5 text-green-500" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
+                            <Zap className="w-3 h-3" />
+                            Test Connessione
                           </button>
                         </div>
                       </div>

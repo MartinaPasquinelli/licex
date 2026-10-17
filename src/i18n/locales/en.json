@@ -1411,7 +1411,11 @@
     "submit": "Issue Asset",
     "submitting": "Issuing...",
     "success": "Asset issued successfully!",
-    "failure": "Failed to issue asset"
+    "failure": "Failed to issue asset",
+    "demoModeToggle": "Demo Simulation",
+    "demoModeDescription": "Simulated issuance for demo (no real Bitcoin node or UTXOs required)",
+    "demoSuccess": "Asset issued successfully in Demo Mode!",
+    "demoFallbackNotice": "Node or UTXOs not detected: asset issued successfully in Demo Mode for testing!"
   },
   "updater": {
     "checkingTitle": "Checking for Updates",

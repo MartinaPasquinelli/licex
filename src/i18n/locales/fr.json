@@ -1411,7 +1411,11 @@
     "submit": "Émettre l'actif",
     "submitting": "Émission...",
     "success": "Actif émis avec succès !",
-    "failure": "Échec de l'émission de l'actif"
+    "failure": "Échec de l'émission de l'actif",
+    "demoModeToggle": "Simulation Démo",
+    "demoModeDescription": "Émission simulée pour la démo (aucun nœud Bitcoin réel ou UTXO requis)",
+    "demoSuccess": "Actif émis avec succès en mode Démo !",
+    "demoFallbackNotice": "Nœud ou UTXO non détectés : actif émis avec succès en mode Démo pour les tests !"
   },
   "updater": {
     "checkingTitle": "Recherche de mises à jour",

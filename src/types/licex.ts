@@ -21,6 +21,18 @@ export interface Company {
 export type TransferPolicy =
   'not_transferable' | 'transferable_with_approval' | 'transferable_free'
 
+export type LicenseAssetMode = 'demo' | 'rgb-node'
+
+export interface LicenseAssetReference {
+  assetId: string
+  contractId: string
+  metadataHash: string
+  schema: 'UDA'
+  status: RgbAssetStatus
+  mode: LicenseAssetMode
+  issuedAt: string
+}
+
 // ── License Listing ──────────────────────────────────────────────────────────
 export type ListingStatus =
   'draft' | 'pending_review' | 'published' | 'suspended' | 'rejected'
@@ -51,6 +63,7 @@ export interface LicenseListing {
   tags: string[]
   createdAt: string
   updatedAt: string
+  rgbAsset?: LicenseAssetReference
 }
 
 // ── RGB Asset ────────────────────────────────────────────────────────────────

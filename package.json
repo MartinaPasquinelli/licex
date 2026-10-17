@@ -87,12 +87,5 @@
   "lint-staged": {
     "src/**/*": "prettier --write --ignore-unknown",
     "src/**/*.{ts,tsx}": "eslint --fix"
-  },
-  "pnpm": {
-    "overrides": {
-      "kaleido-ui>@tetherto/wdk-uikit-react-native": "-",
-      "react-native": "-",
-      "react-native-svg": "-"
-    }
   }
 }

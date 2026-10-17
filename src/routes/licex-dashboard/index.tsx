@@ -13,8 +13,11 @@ import {
   AlertTriangle,
   KeyRound,
 } from 'lucide-react'
+import { toast } from 'react-toastify'
 
-import { useAppSelector } from '../../app/store/hooks'
+import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
+import { mintLicenseListing } from '../../slices/licex/licex.slice'
+import { issueDemoLicenseAsset } from '../../services/licex/licenseAssetIssuer'
 
 function formatSats(sats: number): string {
   if (sats >= 1000000) return `${(sats / 1000000).toFixed(2)}M sats`
@@ -23,6 +26,7 @@ function formatSats(sats: number): string {
 }
 
 export function Component() {
+  const dispatch = useAppDispatch()
   const { companyStats, listings } = useAppSelector((s) => s.licex)
   const [activeTab, setActiveTab] = useState<'listings' | 'transfers' | 'mint'>(
     'listings'
@@ -36,19 +40,57 @@ export function Component() {
     useState('transferable_free')
   const [mintRoyalty, setMintRoyalty] = useState('5')
   const [mintNotice, setMintNotice] = useState<string | null>(null)
+  const [isIssuing, setIsIssuing] = useState(false)
 
   const companyListings = listings.filter(
     (l) => l.companyId === 'comp-1' || l.companyId === 'comp-2'
   )
 
-  const handleMintSubmit = (e: React.FormEvent) => {
+  const handleMintSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setMintNotice(
-      `✓ Nuova licenza RGB configurata: "${mintName}" (${mintEdition}) con policy "${mintTransferPolicy}" e royalty ${mintRoyalty}%. Pronto per il deployment on-chain su Mutinynet.`
-    )
-    setMintName('')
-    setMintEdition('')
-    setMintPrice('')
+    if (isIssuing) return
+    const priceSats = Number(mintPrice) || 0
+    const royalty = Number(mintRoyalty) || 0
+    const requestId = crypto.randomUUID()
+    setIsIssuing(true)
+    try {
+      const issuedAsset = await issueDemoLicenseAsset({
+        edition: mintEdition,
+        productName: mintName,
+        requestId,
+        royaltyPercent: royalty,
+        transferPolicy: mintTransferPolicy as any,
+        version: '2026.1',
+      })
+
+      dispatch(
+        mintLicenseListing({
+          edition: mintEdition,
+          id: `lic-${requestId}`,
+          price: priceSats,
+          productName: mintName,
+          rgbAsset: issuedAsset,
+          royaltyPercent: royalty,
+          transferPolicy: mintTransferPolicy as any,
+        })
+      )
+
+      toast.success('Licenza RGB UDA demo emessa e pubblicata!')
+      setMintNotice(
+        `✓ Licenza pubblicata solo dopo emissione asset. Asset ID: ${issuedAsset.assetId}; contratto UDA: ${issuedAsset.contractId}; hash metadati: ${issuedAsset.metadataHash.slice(0, 16)}…`
+      )
+      setMintName('')
+      setMintEdition('')
+      setMintPrice('')
+      setTimeout(() => setActiveTab('listings'), 1200)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Emissione fallita'
+      toast.error(message)
+      setMintNotice(`✕ Pubblicazione annullata: ${message}`)
+    } finally {
+      setIsIssuing(false)
+    }
   }
 
   return (
@@ -379,9 +421,10 @@ export function Component() {
 
               <button
                 className="w-full py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25 hover:from-purple-500 hover:to-indigo-500 transition-all"
+                disabled={isIssuing}
                 type="submit"
               >
-                Mint & Deploy RGB Asset Contract (Demo)
+                {isIssuing ? 'Issuing UDA…' : 'Mint & Deploy RGB UDA (Demo)'}
               </button>
             </form>
           </div>

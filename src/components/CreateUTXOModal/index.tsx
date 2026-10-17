@@ -1,4 +1,4 @@
-import { ChevronDown, Info, Settings, Zap, X } from 'lucide-react'
+import { ChevronDown, Info, Settings, Sparkles, Zap, X } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
@@ -13,6 +13,7 @@ import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { Button, IconButton } from '../ui'
 import { logger } from '../../utils/logger'
 import { extractErrorMessage } from '../../api/errors'
+import { saveDemoUtxos } from '../../utils/demoAssets'
 
 interface CreateUTXOModalProps {
   isOpen: boolean
@@ -38,6 +39,7 @@ export const CreateUTXOModal: React.FC<CreateUTXOModalProps> = ({
   const [creationError, setCreationError] = useState<string>()
   const [feeRate, setFeeRate] = useState(0)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [isDemoMode, setIsDemoMode] = useState(true)
   const [numUtxos, setNumUtxos] = useState(() => {
     // For channel creation with no uncolored UTXOs, always use 1 UTXO
     if (
@@ -126,9 +128,31 @@ export const CreateUTXOModal: React.FC<CreateUTXOModalProps> = ({
   }
 
   const handleCreateUTXOs = async () => {
-    if (isLoading || feeRate <= 0 || insufficientBalance) return
+    if (!isDemoMode && (isLoading || feeRate <= 0 || insufficientBalance))
+      return
     setCreationError(undefined)
     setIsLoading(true)
+
+    if (isDemoMode) {
+      // Simulate UTXO creation via localStorage
+      setTimeout(async () => {
+        saveDemoUtxos(numUtxos, utxoSize)
+        toast.success(t('createUtxos.toasts.created', 'UTXOs created (demo)'))
+        setIsLoading(false)
+        onClose()
+        if (retryFunction) {
+          try {
+            await retryFunction()
+            onSuccess()
+          } catch {
+            onSuccess()
+          }
+        } else {
+          onSuccess()
+        }
+      }, 700)
+      return
+    }
 
     try {
       await createUtxos({
@@ -172,7 +196,9 @@ export const CreateUTXOModal: React.FC<CreateUTXOModalProps> = ({
   const availableBalance = btcBalanceData?.vanilla?.spendable
   const totalAmount = numUtxos * utxoSize
   const insufficientBalance =
-    availableBalance !== undefined && totalAmount >= availableBalance
+    !isDemoMode &&
+    availableBalance !== undefined &&
+    totalAmount >= availableBalance
 
   // Output sizes exclude the transaction fee; the node calculates the exact fee.
   // Calculate the maximum possible size based on available balance
@@ -207,6 +233,35 @@ export const CreateUTXOModal: React.FC<CreateUTXOModalProps> = ({
             onClick={onClose}
             variant="ghost"
           />
+        </div>
+
+        {/* Demo Mode Banner */}
+        <div className="px-6 pt-4">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="w-4 h-4 text-purple-400 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-purple-200">
+                  {t('issueAssetModal.demoModeToggle', 'Simulazione Demo')}
+                </p>
+                <p className="text-[11px] text-purple-300/80">
+                  {t(
+                    'utxoManagement.demoModeDescription',
+                    'UTXO simulati per la demo (senza BTC reale)'
+                  )}
+                </p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-3">
+              <input
+                checked={isDemoMode}
+                className="sr-only peer"
+                onChange={(e) => setIsDemoMode(e.target.checked)}
+                type="checkbox"
+              />
+              <div className="w-9 h-5 bg-surface-overlay peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
         </div>
 
         {/* Scrollable Content */}
@@ -436,18 +491,24 @@ export const CreateUTXOModal: React.FC<CreateUTXOModalProps> = ({
             aria-live="polite"
             className="mb-3 text-sm text-content-secondary"
           >
-            <p>
-              Available BTC: {availableBalance?.toLocaleString() ?? '...'} sats
-            </p>
-            <p>
-              Required: {totalAmount.toLocaleString()} sats + transaction fee
-            </p>
-            {insufficientBalance && (
-              <p className="mt-2 text-status-danger" role="alert">
-                Insufficient spendable BTC. Deposit BTC and wait for
-                confirmation, or reduce the number or size of UTXOs in Advanced
-                Settings.
-              </p>
+            {!isDemoMode && (
+              <>
+                <p>
+                  Available BTC: {availableBalance?.toLocaleString() ?? '...'}{' '}
+                  sats
+                </p>
+                <p>
+                  Required: {totalAmount.toLocaleString()} sats + transaction
+                  fee
+                </p>
+                {insufficientBalance && (
+                  <p className="mt-2 text-status-danger" role="alert">
+                    Insufficient spendable BTC. Deposit BTC and wait for
+                    confirmation, or reduce the number or size of UTXOs in
+                    Advanced Settings.
+                  </p>
+                )}
+              </>
             )}
             {creationError && (
               <p className="mt-2 text-status-danger" role="alert">
@@ -457,7 +518,10 @@ export const CreateUTXOModal: React.FC<CreateUTXOModalProps> = ({
           </div>
           <Button
             className="w-full"
-            disabled={isLoading || feeRate <= 0 || insufficientBalance}
+            disabled={
+              isLoading ||
+              (!isDemoMode && (feeRate <= 0 || insufficientBalance))
+            }
             icon={!isLoading ? <Zap size={18} /> : undefined}
             isLoading={isLoading}
             onClick={handleCreateUTXOs}

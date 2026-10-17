@@ -5,8 +5,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Bot, Send, Sparkles, Cpu, Lightbulb } from 'lucide-react'
 
-import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
-import { addChatMessage, setChatLoading } from '../../slices/licex/licex.slice'
+import { useAppSelector } from '../../app/store/hooks'
+import { MOCK_CHAT_MESSAGES } from '../../constants/licex-mock-data'
 import type { ChatMessage } from '../../types/licex'
 
 const SUGGESTED_PROMPTS = [
@@ -17,8 +17,10 @@ const SUGGESTED_PROMPTS = [
 ]
 
 export function Component() {
-  const dispatch = useAppDispatch()
-  const { chatMessages, chatLoading, listings } = useAppSelector((s) => s.licex)
+  const listings = useAppSelector((s) => s.licex.listings)
+  const [chatMessages, setChatMessages] =
+    useState<ChatMessage[]>(MOCK_CHAT_MESSAGES)
+  const [chatLoading, setChatLoading] = useState(false)
 
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -42,9 +44,9 @@ export function Component() {
       timestamp: new Date().toISOString(),
     }
 
-    dispatch(addChatMessage(userMsg))
+    setChatMessages((prev) => [...prev, userMsg])
     if (!textToSend) setInput('')
-    dispatch(setChatLoading(true))
+    setChatLoading(true)
 
     // Simulated QVAC Local AI Response
     setTimeout(() => {
@@ -98,8 +100,8 @@ export function Component() {
         timestamp: new Date().toISOString(),
       }
 
-      dispatch(addChatMessage(botMsg))
-      dispatch(setChatLoading(false))
+      setChatMessages((prev) => [...prev, botMsg])
+      setChatLoading(false)
     }, 1200)
   }
 

@@ -3,8 +3,10 @@
 // AI chat, and company dashboard. Uses mock data as initial state.
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import type { NostrLicenseOffer } from '../../types/licexNostr'
 
 import type {
+  LicenseAssetReference,
   LicenseListing,
   WatchlistItem,
   PriceAlert,
@@ -14,6 +16,7 @@ import type {
   LicenseRecord,
   Order,
   MarketplaceFilters,
+  TransferPolicy,
 } from '../../types/licex'
 import {
   MOCK_LISTINGS,
@@ -24,6 +27,7 @@ import {
   MOCK_COMPANY_STATS,
   MOCK_OWNED_LICENSES,
   MOCK_ORDERS,
+  MOCK_NOSTR_OFFERS,
 } from '../../constants/licex-mock-data'
 
 interface LicexState {
@@ -38,6 +42,7 @@ interface LicexState {
   companyStats: CompanyDashboardStats
   ownedLicenses: LicenseRecord[]
   orders: Order[]
+  p2pOffers: NostrLicenseOffer[]
   filters: MarketplaceFilters
   viewMode: 'grid' | 'list'
 }
@@ -62,6 +67,7 @@ const initialState: LicexState = {
   listings: MOCK_LISTINGS,
   orders: MOCK_ORDERS,
   ownedLicenses: MOCK_OWNED_LICENSES,
+  p2pOffers: MOCK_NOSTR_OFFERS,
   priceAlerts: MOCK_PRICE_ALERTS,
   selectedListing: null,
   viewMode: 'grid',
@@ -139,15 +145,8 @@ export const licexSlice = createSlice({
   initialState,
   name: 'licex',
   reducers: {
-    
-    // ── AI Chat ────────────────────────────────────────────────────────
-addChatMessage(state, action: PayloadAction<ChatMessage>) {
-      state.chatMessages.push(action.payload)
-    },
-
-    
     // ── Price Alerts ───────────────────────────────────────────────────
-addPriceAlert(
+    addPriceAlert(
       state,
       action: PayloadAction<{ listingId: string; thresholdSats: number }>
     ) {
@@ -166,7 +165,6 @@ addPriceAlert(
       }
     },
 
-    // ── Watchlist ──────────────────────────────────────────────────────
     addToWatchlist(state, action: PayloadAction<string>) {
       const listing = state.listings.find((l) => l.id === action.payload)
       if (
@@ -213,6 +211,16 @@ addPriceAlert(
       state.filteredListings = applyFilters(state.listings, state.filters)
     },
 
+    completePurchase(
+      state,
+      action: PayloadAction<{ order: Order; licenseRecord: LicenseRecord }>
+    ) {
+      // Salva l'ordine in cima alla cronologia ordini
+      state.orders.unshift(action.payload.order)
+      // Aggiunge la licenza tra quelle possedute dall'utente
+      state.ownedLicenses.unshift(action.payload.licenseRecord)
+    },
+
     removeFromWatchlist(state, action: PayloadAction<string>) {
       state.watchlist = state.watchlist.filter(
         (w) => w.listingId !== action.payload
@@ -229,7 +237,6 @@ addPriceAlert(
       state.wishlist = state.wishlist.filter((w) => w.id !== action.payload)
     },
 
-    // ── Listing Detail ─────────────────────────────────────────────────
     selectListing(state, action: PayloadAction<string | null>) {
       state.selectedListing = action.payload
         ? state.listings.find((l) => l.id === action.payload) || null
@@ -241,6 +248,7 @@ addPriceAlert(
     },
 
     // ── Filters ────────────────────────────────────────────────────────
+
     setFilters(state, action: PayloadAction<Partial<MarketplaceFilters>>) {
       state.filters = { ...state.filters, ...action.payload }
       state.filteredListings = applyFilters(state.listings, state.filters)
@@ -262,6 +270,6 @@ export const {
   removePriceAlert,
   addWishlistItem,
   removeWishlistItem,
-  addChatMessage,
   setChatLoading,
+  completePurchase,
 } = licexSlice.actions

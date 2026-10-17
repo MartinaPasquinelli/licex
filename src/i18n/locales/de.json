@@ -1411,7 +1411,11 @@
     "submit": "Asset emittieren",
     "submitting": "Emission...",
     "success": "Asset erfolgreich emittiert!",
-    "failure": "Asset konnte nicht emittiert werden"
+    "failure": "Asset konnte nicht emittiert werden",
+    "demoModeToggle": "Demo-Simulation",
+    "demoModeDescription": "Simulierte Emission für die Demo (keine echten Bitcoin-Knoten oder UTXOs erforderlich)",
+    "demoSuccess": "Asset erfolgreich im Demo-Modus emittiert!",
+    "demoFallbackNotice": "Knoten oder UTXOs nicht erkannt: Asset erfolgreich im Demo-Modus für Tests emittiert!"
   },
   "updater": {
     "checkingTitle": "Nach Updates suchen",

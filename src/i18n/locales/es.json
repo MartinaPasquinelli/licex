@@ -1411,7 +1411,11 @@
     "submit": "Emitir Activo",
     "submitting": "Emitiendo...",
     "success": "¡Activo emitido exitosamente!",
-    "failure": "Error al emitir el activo"
+    "failure": "Error al emitir el activo",
+    "demoModeToggle": "Simulación Demo",
+    "demoModeDescription": "Emisión simulada para la demo (no se requieren nodos de Bitcoin reales ni UTXOs)",
+    "demoSuccess": "¡Activo emitido con éxito en modo Demo!",
+    "demoFallbackNotice": "Nodo o UTXO no detectados: ¡activo emitido con éxito en modo Demo para pruebas!"
   },
   "updater": {
     "checkingTitle": "Buscando Actualizaciones",
