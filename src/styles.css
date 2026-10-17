@@ -57,7 +57,21 @@
   font-style: normal;
   font-display: swap;
 }
+/* Override finale dei token verdi di kaleido-ui */
+:root,
+.dark {
+  --app-primary: 143 184 222;
+  --app-primary-emphasis: 205 247 246;
+  --app-primary-foreground: 18 16 24;
+  --app-border-strong: 143 184 222;
+}
 
+.light {
+  --app-primary: 155 80 148;
+  --app-primary-emphasis: 130 60 124;
+  --app-primary-foreground: 255 255 255;
+  --app-border-strong: 155 80 148;
+}
 @layer base {
   /* ── Mode declarations ── */
   :root,
@@ -171,7 +185,12 @@
     );
   }
 
-  /* Text-white preservation ONLY on solid dark/colored buttons in light mode */
+  /* ── Light mode: text-white override ─────────────────────────────────────
+     In light mode ALL text-white instances default to the dark content colour
+     UNLESS the element (or an ancestor) carries a solid coloured background
+     where white text is intentionally required.                              */
+
+  /* Preserve white text on solid coloured backgrounds */
   .light button.btn-primary,
   .light .btn-primary,
   .light button.bg-primary:not([class*='/']),
@@ -181,23 +200,131 @@
   .light [class*='bg-red-600'],
   .light [class*='bg-blue-600'],
   .light [class*='bg-green-600'],
+  .light [class*='bg-status-danger']:not([class*='/10']):not([class*='/20']),
+  .light [class*='bg-status-success']:not([class*='/10']):not([class*='/20']),
   .light .text-always-white {
     color: #ffffff !important;
   }
 
-  /* General light mode: bare text-white on neutral surfaces should be dark */
-  .light
-    .text-white:not(
-      button[class*='bg-'],
-      [class*='bg-primary'] *,
-      [class*='bg-purple-'] *,
-      [class*='bg-red-'] *,
-      [class*='bg-blue-'] *,
-      [class*='bg-green-'] *,
-      .badge-solid,
-      .text-always-white
-    ) {
+  /* Global override: ALL text-white → dark in light mode */
+  .light .text-white {
     color: rgb(var(--app-content-primary)) !important;
+  }
+
+  /* Re-allow white text inside genuinely dark/coloured backgrounds */
+  .light
+    [class*='bg-primary']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    ):not([class*='/30'])
+    .text-white,
+  .light
+    [class*='bg-purple-']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    ):not([class*='/30'])
+    .text-white,
+  .light
+    [class*='bg-red-']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    )
+    .text-white,
+  .light
+    [class*='bg-blue-']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    )
+    .text-white,
+  .light
+    [class*='bg-green-']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    )
+    .text-white,
+  .light .badge-solid .text-white,
+  .light .text-always-white {
+    color: #ffffff !important;
+  }
+
+  /* ── Light mode: form inputs & selects ─────────────────────────────────── */
+  /* Native <select> and <input> elements often carry text-white via dynamic
+     JS strings (inputCls / selectCls). Force dark text so they are legible. */
+  /* Cover opacity variants such as text-white/80 that appear in legacy
+     channel and modal components. Keep labels on coloured controls white. */
+  .light [class*='text-white'] {
+    color: rgb(var(--app-content-primary)) !important;
+  }
+
+  .light
+    [class*='bg-primary']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    ):not([class*='/30'])
+    [class*='text-white'],
+  .light
+    [class*='bg-purple-']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    ):not([class*='/30'])
+    [class*='text-white'],
+  .light
+    [class*='bg-red-']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    ):not([class*='/30'])
+    [class*='text-white'],
+  .light
+    [class*='bg-blue-']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    ):not([class*='/30'])
+    [class*='text-white'],
+  .light
+    [class*='bg-green-']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    ):not([class*='/30'])
+    [class*='text-white'],
+  .light
+    [class*='bg-emerald-']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    ):not([class*='/30'])
+    [class*='text-white'],
+  .light
+    [class*='bg-orange-']:not([class*='/10']):not([class*='/15']):not(
+      [class*='/20']
+    ):not([class*='/30'])
+    [class*='text-white'],
+  .light [class*='bg-gradient'] [class*='text-white'] {
+    color: #ffffff !important;
+  }
+
+  .light input,
+  .light select,
+  .light textarea {
+    color: rgb(var(--app-content-primary)) !important;
+    background-color: rgb(var(--app-surface-base)) !important;
+    border-color: rgb(var(--app-border-default)) !important;
+  }
+
+  .light input::placeholder,
+  .light textarea::placeholder {
+    color: rgb(var(--app-content-tertiary)) !important;
+  }
+
+  /* <select> dropdown options always need explicit dark colouring */
+  .light select option {
+    background-color: rgb(var(--app-surface-base));
+    color: rgb(var(--app-content-primary));
+  }
+
+  /* ── Light mode: custom dropdown panels (Select.tsx, etc.) ─────────────── */
+  /* bg-blue-darker is a dark colour — replace with a light surface */
+  .light [class*='bg-blue-darker'],
+  .light .bg-blue-darker {
+    background-color: rgb(var(--app-surface-base)) !important;
+    border-color: rgb(var(--app-border-default)) !important;
+  }
+
+  /* Dropdown option buttons inside custom Select component */
+  .light [class*='bg-blue-darker'] button,
+  .light .bg-blue-darker button {
+    color: rgb(var(--app-content-primary)) !important;
+  }
+  .light [class*='bg-blue-darker'] button:hover,
+  .light .bg-blue-darker button:hover {
+    background-color: rgb(var(--app-surface-overlay)) !important;
   }
 
   /* Smooth global transition for background and colors */
@@ -335,19 +462,21 @@
 
   /* Responsive layout classes */
   .app-container {
-    @apply h-screen flex flex-col overflow-hidden;
+    @apply h-screen min-h-0 flex flex-col overflow-hidden;
   }
 
   .app-content {
-    @apply flex-1 overflow-auto;
+    @apply min-h-0 flex-1 overflow-y-auto overflow-x-hidden;
   }
 
+  /* Setup/config pages: allow internal scrolling so buttons are never clipped */
   .setup-container {
-    @apply h-full flex items-center justify-center p-3;
+    @apply h-full min-h-0 flex items-start justify-center p-3 overflow-y-auto;
   }
 
   .setup-card {
-    @apply p-4 md:p-5 w-full max-w-4xl overflow-auto;
+    @apply p-4 md:p-5 w-full max-w-4xl;
+    /* Not overflow-auto here — let the parent .setup-container scroll */
   }
 
   /* Custom scrollbar class for specific elements */
