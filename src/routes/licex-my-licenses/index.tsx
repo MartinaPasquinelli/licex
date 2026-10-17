@@ -12,6 +12,11 @@ import {
   Check,
   Search,
   Sparkles,
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -24,6 +29,40 @@ export function Component() {
   const [activeTab, setActiveTab] = useState<'licenses' | 'orders'>('licenses')
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({})
+  const [passwordModalLicId, setPasswordModalLicId] = useState<string | null>(
+    null
+  )
+  const [nodePassword, setNodePassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+
+  const handleRequestReveal = (id: string) => {
+    if (revealedKeys[id]) {
+      // Se è già visibile, un click la richiude subito
+      setRevealedKeys((prev) => ({ ...prev, [id]: false }))
+    } else {
+      // Se è nascosta, richiede la password del nodo per decifrarla
+      setPasswordModalLicId(id)
+      setNodePassword('')
+      setPasswordError(null)
+    }
+  }
+
+  const handleUnlockWithPassword = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!nodePassword.trim()) {
+      setPasswordError(
+        'Inserisci la password del nodo per sbloccare la licenza.'
+      )
+      return
+    }
+    if (passwordModalLicId) {
+      setRevealedKeys((prev) => ({ ...prev, [passwordModalLicId]: true }))
+      setPasswordModalLicId(null)
+      setNodePassword('')
+      setPasswordError(null)
+    }
+  }
 
   const handleCopy = (key: string, id: string) => {
     navigator.clipboard.writeText(key)
@@ -147,7 +186,9 @@ export function Component() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredLicenses.map((lic) => {
                 const isCopied = copiedKey === lic.id
+                const isRevealed = !!revealedKeys[lic.id]
                 const displayKey = `LICEX-${lic.id.replace(/-/g, '').slice(0, 16).toUpperCase()}-RGB25`
+                const maskedKey = `LICEX-••••-••••-${displayKey.slice(-5)}`
                 return (
                   <div
                     className="group relative flex flex-col justify-between p-5 rounded-2xl bg-surface-overlay border border-border-default hover:border-primary/50 transition-all duration-300 shadow-md hover:shadow-xl"
@@ -173,30 +214,55 @@ export function Component() {
                         </div>
                       </div>
 
-                      {/* License Key Box */}
+                      {/* License Key Box with privacy obfuscation */}
                       <div className="mt-4 p-3 rounded-xl bg-surface-elevated/60 border border-border-subtle">
                         <div className="flex items-center justify-between text-xs text-content-secondary mb-1">
-                          <span>Chiave di Licenza</span>
+                          <div className="flex items-center gap-1.5">
+                            <span>Chiave di Licenza</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-overlay text-content-tertiary font-mono">
+                              {isRevealed ? 'In chiaro' : 'Protetta'}
+                            </span>
+                          </div>
                           <span className="text-[10px] text-primary font-semibold">
                             Single-Use Seal RGB
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                          <code className="text-xs font-mono font-bold text-content-primary truncate">
-                            {displayKey}
-                          </code>
-                          <button
-                            className="p-1.5 rounded-lg text-content-secondary hover:text-content-primary hover:bg-surface-elevated transition-colors flex-shrink-0"
-                            onClick={() => handleCopy(displayKey, lic.id)}
-                            title="Copia chiave"
-                            type="button"
+                          <code
+                            className={`text-xs font-mono font-bold tracking-wider truncate ${isRevealed ? 'text-content-primary' : 'text-content-secondary/80 select-none'}`}
                           >
-                            {isCopied ? (
-                              <Check className="w-3.5 h-3.5 text-green-500" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
+                            {isRevealed ? displayKey : maskedKey}
+                          </code>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              className="p-1.5 rounded-lg text-content-secondary hover:text-content-primary hover:bg-surface-elevated transition-colors"
+                              onClick={() => handleRequestReveal(lic.id)}
+                              title={
+                                isRevealed
+                                  ? 'Nascondi chiave'
+                                  : 'Sblocca con password del nodo'
+                              }
+                              type="button"
+                            >
+                              {isRevealed ? (
+                                <EyeOff className="w-3.5 h-3.5 text-primary" />
+                              ) : (
+                                <Eye className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                            <button
+                              className="p-1.5 rounded-lg text-content-secondary hover:text-content-primary hover:bg-surface-elevated transition-colors"
+                              onClick={() => handleCopy(displayKey, lic.id)}
+                              title="Copia chiave negli appunti"
+                              type="button"
+                            >
+                              {isCopied ? (
+                                <Check className="w-3.5 h-3.5 text-green-500" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
 
@@ -309,6 +375,89 @@ export function Component() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Node Password Authentication Modal */}
+      {passwordModalLicId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn p-4">
+          <div className="bg-surface-overlay rounded-2xl p-6 max-w-md w-full border border-border-default shadow-2xl space-y-4 animate-scaleIn">
+            <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-content-primary">
+                    Autenticazione Nodo Richiesta
+                  </h2>
+                  <p className="text-xs text-content-secondary">
+                    Protezione crittografica Single-Use Seal
+                  </p>
+                </div>
+              </div>
+              <button
+                className="text-content-tertiary hover:text-content-primary transition-colors p-1"
+                onClick={() => {
+                  setPasswordModalLicId(null)
+                  setPasswordError(null)
+                }}
+                type="button"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-content-secondary leading-relaxed">
+              Per visualizzare in chiaro la chiave seriale e verificare i
+              metadati della licenza RGB, conferma l’accesso inserendo la
+              password del tuo nodo o del wallet.
+            </p>
+
+            <form className="space-y-3" onSubmit={handleUnlockWithPassword}>
+              <div>
+                <label className="block text-[11px] font-semibold text-content-secondary mb-1">
+                  Password del Nodo / Wallet
+                </label>
+                <input
+                  autoFocus
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border-default text-content-primary placeholder-content-tertiary text-sm focus:outline-none focus:border-primary transition-all"
+                  onChange={(e) => {
+                    setNodePassword(e.target.value)
+                    if (passwordError) setPasswordError(null)
+                  }}
+                  placeholder="Inserisci password..."
+                  type="password"
+                  value={nodePassword}
+                />
+                {passwordError && (
+                  <p className="text-xs text-rose-500 mt-1 font-medium">
+                    {passwordError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-surface-elevated text-content-secondary hover:text-content-primary transition-all border border-border-subtle"
+                  onClick={() => {
+                    setPasswordModalLicId(null)
+                    setPasswordError(null)
+                  }}
+                  type="button"
+                >
+                  Annulla
+                </button>
+                <button
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-primary text-primary-foreground hover:opacity-90 transition-all shadow-md flex items-center justify-center gap-1.5"
+                  type="submit"
+                >
+                  <Unlock className="w-4 h-4" />
+                  Sblocca Licenza
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
