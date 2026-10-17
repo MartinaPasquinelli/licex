@@ -28,8 +28,9 @@ export interface DigitalLicenseCertificate {
   schemaType: string
   issuerKey: string
   issuedAt: string
-  licenseKey: string
   holderPubkey: string
+  activationMode: 'wallet_handshake'
+  proofOfHoldingHash: string
 }
 
 export interface SwapExecutionResult {
@@ -63,34 +64,31 @@ export async function executeLicenseSwap(
       'broadcasting',
       'Scambio atomico in corso su Bitcoin: impegno simultaneo di ' +
         quote.formattedTotal +
-        ' e Token UDA...'
+        ' e Asset RGB25...'
     )
 
     await new Promise((resolve) => setTimeout(resolve, 1100))
 
     onStepChange(
       'proof_of_holding',
-      'Verifica del possesso crittografico con l’Issuer Kit di ' +
-        listing.company.name +
-        '...'
+      'Associazione crittografica dell’Asset RGB25 al Single-Use Seal del tuo wallet...'
     )
     void generateProofOfHolding(listing.id, mockBuyerPubkey)
     await new Promise((resolve) => setTimeout(resolve, 900))
 
-    // creazione certificato
-    const randomHex = Math.random().toString(16).substring(2, 8).toUpperCase()
-    const generatedKey = `LICEX-${listing.id.toUpperCase().slice(0, 4)}-${randomHex}-${Date.now().toString().slice(-4)}`
+    // Creazione certificato crittografico nativo RGB25 (Codeless)
     const mockTxid = Array.from({ length: 32 }, () =>
       Math.floor(Math.random() * 16).toString(16)
     ).join('')
     const certificate: DigitalLicenseCertificate = {
+      activationMode: 'wallet_handshake',
       contractId: `rgb1${Math.random().toString(36).substring(2, 12)}licex${listing.id}`,
       genesisAnchor: `mutinynet:block#89412:${mockTxid.slice(0, 8)}`,
       holderPubkey: mockBuyerPubkey,
       issuedAt: new Date().toISOString(),
       issuerKey: `schnorr:pk_${listing.companyId}_verified`,
-      licenseKey: generatedKey,
-      schemaType: 'RGB25/UDA (Software License Certificate)',
+      proofOfHoldingHash: `poh_${randomHexId}_${timestamp}`,
+      schemaType: 'RGB25/UDA (Codeless License Asset)',
       sealUtxo: `txid:${mockTxid.slice(0, 16)}...:1`,
     }
     const order: Order = {
@@ -117,7 +115,10 @@ export async function executeLicenseSwap(
       orderId,
       transferCount: 0,
     }
-    onStepChange('completed', 'Licenza acquisita con successo!')
+    onStepChange(
+      'completed',
+      'Asset RGB25 assegnato con successo al tuo wallet!'
+    )
     return {
       certificate,
       licenseRecord,

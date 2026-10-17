@@ -31,7 +31,7 @@ import {
   WALLET_SETUP_PATH,
 } from '../../app/router/paths'
 
-import { calculatePaymentQuote } from '../../helpers/licexPayments'
+import { calculatePaymentQuote, formatUstd } from '../../helpers/licexPayments'
 import {
   executeLicenseSwap,
   type SwapStep,
@@ -390,7 +390,7 @@ export function Component() {
                   Price
                 </p>
                 <p className="text-3xl font-bold text-[rgb(var(--app-content-primary))] mt-1">
-                  {formatSats(listing.price)}
+                  {formatUstd(listing.price)}
                 </p>
                 <p className="text-xs text-[rgb(var(--app-content-secondary))] mt-0.5">
                   Payment: {listing.paymentAsset}
@@ -640,13 +640,21 @@ export function Component() {
                       Token UDA RGB25 assegnato al tuo Single-Use-Seal UTXO
                     </div>
 
-                    <div className="bg-[#13141f] p-3 rounded-lg border border-[#9a94bc]/20 space-y-1">
-                      <div className="text-[11px] text-[#9a94bc]">
-                        Chiave di Attivazione Software (Decifrata)
+                    <div className="bg-[#13141f] p-3.5 rounded-xl border border-[#9a94bc]/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-[11px] text-[#9a94bc] font-medium">
+                          Modalità di Licenza
+                        </div>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30 font-bold uppercase tracking-wider">
+                          Nativa RGB · Senza Codici
+                        </span>
                       </div>
-                      <div className="font-mono text-xs font-bold text-[#cdf7f6] tracking-wider select-all">
-                        {swapResult.certificate.licenseKey}
-                      </div>
+                      <p className="text-xs text-white leading-relaxed">
+                        Nessun codice seriale o chiave di testo: la licenza è
+                        legata crittograficamente al tuo wallet. Il software si
+                        attiva automaticamente interrogando questo portafoglio
+                        locale.
+                      </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-[10px] text-[#9a94bc] font-mono">

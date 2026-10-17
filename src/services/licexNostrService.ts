@@ -117,24 +117,26 @@ export async function broadcastNostrResaleOffer(
   return newOffer
 }
 
-export async function executeP2PAtomicSwap(
-  offer: NostrLicenseOffer
-): Promise<{
+export async function executeP2PAtomicSwap(offer: NostrLicenseOffer): Promise<{
   order: Order
   newLicenseRecord: LicenseRecord
-  newLicenseKey: string
+  transferredSealUtxo: string
 }> {
   const split = calculateP2PSplit(
     offer.resalePriceUsdt,
     offer.royaltyPercent,
     offer.listing.company.name
   )
-  const orderId = `ord-p2p-${Date.now()}`
-  const newLicenseRecordId = `lr-p2p-${Date.now()}`
-  // Simulazione broadcast scambio atomico P2P
+  const timestamp = Date.now()
+  const orderId = `ord-p2p-${timestamp}`
+  const newLicenseRecordId = `lr-p2p-${timestamp}`
+  // Simulazione broadcast scambio atomico P2P su Bitcoin / Nostr
   await new Promise((resolve) => setTimeout(resolve, 1200))
-  const randomHex = Math.random().toString(16).substring(2, 8).toUpperCase()
-  const newLicenseKey = `LICEX-P2P-${offer.listing.id.toUpperCase().slice(0, 4)}-${randomHex}-${Date.now().toString().slice(-4)}`
+  const mockTxid = Array.from({ length: 32 }, () =>
+    Math.floor(Math.random() * 16).toString(16)
+  ).join('')
+  const transferredSealUtxo = `txid:${mockTxid.slice(0, 16)}...:1`
+
   const order: Order = {
     buyerId: 'user-current',
     companyId: offer.listing.companyId,
@@ -160,8 +162,8 @@ export async function executeP2PAtomicSwap(
     transferCount: offer.transferCount + 1, // Incremento del contatore dei trasferimenti
   }
   return {
-    newLicenseKey,
     newLicenseRecord,
     order,
+    transferredSealUtxo,
   }
 }

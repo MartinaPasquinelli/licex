@@ -12,11 +12,7 @@ import {
   Check,
   Search,
   Sparkles,
-  Eye,
-  EyeOff,
-  Lock,
-  Unlock,
-  X,
+  Zap,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -29,39 +25,13 @@ export function Component() {
   const [activeTab, setActiveTab] = useState<'licenses' | 'orders'>('licenses')
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({})
-  const [passwordModalLicId, setPasswordModalLicId] = useState<string | null>(
+  const [testedHandshakeId, setTestedHandshakeId] = useState<string | null>(
     null
   )
-  const [nodePassword, setNodePassword] = useState('')
-  const [passwordError, setPasswordError] = useState<string | null>(null)
 
-  const handleRequestReveal = (id: string) => {
-    if (revealedKeys[id]) {
-      // Se è già visibile, un click la richiude subito
-      setRevealedKeys((prev) => ({ ...prev, [id]: false }))
-    } else {
-      // Se è nascosta, richiede la password del nodo per decifrarla
-      setPasswordModalLicId(id)
-      setNodePassword('')
-      setPasswordError(null)
-    }
-  }
-
-  const handleUnlockWithPassword = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!nodePassword.trim()) {
-      setPasswordError(
-        'Inserisci la password del nodo per sbloccare la licenza.'
-      )
-      return
-    }
-    if (passwordModalLicId) {
-      setRevealedKeys((prev) => ({ ...prev, [passwordModalLicId]: true }))
-      setPasswordModalLicId(null)
-      setNodePassword('')
-      setPasswordError(null)
-    }
+  const handleTestHandshake = (id: string) => {
+    setTestedHandshakeId(id)
+    setTimeout(() => setTestedHandshakeId(null), 3500)
   }
 
   const handleCopy = (key: string, id: string) => {
@@ -185,10 +155,9 @@ export function Component() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredLicenses.map((lic) => {
+                const contractId = `rgb1${lic.id.replace(/-/g, '').slice(0, 10)}...licex`
+                const sealUtxo = `txid:${lic.id.replace(/-/g, '').slice(0, 8)}...:1`
                 const isCopied = copiedKey === lic.id
-                const isRevealed = !!revealedKeys[lic.id]
-                const displayKey = `LICEX-${lic.id.replace(/-/g, '').slice(0, 16).toUpperCase()}-RGB25`
-                const maskedKey = `LICEX-••••-••••-${displayKey.slice(-5)}`
                 return (
                   <div
                     className="group relative flex flex-col justify-between p-5 rounded-2xl bg-surface-overlay border border-border-default hover:border-primary/50 transition-all duration-300 shadow-md hover:shadow-xl"
@@ -214,55 +183,69 @@ export function Component() {
                         </div>
                       </div>
 
-                      {/* License Key Box with privacy obfuscation */}
-                      <div className="mt-4 p-3 rounded-xl bg-surface-elevated/60 border border-border-subtle">
-                        <div className="flex items-center justify-between text-xs text-content-secondary mb-1">
-                          <div className="flex items-center gap-1.5">
-                            <span>Chiave di Licenza</span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-overlay text-content-tertiary font-mono">
-                              {isRevealed ? 'In chiaro' : 'Protetta'}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-primary font-semibold">
-                            Single-Use Seal RGB
+                      {/* Codeless RGB25 Asset & Software Handshake Card */}
+                      <div className="mt-4 p-3.5 rounded-xl bg-surface-elevated/70 border border-border-subtle space-y-2.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-content-primary flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            Asset RGB25 (Codeless)
+                          </span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+                            Wallet Linked
                           </span>
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <code
-                            className={`text-xs font-mono font-bold tracking-wider truncate ${isRevealed ? 'text-content-primary' : 'text-content-secondary/80 select-none'}`}
-                          >
-                            {isRevealed ? displayKey : maskedKey}
-                          </code>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <button
-                              className="p-1.5 rounded-lg text-content-secondary hover:text-content-primary hover:bg-surface-elevated transition-colors"
-                              onClick={() => handleRequestReveal(lic.id)}
-                              title={
-                                isRevealed
-                                  ? 'Nascondi chiave'
-                                  : 'Sblocca con password del nodo'
-                              }
-                              type="button"
-                            >
-                              {isRevealed ? (
-                                <EyeOff className="w-3.5 h-3.5 text-primary" />
-                              ) : (
-                                <Eye className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                            <button
-                              className="p-1.5 rounded-lg text-content-secondary hover:text-content-primary hover:bg-surface-elevated transition-colors"
-                              onClick={() => handleCopy(displayKey, lic.id)}
-                              title="Copia chiave negli appunti"
-                              type="button"
-                            >
-                              {isCopied ? (
-                                <Check className="w-3.5 h-3.5 text-green-500" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
+
+                        <div className="space-y-1.5 text-[11px] font-mono bg-surface-overlay/80 p-2.5 rounded-lg border border-border-subtle">
+                          <div className="flex justify-between items-center text-content-secondary">
+                            <span>Contract ID:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-content-primary font-bold">
+                                {contractId}
+                              </span>
+                              <button
+                                className="p-1 hover:text-primary transition-colors"
+                                onClick={() => handleCopy(contractId, lic.id)}
+                                title="Copia Contract ID"
+                                type="button"
+                              >
+                                {isCopied ? (
+                                  <Check className="w-3 h-3 text-green-500" />
+                                ) : (
+                                  <Copy className="w-3 h-3 text-content-tertiary" />
+                                )}
+                              </button>
+                            </div>
                           </div>
+                          <div className="flex justify-between items-center text-content-secondary">
+                            <span>Single-Use Seal:</span>
+                            <span className="text-primary font-bold">
+                              {sealUtxo}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-subtle/40">
+                          <div className="text-[11px]">
+                            {testedHandshakeId === lic.id ? (
+                              <span className="text-emerald-500 font-semibold flex items-center gap-1 animate-fadeIn">
+                                <Check className="w-3.5 h-3.5" />
+                                Handshake Software OK! Licenza Attiva
+                              </span>
+                            ) : (
+                              <span className="text-content-secondary">
+                                Attivazione automatica via wallet
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all flex items-center gap-1"
+                            onClick={() => handleTestHandshake(lic.id)}
+                            title="Simula l'interrogazione del software locale al wallet per verificare il possesso dell'asset"
+                            type="button"
+                          >
+                            <Zap className="w-3 h-3" />
+                            Test Connessione
+                          </button>
                         </div>
                       </div>
 
@@ -375,89 +358,6 @@ export function Component() {
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Node Password Authentication Modal */}
-      {passwordModalLicId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn p-4">
-          <div className="bg-surface-overlay rounded-2xl p-6 max-w-md w-full border border-border-default shadow-2xl space-y-4 animate-scaleIn">
-            <div className="flex items-center justify-between border-b border-border-subtle pb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-content-primary">
-                    Autenticazione Nodo Richiesta
-                  </h2>
-                  <p className="text-xs text-content-secondary">
-                    Protezione crittografica Single-Use Seal
-                  </p>
-                </div>
-              </div>
-              <button
-                className="text-content-tertiary hover:text-content-primary transition-colors p-1"
-                onClick={() => {
-                  setPasswordModalLicId(null)
-                  setPasswordError(null)
-                }}
-                type="button"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-content-secondary leading-relaxed">
-              Per visualizzare in chiaro la chiave seriale e verificare i
-              metadati della licenza RGB, conferma l’accesso inserendo la
-              password del tuo nodo o del wallet.
-            </p>
-
-            <form className="space-y-3" onSubmit={handleUnlockWithPassword}>
-              <div>
-                <label className="block text-[11px] font-semibold text-content-secondary mb-1">
-                  Password del Nodo / Wallet
-                </label>
-                <input
-                  autoFocus
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border-default text-content-primary placeholder-content-tertiary text-sm focus:outline-none focus:border-primary transition-all"
-                  onChange={(e) => {
-                    setNodePassword(e.target.value)
-                    if (passwordError) setPasswordError(null)
-                  }}
-                  placeholder="Inserisci password..."
-                  type="password"
-                  value={nodePassword}
-                />
-                {passwordError && (
-                  <p className="text-xs text-rose-500 mt-1 font-medium">
-                    {passwordError}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-surface-elevated text-content-secondary hover:text-content-primary transition-all border border-border-subtle"
-                  onClick={() => {
-                    setPasswordModalLicId(null)
-                    setPasswordError(null)
-                  }}
-                  type="button"
-                >
-                  Annulla
-                </button>
-                <button
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-primary text-primary-foreground hover:opacity-90 transition-all shadow-md flex items-center justify-center gap-1.5"
-                  type="submit"
-                >
-                  <Unlock className="w-4 h-4" />
-                  Sblocca Licenza
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
