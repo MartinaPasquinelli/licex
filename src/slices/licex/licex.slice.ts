@@ -140,6 +140,12 @@ export const licexSlice = createSlice({
   name: 'licex',
   reducers: {
     
+// ── AI Chat ────────────────────────────────────────────────────────
+addChatMessage(state, action: PayloadAction<ChatMessage>) {
+      state.chatMessages.push(action.payload)
+    },
+
+    
     
 // ── Price Alerts ───────────────────────────────────────────────────
 addPriceAlert(
@@ -160,23 +166,9 @@ addPriceAlert(
         })
       }
     },
+
     
-
-
-
-
-// ── AI Chat ────────────────────────────────────────────────────────
-addChatMessage(state, action: PayloadAction<ChatMessage>) {
-      state.chatMessages.push(action.payload)
-    },
-    
-
-
-
-
-
-
-// ── Watchlist ──────────────────────────────────────────────────────
+    // ── Watchlist ──────────────────────────────────────────────────────
 addToWatchlist(state, action: PayloadAction<string>) {
       const listing = state.listings.find((l) => l.id === action.payload)
       if (
@@ -193,13 +185,7 @@ addToWatchlist(state, action: PayloadAction<string>) {
     },
 
     
-    
-
-
-
-
-
-// ── Wishlist ───────────────────────────────────────────────────────
+    // ── Wishlist ───────────────────────────────────────────────────────
 addWishlistItem(
       state,
       action: PayloadAction<
@@ -226,62 +212,50 @@ addWishlistItem(
     },
 
     
-    
-
-
-
-
-clearFilters(state) {
+    clearFilters(state) {
       state.filters = initialFilters
       state.filteredListings = applyFilters(state.listings, state.filters)
     },
-    
 
+    completePurchase(
+      state,
+      action: PayloadAction<{ order: Order; licenseRecord: LicenseRecord }>
+    ) {
+      // Salva l'ordine in cima alla cronologia ordini
+      state.orders.unshift(action.payload.order)
+      // Aggiunge la licenza tra quelle possedute dall'utente
+      state.ownedLicenses.unshift(action.payload.licenseRecord)
+    },
 
-
-
-removeFromWatchlist(state, action: PayloadAction<string>) {
+    removeFromWatchlist(state, action: PayloadAction<string>) {
       state.watchlist = state.watchlist.filter(
         (w) => w.listingId !== action.payload
       )
     },
 
-    
-    
-
-
-
-removePriceAlert(state, action: PayloadAction<string>) {
+    removePriceAlert(state, action: PayloadAction<string>) {
       state.priceAlerts = state.priceAlerts.filter(
         (a) => a.id !== action.payload
       )
     },
-    
 
-
-
-removeWishlistItem(state, action: PayloadAction<string>) {
+    removeWishlistItem(state, action: PayloadAction<string>) {
       state.wishlist = state.wishlist.filter((w) => w.id !== action.payload)
     },
 
-    
-    
-
-// ── Listing Detail ─────────────────────────────────────────────────
-selectListing(state, action: PayloadAction<string | null>) {
+    // ── Listing Detail ─────────────────────────────────────────────────
+    selectListing(state, action: PayloadAction<string | null>) {
       state.selectedListing = action.payload
         ? state.listings.find((l) => l.id === action.payload) || null
         : null
     },
-    
 
-setChatLoading(state, action: PayloadAction<boolean>) {
+    setChatLoading(state, action: PayloadAction<boolean>) {
       state.chatLoading = action.payload
     },
 
-    
     // ── Filters ────────────────────────────────────────────────────────
-setFilters(state, action: PayloadAction<Partial<MarketplaceFilters>>) {
+    setFilters(state, action: PayloadAction<Partial<MarketplaceFilters>>) {
       state.filters = { ...state.filters, ...action.payload }
       state.filteredListings = applyFilters(state.listings, state.filters)
     },
@@ -304,4 +278,5 @@ export const {
   removeWishlistItem,
   addChatMessage,
   setChatLoading,
+  completePurchase,
 } = licexSlice.actions

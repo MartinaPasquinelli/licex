@@ -26,6 +26,14 @@ import {
 import type { TransferPolicy } from '../../types/licex'
 import { LICEX_MARKETPLACE_PATH } from '../../app/router/paths'
 
+import { calculatePaymentQuote, formatUstd } from '../../helpers/licexPayments'
+import {
+  executeLicenseSwap,
+  type SwapStep,
+  type SwapExecutionResult,
+} from '../../services/licexPaymentService'
+import { completePurchase } from '../../slices/licex/licex.slice'
+
 function formatSats(sats: number): string {
   if (sats === 0) return 'Free'
   return `${sats.toLocaleString()} sats`
@@ -66,7 +74,7 @@ function categoryIcon(category: string): string {
     case 'Productivity':
       return '📋'
     case 'Gaming':
-      return '🎮'
+      return '    s🎮'
     default:
       return '📦'
   }
@@ -83,6 +91,14 @@ export function Component() {
   const listing = useMemo(
     () => listings.find((l) => l.id === licenseId),
     [listings, licenseId]
+  )
+
+  const [swapStep, setSwapStep] = useState<SwapStep>('quote')
+  const [swapMessage, setSwapMessage] = useState('')
+  const [swapResult, setSwapResult] = useState<SwapExecutionResult | null>(null)
+  const quote = useMemo(
+    () => (listing ? calculatePaymentQuote(listing, 'primary') : null),
+    [listing]
   )
 
   const isWatchlisted = useMemo(
@@ -469,83 +485,183 @@ export function Component() {
         </div>
 
         {/* Demo purchase modal */}
-        {showPurchaseModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-[rgb(var(--app-surface-secondary))] rounded-2xl p-6 max-w-md w-full mx-4 border border-[rgb(var(--app-border-primary))]/30 shadow-2xl space-y-4 animate-scaleIn">
-              <h2 className="text-lg font-bold text-[rgb(var(--app-content-primary))]">
-                Purchase Confirmation
-              </h2>
-
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-[rgb(var(--app-content-secondary))]">
-                    Product
-                  </span>
-                  <span className="text-[rgb(var(--app-content-primary))] font-medium">
-                    {listing.productName}
-                  </span>
+        {/* Modale di Checkout con Atomic Swap in RGB-USDT */}
+        {showPurchaseModal && quote && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md animate-fadeIn p-4">
+            <div className="bg-[#1a1c2c] rounded-2xl max-w-lg w-full border border-[#9a94bc]/30 shadow-2xl p-6 space-y-5 animate-scaleIn text-white">
+              {/* Intestazione */}
+              <div className="flex items-center justify-between border-b border-[#9a94bc]/20 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#10b981]/20 flex items-center justify-center text-[#10b981] font-bold text-xs">
+                    ₮
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-white">
+                      {swapStep === 'completed'
+                        ? 'Licenza Acquisita!'
+                        : 'Checkout Atomic Swap (RGB-USDT)'}
+                    </h2>
+                    <p className="text-xs text-[#9a94bc]">
+                      Protocollo di Scambio RGB su Bitcoin
+                    </p>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-[rgb(var(--app-content-secondary))]">
-                    Price
-                  </span>
-                  <span className="text-[rgb(var(--app-content-primary))] font-medium">
-                    {formatSats(listing.price)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[rgb(var(--app-content-secondary))]">
-                    LICEX Fee (1%)
-                  </span>
-                  <span className="text-[rgb(var(--app-content-primary))]">
-                    {formatSats(Math.round(listing.price * 0.01))}
-                  </span>
-                </div>
-                <div className="border-t border-[rgb(var(--app-border-primary))]/20 pt-2 flex justify-between">
-                  <span className="text-[rgb(var(--app-content-primary))] font-semibold">
-                    Total
-                  </span>
-                  <span className="text-[rgb(var(--app-content-primary))] font-bold">
-                    {formatSats(
-                      listing.price + Math.round(listing.price * 0.01)
-                    )}
-                  </span>
-                </div>
+                {swapStep !== 'completed' &&
+                  swapStep !== 'signing' &&
+                  swapStep !== 'broadcasting' &&
+                  swapStep !== 'proof_of_holding' && (
+                    <button
+                      className="text-[#9a94bc] hover:text-white text-sm"
+                      onClick={() => setShowPurchaseModal(false)}
+                    >
+                      ✕
+                    </button>
+                  )}
               </div>
 
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-yellow-300/80">
-                  <strong>Demo Mode:</strong> This is a simulated purchase. In
-                  the full version, this will perform an RGB atomic swap on
-                  Mutinynet.
-                </p>
-              </div>
+              {/* FASE 1: RIEPILOGO FINANZIARIO */}
+              {swapStep === 'quote' && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-black/30 border border-[#9a94bc]/20 space-y-2.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-[#9a94bc]">Software</span>
+                      <span className="font-semibold text-white">
+                        {listing.productName} ({listing.edition})
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#9a94bc]">Prezzo Licenza</span>
+                      <span className="font-semibold text-[#cdf7f6]">
+                        {quote.formattedPrice}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-[#9a94bc]">
+                        Protocol Fee LICEX (1%)
+                      </span>
+                      <span className="text-white">{quote.formattedFee}</span>
+                    </div>
+                    <div className="border-t border-[#9a94bc]/20 pt-2 flex justify-between font-bold text-base">
+                      <span>Totale da Pagare</span>
+                      <span className="text-[#10b981]">
+                        {quote.formattedTotal}
+                      </span>
+                    </div>
+                  </div>
 
-              <div className="flex gap-3">
-                <button
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium
-                    bg-[rgb(var(--app-surface-primary))] text-[rgb(var(--app-content-secondary))]
-                    border border-[rgb(var(--app-border-primary))]/30
-                    hover:text-[rgb(var(--app-content-primary))] transition-all"
-                  onClick={() => setShowPurchaseModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold
-                    bg-gradient-to-r from-purple-600 to-purple-500 text-white
-                    hover:from-purple-500 hover:to-purple-400
-                    shadow-lg shadow-purple-500/25 transition-all"
-                  id="confirm-purchase-btn"
-                  onClick={() => {
-                    setShowPurchaseModal(false)
-                    // Demo: just close
-                  }}
-                >
-                  Confirm Purchase (Demo)
-                </button>
-              </div>
+                  <div className="p-3 rounded-xl bg-[#8fb8de]/10 border border-[#8fb8de]/20 flex items-start gap-2.5 text-xs text-[#8fb8de]">
+                    <Shield className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#10b981]" />
+                    <span>
+                      <strong>Scambio Atomico Non-Custodial:</strong> Gli USDT e
+                      la Licenza UDA RGB25 si scambiano simultaneamente nello
+                      stesso blocco Bitcoin. Nessun rischio di mancata consegna.
+                    </span>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-black/40 text-[#9a94bc] border border-[#9a94bc]/20 hover:text-white"
+                      onClick={() => setShowPurchaseModal(false)}
+                    >
+                      Annulla
+                    </button>
+                    <button
+                      className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-[#9b5094] to-[#8fb8de] text-white hover:opacity-90 shadow-lg shadow-[#9b5094]/30"
+                      id="confirm-atomic-swap-btn"
+                      onClick={async () => {
+                        try {
+                          const result = await executeLicenseSwap(
+                            listing,
+                            'primary',
+                            (step, msg) => {
+                              setSwapStep(step)
+                              if (msg) setSwapMessage(msg)
+                            }
+                          )
+                          setSwapResult(result)
+                          dispatch(
+                            completePurchase({
+                              licenseRecord: result.licenseRecord,
+                              order: result.order,
+                            })
+                          )
+                        } catch (e) {
+                          setSwapStep('error')
+                        }
+                      }}
+                    >
+                      Conferma & Paga {quote.formattedTotal}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* FASE 2: PROGRESSO ATOMIC SWAP */}
+              {(swapStep === 'signing' ||
+                swapStep === 'broadcasting' ||
+                swapStep === 'proof_of_holding') && (
+                <div className="py-8 flex flex-col items-center justify-center space-y-4 text-center">
+                  <div className="w-12 h-12 rounded-full border-3 border-[#9b5094] border-t-transparent animate-spin" />
+                  <div>
+                    <h3 className="font-bold text-sm text-white">
+                      Transazione Atomica in Corso
+                    </h3>
+                    <p className="text-xs text-[#cdf7f6] mt-1 max-w-xs">
+                      {swapMessage}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* FASE 3: SUCCESSO E RILASCIO CHIAVE */}
+              {swapStep === 'completed' && swapResult && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-black/40 border border-[#10b981]/30 space-y-3">
+                    <div className="flex items-center gap-2 text-xs text-[#10b981] font-semibold">
+                      <CheckCircle className="w-4 h-4" />
+                      Token UDA RGB25 assegnato al tuo Single-Use-Seal UTXO
+                    </div>
+
+                    <div className="bg-[#13141f] p-3 rounded-lg border border-[#9a94bc]/20 space-y-1">
+                      <div className="text-[11px] text-[#9a94bc]">
+                        Chiave di Attivazione Software (Decifrata)
+                      </div>
+                      <div className="font-mono text-xs font-bold text-[#cdf7f6] tracking-wider select-all">
+                        {swapResult.certificate.licenseKey}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] text-[#9a94bc] font-mono">
+                      <div>
+                        Contract:{' '}
+                        {swapResult.certificate.contractId.slice(0, 16)}...
+                      </div>
+                      <div>Seal: {swapResult.certificate.sealUtxo}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-black/40 text-[#9a94bc] border border-[#9a94bc]/20 hover:text-white"
+                      onClick={() => {
+                        setShowPurchaseModal(false)
+                        setSwapStep('quote')
+                      }}
+                    >
+                      Chiudi
+                    </button>
+                    <button
+                      className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-[#10b981] text-black hover:bg-[#10b981]/90"
+                      onClick={() => {
+                        setShowPurchaseModal(false)
+                        navigate('/my-licenses')
+                      }}
+                    >
+                      Vai a Le Mie Licenze →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
