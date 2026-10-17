@@ -34,10 +34,6 @@ import { MinidenticonImg } from '../../components/MinidenticonImg'
 import { Spinner } from '../../components/Spinner'
 import { BitcoinNetwork, getNetworkDisplayName } from '../../constants'
 import {
-  getModalPortalTarget,
-  getModalPositionClass,
-} from '../../helpers/modalPortal'
-import {
   nodeSettingsActions,
   setSettingsAsync,
 } from '../../slices/nodeSettings/nodeSettings.slice'
@@ -93,23 +89,21 @@ const Modal: React.FC<ModalProps> = ({ onClose, children }) => {
     }
   }, [])
 
-  const pos = getModalPositionClass()
-
   return createPortal(
     <div
       aria-modal="true"
-      className={`${pos} left-72 top-16 right-0 bottom-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn`}
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[10002] animate-fadeIn p-4 pointer-events-auto"
       onClick={onClose}
       role="dialog"
     >
       <div
-        className="bg-surface-base text-white rounded-3xl border border-border-subtle/50 shadow-2xl shadow-black/20 max-w-lg w-full mx-4 overflow-hidden animate-scaleIn"
+        className="bg-surface-base text-content-primary rounded-3xl border border-divider/30 shadow-2xl max-w-lg w-full mx-auto overflow-hidden animate-scaleIn relative z-[10003] pointer-events-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="max-h-[85vh] overflow-y-auto px-8 py-8">{children}</div>
       </div>
     </div>,
-    getModalPortalTarget()
+    document.body
   )
 }
 
@@ -208,7 +202,7 @@ const NodeCard: React.FC<NodeCardProps> = ({
         {/* Node details */}
         {!isCollapsed && (
           <div className="min-w-0 flex-grow">
-            <div className="font-medium text-white truncate">
+            <div className="font-semibold text-content-primary truncate">
               {account.name}
             </div>
             <div className="flex items-center gap-2 mt-1">
@@ -369,9 +363,13 @@ const useAccounts = () => {
 // Main Toolbar Component
 interface ToolbarProps {
   isCollapsed?: boolean
+  onActiveModalChange?: (hasActiveModal: boolean) => void
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ isCollapsed = false }) => {
+export const Toolbar: React.FC<ToolbarProps> = ({
+  isCollapsed = false,
+  onActiveModalChange,
+}) => {
   const { t } = useTranslation()
   const { accounts, isLoading, error, updateAccount, deleteAccount } =
     useAccounts()
@@ -383,6 +381,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({ isCollapsed = false }) => {
 
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    onActiveModalChange?.(Boolean(selectedNode || nodeToDelete || editingNode))
+  }, [selectedNode, nodeToDelete, editingNode, onActiveModalChange])
 
   useEffect(() => {
     let isToastActive = false

@@ -15,6 +15,8 @@ import {
   CheckCircle,
   AlertTriangle,
   Info,
+  User,
+  Lock,
 } from 'lucide-react'
 
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
@@ -24,7 +26,11 @@ import {
   addPriceAlert,
 } from '../../slices/licex/licex.slice'
 import type { TransferPolicy } from '../../types/licex'
-import { LICEX_MARKETPLACE_PATH } from '../../app/router/paths'
+import {
+  LICEX_MARKETPLACE_PATH,
+  ACCOUNT_PATH,
+  WALLET_SETUP_PATH,
+} from '../../app/router/paths'
 
 function formatSats(sats: number): string {
   if (sats === 0) return 'Free'
@@ -77,8 +83,15 @@ export function Component() {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const { listings, watchlist } = useAppSelector((s) => s.licex)
+  const nodeSettingsData = useAppSelector((s) => s.nodeSettings.data)
   const [showPurchaseModal, setShowPurchaseModal] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [purchaseSuccess, setPurchaseSuccess] = useState(false)
   const [alertThreshold, setAlertThreshold] = useState('')
+
+  const hasAccount = Boolean(
+    nodeSettingsData?.name || localStorage.getItem('licex_account_email')
+  )
 
   const listing = useMemo(
     () => listings.find((l) => l.id === licenseId),
@@ -379,7 +392,13 @@ export function Component() {
                   transition-all duration-300 hover:shadow-purple-500/40 hover:-translate-y-0.5
                   active:translate-y-0"
                 id="purchase-button"
-                onClick={() => setShowPurchaseModal(true)}
+                onClick={() => {
+                  if (!hasAccount) {
+                    setShowAuthModal(true)
+                  } else {
+                    setShowPurchaseModal(true)
+                  }
+                }}
               >
                 <ShoppingCart className="w-4 h-4" />
                 {listing.price === 0 ? 'Get for Free' : 'Purchase License'}
@@ -540,12 +559,103 @@ export function Component() {
                   id="confirm-purchase-btn"
                   onClick={() => {
                     setShowPurchaseModal(false)
-                    // Demo: just close
+                    setPurchaseSuccess(true)
                   }}
                 >
                   Confirm Purchase (Demo)
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Auth Required Modal */}
+        {showAuthModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-[rgb(var(--app-surface-secondary))] rounded-2xl p-6 max-w-md w-full mx-4 border border-[rgb(var(--app-border-primary))]/30 shadow-2xl space-y-4 animate-scaleIn">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#9B5094]/20 border border-[#9B5094]/30 flex items-center justify-center text-[#9B5094] dark:text-[#CDF7F6]">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-content-primary">
+                    Accesso Richiesto
+                  </h2>
+                  <p className="text-xs text-content-secondary">
+                    Per procedere all'acquisto della licenza è necessario
+                    accedere al proprio Account LicEX.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-surface-elevated/40 border border-border-subtle text-xs text-content-secondary space-y-1.5">
+                <p>
+                  • Le licenze software acquistate vengono registrate e
+                  assegnate direttamente al tuo <strong>nodo e account</strong>.
+                </p>
+                <p>
+                  • Configura un'email per ricevere le credenziali o collega il
+                  tuo nodo Bitcoin/RGB per il saldo.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  className="w-full py-2.5 rounded-xl text-sm font-bold bg-primary text-primary-foreground hover:opacity-90 shadow-md transition-all flex items-center justify-center gap-2"
+                  onClick={() => {
+                    setShowAuthModal(false)
+                    navigate(ACCOUNT_PATH)
+                  }}
+                  type="button"
+                >
+                  <User className="w-4 h-4" />
+                  Vai a Gestione Account (Email / Nodo)
+                </button>
+
+                <button
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold bg-surface-overlay text-content-secondary hover:text-content-primary hover:bg-surface-elevated border border-border-subtle transition-all"
+                  onClick={() => {
+                    setShowAuthModal(false)
+                    navigate(WALLET_SETUP_PATH)
+                  }}
+                  type="button"
+                >
+                  Collega o Configura Nodo
+                </button>
+
+                <button
+                  className="w-full py-1.5 text-xs text-content-tertiary hover:text-content-secondary transition-colors"
+                  onClick={() => setShowAuthModal(false)}
+                  type="button"
+                >
+                  Annulla
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Purchase Success Toast / Modal */}
+        {purchaseSuccess && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-[rgb(var(--app-surface-secondary))] rounded-2xl p-6 max-w-sm w-full mx-4 border border-[rgb(var(--app-border-primary))]/30 shadow-2xl space-y-4 animate-scaleIn text-center">
+              <div className="w-12 h-12 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center mx-auto">
+                <CheckCircle className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-content-primary">
+                Acquisto Completato!
+              </h3>
+              <p className="text-xs text-content-secondary">
+                La licenza per <strong>{listing.productName}</strong> è stata
+                associata al tuo account LicEX.
+              </p>
+              <button
+                className="w-full py-2.5 rounded-xl text-sm font-bold bg-primary text-primary-foreground hover:opacity-90 transition-all"
+                onClick={() => setPurchaseSuccess(false)}
+                type="button"
+              >
+                Chiudi
+              </button>
             </div>
           </div>
         )}

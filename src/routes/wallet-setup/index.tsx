@@ -17,9 +17,7 @@ import {
   WALLET_RESTORE_PATH,
 } from '../../app/router/paths'
 import logoIcon from '../../assets/logo.svg'
-import { AppVersion } from '../../components/AppVersion'
 import { Layout } from '../../components/Layout'
-import { Toolbar } from '../../components/Toolbar'
 import {
   NodeOption,
   WalletAction,
@@ -87,39 +85,9 @@ export const Component = () => {
 
   return (
     <Layout>
-      <div className="flex h-screen overflow-hidden">
-        {/* Sidebar with Toolbar */}
-        <div className="w-72 h-full bg-surface-base border-r border-divider/10 flex flex-col">
-          <div className="flex items-center gap-2.5 p-4 border-b border-divider/10 select-none">
-            <img
-              alt="LicEX"
-              className="h-8 w-8 cursor-pointer flex-shrink-0"
-              onClick={() => {}}
-              src={logoIcon}
-            />
-            <div className="flex flex-col leading-tight">
-              <span className="font-black text-sm tracking-widest bg-gradient-to-r from-[#CDF7F6] via-[#8FB8DE] to-[#9B5094] bg-clip-text text-transparent">
-                LicEX
-              </span>
-              <span className="text-[8px] uppercase tracking-wider text-content-tertiary font-semibold">
-                Wallet Onboarding
-              </span>
-            </div>
-          </div>
-
-          {/* Toolbar */}
-          <div className="flex-1 overflow-hidden">
-            <Toolbar />
-          </div>
-
-          {/* App version at bottom of sidebar */}
-          <div className="p-4 border-t border-divider/10">
-            <AppVersion className="relative" />
-          </div>
-        </div>
-
+      <div className="h-full min-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-divider/20 bg-surface-base shadow-sm">
         {/* Main Content */}
-        <div className="flex-1 overflow-hidden relative flex flex-col">
+        <div className="flex-1 overflow-y-auto relative flex flex-col p-6">
           {/* Animated background gradient */}
           <div className="absolute inset-0 bg-gradient-to-br from-cyan/5 via-transparent to-blue-500/5 pointer-events-none" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(6,182,212,0.1),transparent_50%)] pointer-events-none" />
@@ -147,7 +115,7 @@ export const Component = () => {
                         {/* Glow */}
                         <div className="absolute inset-0 bg-primary/10 rounded-2xl blur-xl scale-150 opacity-30 [animation:pulse_6s_ease-in-out_infinite]" />
                       </div>
-                      <h1 className="text-3xl md:text-5xl font-bold mb-3 text-white tracking-tight leading-tight py-2">
+                      <h1 className="text-3xl md:text-5xl font-bold mb-3 text-content-primary tracking-tight leading-tight py-2">
                         {t('walletSetup.welcomeTo')}{' '}
                         <span className="bg-gradient-to-r from-[#CDF7F6] via-[#8FB8DE] to-[#9B5094] bg-clip-text text-transparent">
                           LicEX
@@ -192,7 +160,7 @@ export const Component = () => {
                   <>
                     <div className="mb-8 slide-in">
                       <button
-                        className="px-3 py-2 text-content-secondary hover:text-white transition-colors flex items-center gap-1.5 hover:bg-surface-overlay/50 rounded-lg text-sm"
+                        className="px-3 py-2 text-content-secondary hover:text-content-primary transition-colors flex items-center gap-1.5 hover:bg-surface-overlay/50 rounded-lg text-sm"
                         onClick={() => handleNodeTypeChange(null)}
                         type="button"
                       >
@@ -212,7 +180,7 @@ export const Component = () => {
                         </div>
                         <div className="absolute inset-0 bg-primary/15 rounded-2xl blur-xl scale-150 opacity-50" />
                       </div>
-                      <h1 className="text-3xl md:text-4xl font-bold mb-4 text-white leading-tight tracking-tight">
+                      <h1 className="text-3xl md:text-4xl font-bold mb-4 text-content-primary leading-tight tracking-tight">
                         {t('walletSetup.setupLocalTitle')}
                       </h1>
                       <p className="text-content-secondary text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
@@ -239,7 +207,7 @@ export const Component = () => {
                             className={`w-5 h-5 ${localNodeMode === 'native' ? 'text-status-success' : 'text-content-secondary'}`}
                           />
                           <span
-                            className={`font-semibold ${localNodeMode === 'native' ? 'text-white' : 'text-content-secondary'}`}
+                            className={`font-semibold ${localNodeMode === 'native' ? 'text-content-primary' : 'text-content-secondary'}`}
                           >
                             {t('walletSetup.backendNative')}
                           </span>

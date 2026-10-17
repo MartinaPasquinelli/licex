@@ -12,8 +12,7 @@ import {
   User,
   Loader2,
   RefreshCw,
-  Plus,
-  Wallet,
+  X,
 } from 'lucide-react'
 import React, { useEffect, useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -32,7 +31,6 @@ import { useNodeLifecycleEvents } from '../../hooks/useNodeLifecycleEvents'
 import { useOnClickOutside } from '../../hooks/useOnClickOutside'
 import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { nodeSettingsActions } from '../../slices/nodeSettings/nodeSettings.slice'
-import { isNodeEnabled } from '../../slices/settings/settings.slice'
 import { uiSliceActions } from '../../slices/ui/ui.slice'
 import { AppVersion } from '../AppVersion'
 import { BackupModal } from '../BackupModal'
@@ -44,6 +42,7 @@ import { LogoutModal, LogoutButton } from '../LogoutModal'
 import { useNotification } from '../NotificationSystem'
 import { ShutdownAnimation } from '../ShutdownAnimation'
 import { SupportModal } from '../SupportModal'
+import { Toolbar } from '../Toolbar'
 
 import 'react-toastify/dist/ReactToastify.min.css'
 import {
@@ -134,7 +133,7 @@ const SidebarNavItem = ({ item, isCollapsed, isActive }: NavItemProps) => {
           flex items-center rounded-xl transition-all duration-300
           ${
             isActive
-              ? 'bg-gradient-to-r from-[#9B5094]/25 to-[#8FB8DE]/20 text-[#CDF7F6] font-semibold border-l-2 border-[#8FB8DE] shadow-lg shadow-[#9B5094]/10'
+              ? 'bg-surface-overlay/80 shadow-md'
               : 'text-content-secondary hover:text-content-primary hover:bg-surface-overlay/80 hover:shadow-md'
           }
 
@@ -150,11 +149,17 @@ const SidebarNavItem = ({ item, isCollapsed, isActive }: NavItemProps) => {
           to={item.to ?? '#'}
         >
           <div className={`flex items-center ${!isCollapsed && 'space-x-3'}`}>
-            <div className="transition-transform duration-300 group-hover:scale-110">
+            <div
+              className={`transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-[#9B5094] dark:text-[#CDF7F6]' : ''}`}
+            >
               {item.icon}
             </div>
             {!isCollapsed && (
-              <span className="font-medium text-sm">{item.label}</span>
+              <span
+                className={`text-sm ${isActive ? 'font-bold text-[#9B5094] dark:text-[#CDF7F6]' : 'font-medium'}`}
+              >
+                {item.label}
+              </span>
             )}
           </div>
         </NavLink>
@@ -184,7 +189,7 @@ const SidebarNavItem = ({ item, isCollapsed, isActive }: NavItemProps) => {
                 flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm cursor-pointer
                 transition-all duration-200
                 ${subItem.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-surface-overlay/80 hover:text-content-primary hover:translate-x-1'}
-                ${location.pathname === subItem.to ? 'bg-gradient-to-r from-[#9B5094]/25 to-[#8FB8DE]/20 text-[#CDF7F6] font-semibold border-l-2 border-[#8FB8DE]' : 'text-content-secondary'}
+                ${location.pathname === subItem.to ? 'bg-primary/15 text-primary font-bold border-l-4 border-[#9B5094]' : 'text-content-secondary'}
               `}
                   end
                   key={subItem.to}
@@ -560,13 +565,14 @@ export const Layout = (props: Props) => {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const shouldHideNavbar = HIDE_NAVBAR_PATHS.includes(location.pathname)
-  // LicEX routes don't depend on the node being reachable, so the overlay must not block them
+  // LicEX routes and setup don't depend on the node being reachable, so the overlay must not block them
   const isLicexRoute =
     location.pathname.startsWith('/marketplace') ||
     location.pathname.startsWith('/watchlist') ||
     location.pathname.startsWith('/wishlist') ||
     location.pathname.startsWith('/licex-assistant') ||
-    location.pathname.startsWith('/company-dashboard')
+    location.pathname.startsWith('/company-dashboard') ||
+    location.pathname.startsWith('/wallet-setup')
 
   // Get translated menu items
   const NAV_SECTIONS = getNavSections(t)
@@ -594,6 +600,8 @@ export const Layout = (props: Props) => {
   useNodeLifecycleEvents()
 
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [showAccountsModal, setShowAccountsModal] = useState(false)
+  const [isToolbarSubModalOpen, setIsToolbarSubModalOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const { addNotification } = useNotification()
@@ -608,12 +616,17 @@ export const Layout = (props: Props) => {
     (state) => state.node.reachabilityError
   )
   const nodeSettingsData = useAppSelector((state) => state.nodeSettings.data)
-  const appMode = useAppSelector((state) => state.settings.appMode)
-  // A configured node (local OR remote) surfaces the wallet section
-  const nodeSectionEnabled = isNodeEnabled(appMode) || !!nodeSettingsData?.name
+  // A configured node or saved account surfaces the account & wallet section
   const isNodeReachable =
     nodeReachability === 'reachable' ||
     (nodeReachability === 'unknown' && nodeInfo.isSuccess)
+  // La sezione Account & Wallet è attiva SOLO se c'è un nodo attivo/raggiungibile
+  const nodeSectionEnabled = isNodeReachable
+
+  useEffect(() => {
+    setShowAccountsModal(false)
+  }, [nodeSectionEnabled, location.pathname])
+
   const isNodeUnreachable =
     nodeReachability === 'unreachable' || nodeReachability === 'slow'
   const shouldPoll = isNodeReachable
@@ -675,11 +688,13 @@ export const Layout = (props: Props) => {
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true)
+      localStorage.removeItem('licex_account_email')
       const lockResponse = await lock().unwrap()
       await invoke('stop_node')
 
       if (lockResponse !== undefined || lockResponse === null) {
         dispatch(nodeSettingsActions.resetNodeSettings())
+        dispatch(nodeApi.util.resetApiState())
         addNotification({
           autoClose: 3000,
           message: t('modals.logoutSuccessMessage'),
@@ -691,6 +706,9 @@ export const Layout = (props: Props) => {
         throw new Error('Node lock unsuccessful')
       }
     } catch (error) {
+      localStorage.removeItem('licex_account_email')
+      dispatch(nodeSettingsActions.resetNodeSettings())
+      dispatch(nodeApi.util.resetApiState())
       addNotification({
         autoClose: 5000,
         message: t('modals.logoutFailedMessage', {
@@ -1075,15 +1093,14 @@ export const Layout = (props: Props) => {
               </button>
             </div>
 
-            {/* Main navigation — grouped into LICEX and Wallet categories */}
+            {/* Main navigation — grouped into LICEX (always visible), I TUOI ACCOUNT, and Account & Wallet (node-only) */}
             <div className="flex-1 overflow-y-auto pt-3 px-3">
               {NAV_SECTIONS.map((section, sectionIndex) => {
-                const sectionEnabled =
-                  section.key === 'wallet' ? nodeSectionEnabled : true
-                const activate = () => {
-                  navigate(ROOT_PATH)
+                // Se non siamo collegati ad un nodo, la sezione wallet/account NON viene renderizzata affatto
+                if (section.key === 'wallet' && !nodeSectionEnabled) {
+                  return null
                 }
-                const ActivateIcon = Wallet
+
                 return (
                   <div
                     className={sectionIndex > 0 ? 'mt-6' : ''}
@@ -1098,49 +1115,39 @@ export const Layout = (props: Props) => {
                         {section.label}
                       </div>
                     )}
-                    {sectionEnabled ? (
-                      <div className="space-y-1.5">
-                        {section.items.map((item) => (
-                          <SidebarNavItem
-                            isActive={isItemActive(item)}
-                            isCollapsed={isSidebarCollapsed}
-                            item={item}
-                            key={item.to ?? item.label}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <button
-                        className={`group flex w-full items-center rounded-xl border border-dashed border-border-strong py-3 px-4 text-content-secondary transition-all duration-300 hover:border-primary/40 hover:text-white hover:bg-surface-overlay/60
-                          ${isSidebarCollapsed ? 'justify-center' : 'justify-start space-x-3'}`}
-                        onClick={activate}
-                        title={
-                          isSidebarCollapsed
-                            ? t('navigation.activate', {
-                                defaultValue: 'Activate {{name}}',
-                                name: section.label,
-                              })
-                            : undefined
-                        }
-                        type="button"
-                      >
-                        <ActivateIcon className="w-5 h-5 flex-shrink-0" />
-                        {!isSidebarCollapsed && (
-                          <span className="text-sm font-semibold">
-                            {t('navigation.activate', {
-                              defaultValue: 'Connect {{name}}',
-                              name: section.label,
-                            })}
-                          </span>
-                        )}
-                        {!isSidebarCollapsed && (
-                          <Plus className="w-4 h-4 ml-auto opacity-60 group-hover:opacity-100" />
-                        )}
-                      </button>
-                    )}
+                    <div className="space-y-1.5">
+                      {section.items.map((item) => (
+                        <SidebarNavItem
+                          isActive={isItemActive(item)}
+                          isCollapsed={isSidebarCollapsed}
+                          item={item}
+                          key={item.to ?? item.label}
+                        />
+                      ))}
+                    </div>
                   </div>
                 )
               })}
+
+              {/* I TUOI ACCOUNT — pulsante cliccabile che apre il popup dei nodi/account */}
+              {!nodeSectionEnabled && (
+                <div className="mt-4 border-t border-divider/20 pt-3">
+                  <button
+                    className={`group flex w-full items-center rounded-xl border border-primary/30 bg-primary/5 py-2.5 px-3.5 text-content-primary transition-all duration-200 hover:bg-primary/15 hover:border-primary/60
+                      ${isSidebarCollapsed ? 'justify-center px-2' : 'justify-start space-x-3'}`}
+                    onClick={() => setShowAccountsModal(true)}
+                    title={isSidebarCollapsed ? 'I tuoi account' : undefined}
+                    type="button"
+                  >
+                    <User className="w-5 h-5 flex-shrink-0 text-primary" />
+                    {!isSidebarCollapsed && (
+                      <span className="text-sm font-semibold tracking-wide">
+                        I tuoi account
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="px-4 py-3 border-t border-divider/20">
@@ -1161,9 +1168,9 @@ export const Layout = (props: Props) => {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     className="flex items-center justify-center gap-2 py-3 px-3 rounded-lg
-                               bg-[#8FB8DE]/15 hover:bg-[#8FB8DE]/25
-                               border border-[#8FB8DE]/30 text-[#CDF7F6]
-                               font-semibold text-sm transition-all duration-200
+                               bg-[#8FB8DE]/25 hover:bg-[#8FB8DE]/35
+                               border border-[#8FB8DE]/50 text-[#6A605C] dark:text-[#CDF7F6]
+                               font-bold text-sm transition-all duration-200
                                transform hover:scale-[1.02] active:scale-[0.98]"
                     onClick={() => handleTransactionAction('deposit')}
                   >
@@ -1172,9 +1179,9 @@ export const Layout = (props: Props) => {
                   </button>
                   <button
                     className="flex items-center justify-center gap-2 py-3 px-3 rounded-lg
-                               bg-[#9B5094]/15 hover:bg-[#9B5094]/25
-                               border border-[#9B5094]/30 text-[#CDF7F6]
-                               font-semibold text-sm transition-all duration-200
+                               bg-[#9B5094]/25 hover:bg-[#9B5094]/35
+                               border border-[#9B5094]/50 text-[#6A605C] dark:text-[#CDF7F6]
+                               font-bold text-sm transition-all duration-200
                                transform hover:scale-[1.02] active:scale-[0.98]"
                     onClick={() => handleTransactionAction('withdraw')}
                   >
@@ -1304,6 +1311,54 @@ export const Layout = (props: Props) => {
         onClose={() => setShowLogoutModal(false)}
         onConfirm={handleLogout}
       />
+
+      {/* I Tuoi Account Modal (Popup centrato) */}
+      {showAccountsModal && (
+        <div
+          aria-modal="true"
+          className={`fixed inset-0 flex items-center justify-center z-[9999] animate-fadeIn p-4 transition-all duration-200 ${
+            isToolbarSubModalOpen
+              ? 'pointer-events-none bg-transparent'
+              : 'pointer-events-auto bg-black/60 backdrop-blur-sm'
+          }`}
+          onClick={() => {
+            if (!isToolbarSubModalOpen) setShowAccountsModal(false)
+          }}
+          role="dialog"
+        >
+          <div
+            className={`bg-surface-base text-content-primary rounded-3xl border border-divider/30 shadow-2xl max-w-md w-full mx-auto overflow-hidden animate-scaleIn flex flex-col max-h-[85vh] transition-all duration-200 ${
+              isToolbarSubModalOpen
+                ? 'opacity-0 pointer-events-none scale-95'
+                : 'opacity-100 scale-100'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-divider/20 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                <h3 className="text-base font-bold text-content-primary">
+                  I tuoi account
+                </h3>
+              </div>
+              <button
+                className="p-1.5 rounded-lg text-content-tertiary hover:text-content-primary hover:bg-surface-overlay transition-colors"
+                onClick={() => setShowAccountsModal(false)}
+                title="Chiudi"
+                type="button"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body: Toolbar con lista nodi/account */}
+            <div className="p-4 overflow-y-auto flex-1">
+              <Toolbar onActiveModalChange={setIsToolbarSubModalOpen} />
+            </div>
+          </div>
+        </div>
+      )}
 
       <ToastContainer
         autoClose={5000}

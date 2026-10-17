@@ -30,7 +30,6 @@ import {
   WALLET_HISTORY_ASSETS_PATH,
   WALLET_HISTORY_CHANNEL_ORDERS_PATH,
   WALLET_HISTORY_PATH,
-  WALLET_SETUP_PATH,
   WALLET_RESTORE_PATH,
   WALLET_UNLOCK_PATH,
   WALLET_REMOTE_PATH,
@@ -75,7 +74,7 @@ export interface NavSection {
   items: NavItem[]
 }
 
-// Sidebar navigation, grouped into sections: LICEX and Wallet.
+// Sidebar navigation, grouped into sections: LICEX (Public/Marketplace) and Account & Wallet.
 export const getNavSections = (t: TFunction): NavSection[] => [
   {
     items: [
@@ -86,34 +85,10 @@ export const getNavSections = (t: TFunction): NavSection[] => [
         to: LICEX_MARKETPLACE_PATH,
       },
       {
-        icon: <Key className="w-5 h-5" />,
-        label: t('navigation.myLicenses', 'Le Mie Licenze & Ordini'),
-        matchPath: LICEX_MY_LICENSES_PATH,
-        to: LICEX_MY_LICENSES_PATH,
-      },
-      {
-        icon: <Heart className="w-5 h-5" />,
-        label: t('navigation.watchlist', 'Watchlist & Alerts'),
-        matchPath: LICEX_WATCHLIST_PATH,
-        to: LICEX_WATCHLIST_PATH,
-      },
-      {
-        icon: <Sparkles className="w-5 h-5" />,
-        label: t('navigation.wishlist', 'Software Wishlist'),
-        matchPath: LICEX_WISHLIST_PATH,
-        to: LICEX_WISHLIST_PATH,
-      },
-      {
         icon: <Bot className="w-5 h-5" />,
         label: t('navigation.assistant', 'LICEX Assistant'),
         matchPath: LICEX_ASSISTANT_PATH,
         to: LICEX_ASSISTANT_PATH,
-      },
-      {
-        icon: <Building2 className="w-5 h-5" />,
-        label: t('navigation.publisherDashboard', 'Publisher Dashboard'),
-        matchPath: LICEX_COMPANY_DASHBOARD_PATH,
-        to: LICEX_COMPANY_DASHBOARD_PATH,
       },
     ],
     key: 'licex',
@@ -127,9 +102,33 @@ export const getNavSections = (t: TFunction): NavSection[] => [
         matchPath: ACCOUNT_PATH,
         to: ACCOUNT_PATH,
       },
+      {
+        icon: <Key className="w-5 h-5" />,
+        label: t('navigation.myLicenses', 'Le Mie Licenze'),
+        matchPath: LICEX_MY_LICENSES_PATH,
+        to: LICEX_MY_LICENSES_PATH,
+      },
+      {
+        icon: <Wallet className="w-5 h-5" />,
+        label: t('navigation.walletDashboard', 'Wallet & Saldi'),
+        matchPath: WALLET_DASHBOARD_PATH,
+        to: WALLET_DASHBOARD_PATH,
+      },
+      {
+        icon: <Heart className="w-5 h-5" />,
+        label: t('navigation.watchlist', 'Watchlist & Alerts'),
+        matchPath: LICEX_WATCHLIST_PATH,
+        to: LICEX_WATCHLIST_PATH,
+      },
+      {
+        icon: <Sparkles className="w-5 h-5" />,
+        label: t('navigation.wishlist', 'Software Wishlist'),
+        matchPath: LICEX_WISHLIST_PATH,
+        to: LICEX_WISHLIST_PATH,
+      },
     ],
     key: 'wallet',
-    label: 'ACCOUNT',
+    label: 'ACCOUNT & WALLET',
   },
 ]
 
@@ -269,7 +268,7 @@ export const getPageConfig = (t: TFunction) => ({
   },
   [LICEX_MY_LICENSES_PATH]: {
     icon: <Key className="w-5 h-5" />,
-    title: t('navigation.myLicenses', 'Le Mie Licenze & Ordini'),
+    title: t('navigation.myLicenses', 'Le Mie Licenze'),
   },
   [LICEX_WATCHLIST_PATH]: {
     icon: <Heart className="w-5 h-5" />,
@@ -322,7 +321,6 @@ export const PAGE_CONFIG = getPageConfig(
 )
 
 export const HIDE_NAVBAR_PATHS = [
-  WALLET_SETUP_PATH,
   WALLET_RESTORE_PATH,
   WALLET_UNLOCK_PATH,
   WALLET_REMOTE_PATH,
