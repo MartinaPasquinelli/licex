@@ -1021,7 +1021,7 @@ export const Component = () => {
       content: React.ReactNode,
       _onBack?: () => void
     ) => (
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left decorative panel */}
         <div className="hidden md:flex flex-col w-64 xl:w-72 shrink-0 bg-surface-base border-r border-border-subtle relative overflow-hidden">
           <div className="absolute inset-0 pointer-events-none">
@@ -1074,8 +1074,8 @@ export const Component = () => {
           </div>
         </div>
         {/* Right content panel */}
-        <div className="flex flex-col flex-1 overflow-hidden bg-surface-raised">
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex min-h-0 flex-col flex-1 overflow-hidden bg-surface-raised">
+          <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
             <div className="max-w-2xl mx-auto px-6 py-6">
               <div className="text-center mt-4 mb-8">
                 <h3 className="text-3xl font-bold text-white">{title}</h3>

@@ -85,14 +85,14 @@ export const Component = () => {
 
   return (
     <Layout>
-      <div className="h-full min-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-divider/20 bg-surface-base shadow-sm">
+      <div className="relative min-h-full rounded-2xl border border-divider/20 bg-surface-base pb-10 shadow-sm">
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto relative flex flex-col p-6">
+        <div className="relative flex flex-col p-6">
           {/* Animated background gradient */}
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan/5 via-transparent to-blue-500/5 pointer-events-none" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(6,182,212,0.1),transparent_50%)] pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#9B5094]/5 via-transparent to-[#8FB8DE]/5 pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(155,80,148,0.1),transparent_50%)] pointer-events-none" />
 
-          <div className="flex-1 flex items-center justify-center p-4 relative z-10 overflow-hidden">
+          <div className="relative z-10 flex items-start justify-center p-4 pb-8">
             <div className="w-full max-w-4xl">
               <div
                 className="fade-in content-container"
@@ -146,7 +146,11 @@ export const Component = () => {
                         />
                         <NodeOption
                           description={t('walletSetup.localNodeDescription')}
-                          icon={<Server className="w-6 h-6" />}
+                          icon={
+                            <Server
+                              className={`w-5 h-5 ${localNodeMode === 'native' ? 'text-[#8FB8DE]' : 'text-content-secondary'}`}
+                            />
+                          }
                           onClick={() => {
                             dispatch(setAppMode('node'))
                             handleNodeTypeChange('local')
@@ -172,13 +176,12 @@ export const Component = () => {
                     <div className="text-center mb-10 slide-in">
                       <div className="relative inline-flex mb-6">
                         <div
-                          className={`${IconWrapper} bg-gradient-to-br from-cyan/25 via-cyan/15 to-blue-500/15 border-2 border-primary/30
-                          rounded-2xl shadow-2xl shadow-primary/15
-                          relative z-10`}
+                          className={`${IconWrapper} bg-gradient-to-br from-[#9B5094]/25 via-[#9B5094]/15 to-[#9B5094]/5 border-2 border-[#9B5094]/30
+                                        rounded-2xl shadow-2xl shadow-[#9B5094]/15 relative z-10`}
                         >
-                          <Server className="w-7 h-7 text-primary drop-shadow-[0_0_6px_rgba(6,182,212,0.5)]" />
+                          <Server className="w-7 h-7 text-[#9B5094] drop-shadow-[0_0_6px_rgba(155,80,148,0.5)]" />
                         </div>
-                        <div className="absolute inset-0 bg-primary/15 rounded-2xl blur-xl scale-150 opacity-50" />
+                        <div className="absolute inset-0 bg-[#9B5094]/15 rounded-2xl blur-xl scale-150 opacity-50" />
                       </div>
                       <h1 className="text-3xl md:text-4xl font-bold mb-4 text-content-primary leading-tight tracking-tight">
                         {t('walletSetup.setupLocalTitle')}
@@ -195,7 +198,7 @@ export const Component = () => {
                           !isNativeSupported
                             ? 'border-border-default/20 bg-surface-elevated/10 opacity-50 cursor-not-allowed'
                             : localNodeMode === 'native'
-                              ? 'border-cyan bg-cyan/10 shadow-lg shadow-cyan/10'
+                              ? 'border-[#8FB8DE] bg-[#8FB8DE]/10 shadow-lg shadow-[#8FB8DE]/10'
                               : 'border-border-default/40 bg-surface-elevated/20 hover:border-border-default/60'
                         }`}
                         disabled={!isNativeSupported}
@@ -303,9 +306,7 @@ export const Component = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <WalletAction
                           description={t('walletSetup.createWalletDescription')}
-                          icon={
-                            <Wallet className="w-6 h-6 text-status-success" />
-                          }
+                          icon={<Wallet className="w-6 h-6 text-primary" />}
                           onClick={() => navigateToWalletInit(WALLET_INIT_PATH)}
                           primary
                           title={t('walletSetup.createWalletTitle')}
@@ -315,7 +316,7 @@ export const Component = () => {
                             'walletSetup.restoreWalletDescription'
                           )}
                           icon={
-                            <ArrowLeftRight className="w-6 h-6 text-status-success" />
+                            <ArrowLeftRight className="w-6 h-6 text-primary" />
                           }
                           onClick={() =>
                             navigateToWalletInit(WALLET_RESTORE_PATH)

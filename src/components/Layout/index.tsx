@@ -38,6 +38,7 @@ import { useBackup } from '../../hooks/useBackup'
 import { useNwcAutostart } from '../../hooks/useNwcAutostart'
 import { useNodeReachabilityMonitor } from '../../hooks/useNodeReachabilityMonitor'
 import { useNodeReconnect } from '../../hooks/useNodeReconnect'
+import { logger } from '../../utils/logger'
 import { LogoutModal, LogoutButton } from '../LogoutModal'
 import { useNotification } from '../NotificationSystem'
 import { ShutdownAnimation } from '../ShutdownAnimation'
@@ -134,7 +135,7 @@ const SidebarNavItem = ({ item, isCollapsed, isActive }: NavItemProps) => {
           flex items-center rounded-xl transition-all duration-200
           ${
             isActive
-              ? 'bg-[#9B5094]/10 dark:bg-primary/20 border-l-4 border-[#9B5094] dark:border-[#CDF7F6] shadow-sm'
+              ? 'bg-[#9B5094]/10 dark:bg-primary/20  dark:border-[#CDF7F6] shadow-sm'
               : 'text-content-secondary hover:text-content-primary hover:bg-surface-overlay/80 hover:shadow-sm'
           }
         `}
@@ -689,22 +690,24 @@ export const Layout = (props: Props) => {
     try {
       setIsLoggingOut(true)
       localStorage.removeItem('licex_account_email')
-      const lockResponse = await lock().unwrap()
-      await invoke('stop_node')
-
-      if (lockResponse !== undefined || lockResponse === null) {
-        dispatch(nodeSettingsActions.resetNodeSettings())
-        dispatch(nodeApi.util.resetApiState())
-        addNotification({
-          autoClose: 3000,
-          message: t('modals.logoutSuccessMessage'),
-          title: t('modals.logoutSuccess'),
-          type: 'success',
-        })
-        navigate(WALLET_SETUP_PATH)
-      } else {
-        throw new Error('Node lock unsuccessful')
+      await lock().unwrap()
+      try {
+        await invoke('stop_node')
+      } catch (stopError) {
+        // The node may already be stopped or may be remote; the lock above
+        // still completed successfully, so this must not turn logout into an error.
+        logger.warn('Node stop skipped during logout:', stopError)
       }
+
+      dispatch(nodeSettingsActions.resetNodeSettings())
+      dispatch(nodeApi.util.resetApiState())
+      addNotification({
+        autoClose: 3000,
+        message: t('modals.logoutSuccessMessage'),
+        title: t('modals.logoutSuccess'),
+        type: 'success',
+      })
+      navigate(WALLET_SETUP_PATH)
     } catch (error) {
       localStorage.removeItem('licex_account_email')
       dispatch(nodeSettingsActions.resetNodeSettings())
@@ -1026,7 +1029,7 @@ export const Layout = (props: Props) => {
       )}
 
       {!shouldHideNavbar ? (
-        <div className="min-h-screen flex m-0 p-0 overflow-x-hidden">
+        <div className="h-screen min-h-0 flex m-0 p-0 overflow-hidden">
           {/* Sidebar Navigation */}
           <div
             className={`flex flex-col fixed left-0 top-0 h-screen bg-surface-base border-r border-divider/30
@@ -1210,7 +1213,7 @@ export const Layout = (props: Props) => {
 
           {/* Main content */}
           <main
-            className={`flex-1 flex flex-col ${isLicexRoute ? 'h-screen min-h-0' : 'min-h-screen'} max-w-full overflow-x-hidden bg-surface-raised transition-all duration-300
+            className={`flex-1 min-h-0 flex flex-col max-w-full overflow-x-hidden bg-surface-raised transition-all duration-300
                         ${isSidebarCollapsed ? 'ml-20' : 'ml-60'}`}
           >
             {/* Top bar with page title and user profile */}
@@ -1286,7 +1289,7 @@ export const Layout = (props: Props) => {
 
             {/* Main content area */}
             <div
-              className={`relative isolate flex-1 overflow-hidden ${isLicexRoute ? 'min-h-0 p-3' : 'p-4'}`}
+              className={`relative isolate min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${isLicexRoute ? 'p-3' : 'p-4'}`}
               id="content-area"
             >
               {/* Portal target for modals — absolute inset-0 so modals cover only this area.
@@ -1300,7 +1303,7 @@ export const Layout = (props: Props) => {
         </div>
       ) : (
         // For setup and other paths that hide the navbar
-        <div className="h-screen flex flex-col overflow-hidden">
+        <div className="h-screen min-h-0 flex flex-col overflow-y-auto overflow-x-hidden">
           {props.children}
         </div>
       )}

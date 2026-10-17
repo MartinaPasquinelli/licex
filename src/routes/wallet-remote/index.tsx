@@ -19,15 +19,12 @@ import {
   WALLET_SETUP_PATH,
   WALLET_UNLOCK_PATH,
 } from '../../app/router/paths'
-import logoFull from '../../assets/logo-full.svg'
-import { AppVersion } from '../../components/AppVersion'
 import { useAppDispatch } from '../../app/store/hooks'
 import { Layout } from '../../components/Layout'
 import { NetworkSelector } from '../../components/NetworkSelector'
 import { RegtestConnectionSelector } from '../../components/RegtestConnectionSelector'
 import { TermsWarningModal } from '../../components/TermsWarningModal'
 import { SupportModal } from '../../components/SupportModal'
-import { Toolbar } from '../../components/Toolbar'
 import { useNotification } from '../../components/NotificationSystem'
 import { HelpCircle, Bell } from 'lucide-react'
 import {
@@ -613,24 +610,10 @@ export const Component = () => {
   return (
     <>
       <Layout>
-        <div className="flex h-screen overflow-hidden">
-          {/* Sidebar */}
-          <div className="w-72 h-full bg-surface-base border-r border-divider/10 flex flex-col shrink-0">
-            <div className="flex items-center p-4 border-b border-divider/10">
-              <img alt="LicEX" className="h-8" src={logoFull} />
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <Toolbar />
-            </div>
-            <div className="p-4 border-t border-divider/10">
-              <AppVersion className="relative" />
-            </div>
-          </div>
-
-          {/* Main area */}
-          <div className="flex-1 flex flex-col overflow-hidden">
+        <>
+          <>
             {/* Topbar */}
-            <div className="flex-shrink-0 bg-surface-base/80 backdrop-blur-xl border-b border-divider/20 px-6 py-4 flex justify-end items-center gap-2">
+            <div className="hidden">
               <button
                 aria-label="Support"
                 className="p-3 text-content-secondary hover:text-white rounded-xl hover:bg-gradient-to-r hover:from-surface-overlay hover:to-surface-overlay/50
@@ -656,7 +639,7 @@ export const Component = () => {
 
             {/* Backdrop — click outside to close */}
             <div
-              className="flex-1 flex items-center justify-center p-4 overflow-hidden"
+              className="flex-1 flex items-start justify-center p-4 md:p-8 overflow-y-auto"
               onClick={() => navigate(WALLET_SETUP_PATH)}
             >
               {/* Modal card — stop propagation */}
@@ -1045,10 +1028,8 @@ export const Component = () => {
               {/* end modal card */}
             </div>
             {/* end backdrop */}
-          </div>
-          {/* end main area */}
-        </div>
-        {/* end flex h-screen */}
+          </>
+        </>
       </Layout>
       <TermsWarningModal
         isOpen={showTermsModal}
