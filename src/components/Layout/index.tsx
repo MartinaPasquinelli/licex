@@ -25,7 +25,7 @@ import {
   WALLET_SETUP_PATH,
 } from '../../app/router/paths'
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
-import logoIcon from '../../assets/logo.svg'
+import logoIcon from '../../assets/logo-licex-notext.svg'
 import { isBtcWalletTx } from '../../helpers/walletHistoryUtils'
 import { useNodeLifecycleEvents } from '../../hooks/useNodeLifecycleEvents'
 import { useOnClickOutside } from '../../hooks/useOnClickOutside'
@@ -43,6 +43,7 @@ import { useNotification } from '../NotificationSystem'
 import { ShutdownAnimation } from '../ShutdownAnimation'
 import { SupportModal } from '../SupportModal'
 import { Toolbar } from '../Toolbar'
+import { ThemeToggle } from '../ThemeToggle'
 
 import 'react-toastify/dist/ReactToastify.min.css'
 import {
@@ -130,13 +131,12 @@ const SidebarNavItem = ({ item, isCollapsed, isActive }: NavItemProps) => {
     >
       <div
         className={`
-          flex items-center rounded-xl transition-all duration-300
+          flex items-center rounded-xl transition-all duration-200
           ${
             isActive
-              ? 'bg-surface-overlay/80 shadow-md'
-              : 'text-content-secondary hover:text-content-primary hover:bg-surface-overlay/80 hover:shadow-md'
+              ? 'bg-[#9B5094]/10 dark:bg-primary/20 border-l-4 border-[#9B5094] dark:border-[#CDF7F6] shadow-sm'
+              : 'text-content-secondary hover:text-content-primary hover:bg-surface-overlay/80 hover:shadow-sm'
           }
-
         `}
       >
         <NavLink
@@ -1050,7 +1050,7 @@ export const Layout = (props: Props) => {
                     src={logoIcon}
                   />
                   <div className="flex flex-col leading-tight">
-                    <span className="font-black text-sm tracking-widest bg-gradient-to-r from-[#CDF7F6] via-[#8FB8DE] to-[#9B5094] bg-clip-text text-transparent">
+                    <span className="font-black text-sm tracking-widest bg-gradient-to-r from-[#6885b1] via-[#835a7b] to-[#9e1644] bg-clip-text text-transparent">
                       LicEX
                     </span>
                     <span className="text-[8px] uppercase tracking-wider text-[#9A94BC] font-semibold">
@@ -1133,15 +1133,17 @@ export const Layout = (props: Props) => {
               {!nodeSectionEnabled && (
                 <div className="mt-4 border-t border-divider/20 pt-3">
                   <button
-                    className={`group flex w-full items-center rounded-xl border border-primary/30 bg-primary/5 py-2.5 px-3.5 text-content-primary transition-all duration-200 hover:bg-primary/15 hover:border-primary/60
+                    className={`group flex w-full items-center rounded-xl border border-divider/40 bg-surface-overlay hover:bg-surface-elevated py-2.5 px-3 transition-all duration-200 shadow-sm hover:border-primary/50
                       ${isSidebarCollapsed ? 'justify-center px-2' : 'justify-start space-x-3'}`}
                     onClick={() => setShowAccountsModal(true)}
                     title={isSidebarCollapsed ? 'I tuoi account' : undefined}
                     type="button"
                   >
-                    <User className="w-5 h-5 flex-shrink-0 text-primary" />
+                    <div className="w-8 h-8 rounded-lg bg-[#9B5094]/15 dark:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                      <User className="w-4 h-4 text-[#9B5094] dark:text-[#CDF7F6]" />
+                    </div>
                     {!isSidebarCollapsed && (
-                      <span className="text-sm font-semibold tracking-wide">
+                      <span className="text-sm font-bold text-content-primary tracking-tight">
                         I tuoi account
                       </span>
                     )}
@@ -1150,7 +1152,12 @@ export const Layout = (props: Props) => {
               )}
             </div>
 
-            <div className="px-4 py-3 border-t border-divider/20">
+            <div className="px-4 py-3 border-t border-divider/20 space-y-2">
+              <ThemeToggle
+                className="w-full justify-start"
+                showLabel={!isSidebarCollapsed}
+                variant="button"
+              />
               <SidebarNavItem
                 isActive={location.pathname.startsWith(SETTINGS_PATH)}
                 isCollapsed={isSidebarCollapsed}
@@ -1226,10 +1233,7 @@ export const Layout = (props: Props) => {
 
                     return (
                       <>
-                        <div
-                          className="p-3 bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl text-primary
-                                      shadow-lg shadow-primary/10 ring-1 ring-primary/20"
-                        >
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#9B5094] via-[#8FB8DE] to-[#CDF7F6] p-0.5 flex items-center justify-center shadow-lg shadow-[#9B5094]/20">
                           {icon}
                         </div>
                         <h1 className="text-xl font-semibold text-content-primary tracking-tight">
@@ -1240,7 +1244,10 @@ export const Layout = (props: Props) => {
                   })()}
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3">
+                  {/* Theme toggle switch (Dark / Light) */}
+                  <ThemeToggle />
+
                   {/* User profile */}
                   <UserProfile
                     dropdownAlign="right"

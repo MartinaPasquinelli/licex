@@ -105,39 +105,6 @@ export function Component() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header bar */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-secondary))]/40">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#9B5094] via-[#8FB8DE] to-[#CDF7F6] p-0.5 flex items-center justify-center shadow-lg shadow-[#9B5094]/20">
-              <div className="w-full h-full bg-[rgb(var(--app-surface-secondary))] rounded-[10px] flex items-center justify-center">
-                <Bot className="w-5 h-5 text-[#CDF7F6]" />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold text-[rgb(var(--app-content-primary))]">
-                  LICEX Assistant
-                </h1>
-                <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-[#8FB8DE]/15 text-[#CDF7F6] border border-[#8FB8DE]/30 font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#CDF7F6] animate-pulse" />
-                  QVAC Agent Engine
-                </span>
-              </div>
-              <p className="text-xs text-[rgb(var(--app-content-secondary))]">
-                Local AI for software license legal compliance, pricing
-                discovery & transfer policy analysis
-              </p>
-            </div>
-          </div>
-
-          <div className="hidden md:flex items-center gap-2 text-xs text-[#9A94BC] bg-[rgb(var(--app-surface-primary))] px-3 py-1.5 rounded-lg border border-[rgb(var(--app-border-primary))]/30">
-            <Cpu className="w-4 h-4 text-[#8FB8DE]" />
-            <span>Local Inference Ready</span>
-          </div>
-        </div>
-      </div>
-
       {/* Messages list */}
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
         {chatMessages.map((msg) => (

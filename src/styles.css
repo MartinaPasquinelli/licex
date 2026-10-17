@@ -1,62 +1,7 @@
 @import 'tailwindcss';
 @import 'kaleido-ui/css';
 
-/* ── LicEX Master Palette Override (#CDF7F6, #8FB8DE, #9A94BC, #9B5094, #6A605C) ── */
-:root,
-html,
-body,
-.dark,
-.light {
-  --primary: #8fb8de !important;
-  --primary-foreground: #ffffff !important;
-  --ring: #cdf7f6 !important;
-  --secondary: #9b5094 !important;
-  --secondary-foreground: #ffffff !important;
-  --accent: #9a94bc !important;
-  --accent-foreground: #636363 !important;
-  --brand: #8fb8de !important;
-
-  --app-primary: 143 184 222 !important;
-  /* #8FB8DE Pastel Sky */
-  --app-primary-emphasis: 205 247 246 !important;
-  /* #CDF7F6 Aqua */
-  --app-primary-foreground: 18 16 24 !important;
-
-  --app-secondary: 155 80 148 !important;
-  /* #9B5094 Orchid Plum */
-  --app-secondary-emphasis: 175 90 167 !important;
-  --app-secondary-foreground: 255 255 255 !important;
-  --app-secondary-content: 205 247 246 !important;
-
-  --app-border-strong: 143 184 222 !important;
-
-  --app-status-success: 143 184 222 !important;
-  --success-fg: #8fb8de !important;
-
-  --brand-gradient: linear-gradient(
-    90deg,
-    #cdf7f6 0%,
-    #8fb8de 40%,
-    #9b5094 100%
-  ) !important;
-  --gradient-page-brand:
-    radial-gradient(
-      ellipse 70% 45% at 50% -5%,
-      rgba(143, 184, 222, 0.16) 0%,
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 50% 32% at 0% 68%,
-      rgba(155, 80, 148, 0.16) 0%,
-      transparent 70%
-    ) !important;
-  --gradient-card-hero: linear-gradient(
-    135deg,
-    rgba(155, 80, 148, 0.12) 0%,
-    rgba(143, 184, 222, 0.08) 50%,
-    rgba(205, 247, 246, 0.06) 100%
-  ) !important;
-}
+/* ── LicEX Design System Theme Tokens ── */
 
 /* App-specific Tailwind theme (legacy palette, spacing, animations, keyframes). */
 @config '../tailwind.config.js';
@@ -114,41 +59,11 @@ body,
 }
 
 @layer base {
-  /* Design tokens (surface / content / border / status / primary / secondary /
-     divider) and Satoshi typography now come from kaleido-ui/css via @theme.
-     App-specific base styles follow. */
-
-  /* ── Light mode: override explicit text-white to use dark content color ── */
-  .light .text-white {
-    color: rgb(var(--app-content-primary)) !important;
-  }
-
-  /* Override Tailwind variant utilities for text-white in light mode */
-  .light .hover\:text-white:hover,
-  .light .focus\:text-white:focus,
-  .light .active\:text-white:active,
-  .light .visited\:text-white:visited {
-    color: rgb(var(--app-content-primary)) !important;
-  }
-
-  /* Light mode body — explicit white background */
-  .light body,
-  body.light {
-    background-color: rgb(var(--app-surface-raised));
-    color: rgb(var(--app-content-primary));
-  }
-
-  .dark {
-    color-scheme: dark;
-  }
-
-  .light {
-    color-scheme: light;
-  }
-
-  /* ── LicEX Signature Palette Override (#CDF7F6, #8FB8DE, #9A94BC, #9B5094, #6A605C) ── */
+  /* ── Mode declarations ── */
   :root,
   .dark {
+    color-scheme: dark;
+
     --primary: #8fb8de;
     --primary-foreground: #121017;
     --ring: #cdf7f6;
@@ -156,9 +71,10 @@ body,
     --secondary-foreground: #ffffff;
     --accent: #9a94bc;
     --accent-foreground: #121017;
+    --brand: #8fb8de;
 
     --app-primary: 143 184 222;
-    /* #8FB8DE Pastel Sky */
+    /* #8FB8DE Sky */
     --app-primary-emphasis: 205 247 246;
     /* #CDF7F6 Aqua */
     --app-primary-foreground: 18 16 24;
@@ -169,72 +85,139 @@ body,
     --app-secondary-foreground: 255 255 255;
     --app-secondary-content: 205 247 246;
 
-    --app-surface-base: 18 16 23;
-    --app-surface-raised: 24 21 31;
-    --app-surface-overlay: 34 30 43;
-    --app-surface-elevated: 48 42 60;
-    --app-surface-high: 62 55 78;
+    /* Dark Mode Surfaces */
+    --app-surface-base: 18 16 24;
+    /* deep card base */
+    --app-surface-raised: 25 22 33;
+    /* page background */
+    --app-surface-overlay: 37 32 48;
+    /* interactive elements */
+    --app-surface-elevated: 50 44 64;
+    --app-surface-high: 66 58 84;
 
-    --app-content-primary: 30 28 40; /* #1E1C28 dark text */
-    --app-content-secondary: 106 96 92; /* #6A605C secondary dark */
-    /* #9A94BC Lavender */
-    --app-content-tertiary: 106 96 92;
-    /* #6A605C Warm Taupe */
+    /* Dark Mode Text — bright and ultra-legible */
+    --app-content-primary: 246 247 252;
+    /* #F6F7FC crisp light */
+    --app-content-secondary: 195 190 216;
+    /* soft lavender */
+    --app-content-tertiary: 155 148 180;
+    /* readable muted */
 
-    --app-border-subtle: 42 38 52;
-    --app-border-default: 62 56 78;
+    --app-border-subtle: 46 41 58;
+    --app-border-default: 68 62 86;
     --app-border-strong: 143 184 222;
-    --app-divider: 52 46 64;
+    --app-divider: 54 48 68;
+
+    --brand-gradient: linear-gradient(
+      90deg,
+      #cdf7f6 0%,
+      #8fb8de 40%,
+      #9b5094 100%
+    );
   }
 
-  /* ── LicEX Light Theme ── */
   .light {
-    --primary: #8fb8de;
-    --primary-foreground: #121017;
-    --ring: #8fb8de;
-    --secondary: #9b5094;
+    color-scheme: light;
+
+    --primary: #9b5094;
+    /* Rich plum for light */
+    --primary-foreground: #ffffff;
+    --ring: #9b5094;
+    --secondary: #6b9ac4;
     --secondary-foreground: #ffffff;
-    --accent: #9a94bc;
-    --accent-foreground: #121017;
+    --accent: #8b83ad;
+    --accent-foreground: #ffffff;
+    --brand: #9b5094;
 
-    --app-primary: 143 184 222;
-    --app-primary-emphasis: 205 247 246;
-    --app-primary-foreground: 18 16 24;
+    --app-primary: 155 80 148;
+    /* #9B5094 */
+    --app-primary-emphasis: 130 60 124;
+    --app-primary-foreground: 255 255 255;
 
-    --app-secondary: 155 80 148;
-    --app-secondary-emphasis: 175 90 167;
+    --app-secondary: 107 154 196;
+    /* #6B9AC4 */
+    --app-secondary-emphasis: 80 130 175;
     --app-secondary-foreground: 255 255 255;
     --app-secondary-content: 155 80 148;
 
-    /* Light surfaces — white/near-white */
+    /* Light Mode Surfaces — crisp clean surfaces */
     --app-surface-base: 255 255 255;
-    --app-surface-raised: 248 249 252;
-    --app-surface-overlay: 237 242 248;
-    --app-surface-elevated: 225 233 243;
-    --app-surface-high: 210 222 236;
+    /* pure white cards */
+    --app-surface-raised: 247 248 252;
+    /* light page background */
+    --app-surface-overlay: 238 241 249;
+    /* hover & secondary cards */
+    --app-surface-elevated: 226 232 244;
+    --app-surface-high: 212 220 236;
 
-    /* Dark text */
-    --app-content-primary: 30 28 40;
-    --app-content-secondary: 100 90 130;
-    --app-content-tertiary: 106 96 92;
+    /* Light Mode Text — deep dark high contrast */
+    --app-content-primary: 20 18 28;
+    /* deep dark */
+    --app-content-secondary: 76 70 94;
+    /* readable slate */
+    --app-content-tertiary: 116 110 134;
+    /* muted gray */
 
-    --app-border-subtle: 220 228 240;
-    --app-border-default: 200 215 232;
-    --app-border-strong: 143 184 222;
-    --app-divider: 215 225 238;
+    --app-border-subtle: 228 233 244;
+    --app-border-default: 208 218 234;
+    --app-border-strong: 155 80 148;
+    --app-divider: 222 228 240;
+
+    --brand-gradient: linear-gradient(
+      90deg,
+      #9b5094 0%,
+      #6b9ac4 60%,
+      #4a82b0 100%
+    );
   }
 
+  /* Text-white preservation ONLY on solid dark/colored buttons in light mode */
+  .light button.btn-primary,
+  .light .btn-primary,
+  .light button.bg-primary:not([class*='/']),
+  .light [class*='bg-[#9B5094]']:not([class*='/']),
+  .light [class*='bg-purple-600'],
+  .light [class*='bg-purple-700'],
+  .light [class*='bg-red-600'],
+  .light [class*='bg-blue-600'],
+  .light [class*='bg-green-600'],
+  .light .text-always-white {
+    color: #ffffff !important;
+  }
+
+  /* General light mode: bare text-white on neutral surfaces should be dark */
+  .light
+    .text-white:not(
+      button[class*='bg-'],
+      [class*='bg-primary'] *,
+      [class*='bg-purple-'] *,
+      [class*='bg-red-'] *,
+      [class*='bg-blue-'] *,
+      [class*='bg-green-'] *,
+      .badge-solid,
+      .text-always-white
+    ) {
+    color: rgb(var(--app-content-primary)) !important;
+  }
+
+  /* Smooth global transition for background and colors */
   html {
     @apply antialiased;
     overflow-x: hidden;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
   }
 
   body {
     @apply bg-surface-raised text-content-primary font-sans;
     overflow-x: hidden;
     scrollbar-width: thin;
-    scrollbar-color: rgb(var(--app-surface-base) / 0.8)
-      rgb(var(--app-surface-base) / 0.3);
+    scrollbar-color: rgb(var(--app-surface-overlay))
+      rgb(var(--app-surface-base));
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
   }
 
   /* Global scrollbar styling */
@@ -396,15 +379,37 @@ body,
 
 /* Global press animation — outside @layer so it overrides transition-colors utilities */
 button {
-  transition: all 150ms ease;
+  transition: none !important;
 }
 
-button:not([disabled]):hover {
-  transform: scale(1.02);
-}
-
+button:not([disabled]):hover,
 button:not([disabled]):active {
-  transform: scale(0.98);
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* LICEX — blocca qualsiasi ingrandimento delle card */
+[id^='license-card-'],
+[id^='license-card-']:hover,
+[id^='license-card-']:active,
+[id^='license-card-']:focus,
+[id^='license-card-']:focus-within {
+  transform: none !important;
+  scale: none !important;
+  zoom: 1 !important;
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Evita che gli elementi interni ingrandiscano visivamente la card */
+[id^='license-card-'] * {
+  animation: none !important;
+}
+
+[id^='license-card-'] button:hover,
+[id^='license-card-'] button:active {
+  transform: none !important;
+  scale: none !important;
 }
 
 /* Modal portal target: when no modal is mounted the empty overlay must not
@@ -495,15 +500,15 @@ button.icon-action:not([disabled]):active {
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3);
+    box-shadow: 0 0 0 0 rgb(var(--app-primary) / 0.3);
   }
 
   70% {
-    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 10px rgb(var(--app-primary) / 0);
   }
 
   100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 0 rgb(var(--app-primary) / 0);
   }
 }
 
@@ -546,7 +551,7 @@ button.icon-action:not([disabled]):active {
 
 /* Additional utility classes for channel card states */
 .channel-balanced {
-  border-color: rgba(34, 197, 94, 0.4);
+  border-color: rgb(var(--app-primary) / 0.4);
 }
 
 .channel-unbalanced {
@@ -627,7 +632,7 @@ button.icon-action:not([disabled]):active {
   left: 50%;
   width: 8px;
   height: 8px;
-  background-color: rgb(34, 197, 94);
+  background-color: rgb(var(--app-primary));
   border-radius: 50%;
   transform: translate(-50%, -50%);
   animation: pulse 2s infinite;
@@ -883,6 +888,14 @@ button.icon-action:not([disabled]):active {
 
 .close-channel-btn:hover .zap-icon {
   animation: zapPulse 0.7s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+[id^='license-card-'],
+[id^='license-card-']:hover {
+  transform: none !important;
+  scale: 1 !important;
+  transition: none !important;
+  animation: none !important;
 }
 
 /* Close Channel button hover pulse — red bg + text, stays in bounds */

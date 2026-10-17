@@ -17,7 +17,7 @@ import {
   getModalPositionClass,
 } from '../../../../helpers/modalPortal'
 import { Spinner } from '../../../../components/Spinner'
-import kaleidoswapPictogram from '../../../../assets/logo.svg'
+import kaleidoswapPictogram from '../../../../assets/logo-licex-notext.svg'
 import { makerApi } from '../../../../slices/makerApi/makerApi.slice'
 import { nodeApi } from '../../../../slices/nodeApi/nodeApi.slice'
 import { uiSliceActions } from '../../../../slices/ui/ui.slice'

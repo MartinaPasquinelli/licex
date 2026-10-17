@@ -48,7 +48,7 @@ import {
   NetworkSettings,
 } from '../../components/ui'
 import { UnlockingProgress } from '../../components/UnlockingProgress'
-import kaleidoswapPictogram from '../../assets/logo.svg'
+import kaleidoswapPictogram from '../../assets/logo-licex-notext.svg'
 import { BitcoinNetwork } from '../../constants'
 import { NETWORK_DEFAULTS, getDefaultMakerUrls } from '../../constants/networks'
 import { buildLocalNodeUrl } from '../../api/client'

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 
-import logo from '../../assets/logo.svg'
+import logo from '../../assets/logo-licex-notext.svg'
 
 interface ShutdownAnimationProps {
   isVisible: boolean

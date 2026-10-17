@@ -53,7 +53,7 @@ import {
   setFiatCurrency,
   setLanguage,
   setNodeConnectionString,
-  // setTheme, // temporarily unused — light mode disabled
+  setTheme,
 } from '../../slices/settings/settings.slice'
 import {
   CURRENCY_LABELS,
@@ -175,7 +175,7 @@ export const Component: React.FC = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const dispatch = useDispatch()
-  const { bitcoinUnit, fiatCurrency, nodeConnectionString, language } =
+  const { bitcoinUnit, fiatCurrency, nodeConnectionString, language, theme } =
     useSelector((state: RootState) => state.settings)
   const currentAccount = useAppSelector((state) => state.nodeSettings.data)
   const nodeSettings = useAppSelector((state) => state.nodeSettings.data)
@@ -673,6 +673,25 @@ export const Component: React.FC = () => {
                   </SettingRow>
                 )}
               />
+
+              <SettingRow label={t('settings.theme', 'Tema')}>
+                <div className="relative">
+                  <select
+                    aria-label={t('settings.theme', 'Tema')}
+                    className={selectCls}
+                    onChange={(e) => dispatch(setTheme(e.target.value as any))}
+                    value={theme}
+                  >
+                    <option value="light">
+                      ☀️ {t('settings.themeLight', 'Chiaro')}
+                    </option>
+                    <option value="dark">
+                      🌙 {t('settings.themeDark', 'Scuro')}
+                    </option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-secondary" />
+                </div>
+              </SettingRow>
             </SettingsCard>
 
             <section className="overflow-hidden rounded-2xl border border-border-subtle bg-surface-overlay">

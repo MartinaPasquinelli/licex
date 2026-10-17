@@ -27,7 +27,7 @@ import {
   isValidPeerConnectionString,
   isValidPubkeyAndAddress,
 } from '../../helpers/address'
-import kaleidoswapPictogram from '../../assets/logo.svg'
+import kaleidoswapPictogram from '../../assets/logo-licex-notext.svg'
 import { MinidenticonImg } from '../../components/MinidenticonImg'
 import {
   NewChannelFormSchema,

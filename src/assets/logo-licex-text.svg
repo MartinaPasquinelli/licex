@@ -2,13 +2,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 210 210">
   <defs>
     <style>
-      .cls-1{font-family:Helvetica;font-size:10.594;font-weight:bold;fill:url(#New_Gradient_Swatch_2)}
+      .cls-1{font-family:Helvetica;font-size:10.594;font-weight:bold;fill:url(#linear-gradient-1)}
       .cls-2{font-size:7.766}
       .cls-3{fill:none;stroke:#ffffff;stroke-width:0.6;stroke-miterlimit:10}
     </style>
-    <linearGradient id="New_Gradient_Swatch_2" x1="0" y1="-2.861" x2="24.02" y2="-2.861" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#cfe4f4"/>
-      <stop offset="1" stop-color="#92a5c8"/>
+    <linearGradient id="linear-gradient-1" x1="0" y1="-2.861" x2="24.02" y2="-2.861" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6699cc"/>
+      <stop offset="1" stop-color="#990066"/>
     </linearGradient>
     <mask id="mask-1" maskUnits="userSpaceOnUse" color-interpolation="sRGB" x="-18.732" y="32.893" width="247.464" height="181.037">
       <rect x="-18.732" y="32.893" width="247.464" height="181.037" fill="#fff"/>
@@ -23,7 +23,7 @@
       <path d="M201.721 154.275 L186.705 154.275 L178.753 136.025 L170.758 154.275 L156.123 154.275 L171.858 123.467 L156.799 93.552 L171.562 93.552 L179.26 111.188 L186.789 93.552 L201.129 93.552 L185.986 123.188 Z" fill="#000"/>
     </mask>
   </defs>
-  <title>Untitled-1</title>
+  <title>licex</title>
   <g id="Layer_1" data-name="Layer 1">
     <g>
       <text transform="matrix(8.177 0 0 10.789 6.799 154.275)" x="0" y="0" xml:space="preserve" class="cls-1"><tspan x="0" y="0">L</tspan><tspan x="6.472" y="0" class="cls-2">icE</tspan><tspan x="18.127" y="0">x</tspan></text>

@@ -58,22 +58,31 @@ function transferPolicyColor(policy: TransferPolicy): string {
   }
 }
 
-function categoryIcon(category: string): string {
+import {
+  Palette,
+  ShieldCheck,
+  Code2,
+  BrainCircuit,
+  ClipboardList,
+  Gamepad2,
+} from 'lucide-react'
+
+function categoryIcon(category: string) {
   switch (category) {
     case 'Creative & Design':
-      return '🎨'
+      return <Palette size={20} strokeWidth={1.8} />
     case 'Security':
-      return '🛡️'
+      return <ShieldCheck size={20} strokeWidth={1.8} />
     case 'Development':
-      return '⚙️'
+      return <Code2 size={20} strokeWidth={1.8} />
     case 'Analytics & AI':
-      return '🧠'
+      return <BrainCircuit size={20} strokeWidth={1.8} />
     case 'Productivity':
-      return '📋'
+      return <ClipboardList size={20} strokeWidth={1.8} />
     case 'Gaming':
-      return '🎮'
+      return <Gamepad2 size={20} strokeWidth={1.8} />
     default:
-      return '📦'
+      return <Package size={20} strokeWidth={1.8} />
   }
 }
 
@@ -86,16 +95,15 @@ const LicenseCard: React.FC<{
 }> = ({ listing, isWatchlisted, onView, onToggleWatchlist }) => {
   return (
     <div
-      className="group relative rounded-2xl overflow-hidden transition-all duration-300
-        bg-gradient-to-br from-[rgb(var(--app-surface-secondary))] to-[rgb(var(--app-surface-primary))]
-        border border-[rgb(var(--app-border-primary))]/30
-        hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/10
-        hover:-translate-y-1 cursor-pointer"
+      className="group relative rounded-2xl overflow-hidden
+                bg-gradient-to-br from-[rgb(var(--app-surface-secondary))] to-[rgb(var(--app-surface-primary))]
+                border border-[rgb(var(--app-border-primary))]/30
+                cursor-pointer"
       id={`license-card-${listing.id}`}
       onClick={onView}
     >
       {/* Category gradient header */}
-      <div className="h-32 relative overflow-hidden">
+      <div className="h-28 relative overflow-hidden">
         <div
           className="absolute inset-0 opacity-20"
           style={{
@@ -117,7 +125,7 @@ const LicenseCard: React.FC<{
 
         {/* Category + Edition badges */}
         <div className="absolute top-3 left-3 flex gap-2">
-          <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-white/10 backdrop-blur-sm text-white border border-white/10">
+          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-surface-base/90 backdrop-blur-sm text-content-primary border border-divider/40 shadow-sm flex items-center gap-1.5">
             {categoryIcon(listing.category)} {listing.category}
           </span>
         </div>
@@ -127,9 +135,9 @@ const LicenseCard: React.FC<{
           className={`absolute top-3 right-3 p-2 rounded-full transition-all duration-200
             ${
               isWatchlisted
-                ? 'bg-rose-500/20 text-rose-400'
-                : 'bg-white/10 text-white/60 hover:text-rose-400 hover:bg-rose-500/20'
-            } backdrop-blur-sm border border-white/10`}
+                ? 'bg-rose-500/20 text-rose-500'
+                : 'bg-surface-base/80 text-content-secondary hover:text-rose-500 hover:bg-rose-500/10'
+            } backdrop-blur-sm border border-divider/30 shadow-sm`}
           id={`watchlist-btn-${listing.id}`}
           onClick={(e) => {
             e.stopPropagation()
@@ -141,15 +149,10 @@ const LicenseCard: React.FC<{
             fill={isWatchlisted ? 'currentColor' : 'none'}
           />
         </button>
-
-        {/* Large emoji */}
-        <div className="absolute bottom-3 left-4 text-4xl opacity-60">
-          {categoryIcon(listing.category)}
-        </div>
       </div>
 
       {/* Content */}
-      <div className="p-4 space-y-3">
+      <div className="p-3.5 space-y-2.5">
         {/* Company badge */}
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-400 to-cyan-400 flex-shrink-0" />
@@ -224,8 +227,8 @@ const LicenseCard: React.FC<{
             )}
           </div>
           <button
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-              bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/30
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+              bg-[#9B5094]/15 text-[#9B5094] dark:text-purple-300 dark:bg-purple-500/20 hover:bg-[#9B5094]/25 border border-[#9B5094]/30 dark:border-purple-500/30
               transition-all duration-200"
             onClick={(e) => {
               e.stopPropagation()
@@ -250,11 +253,11 @@ const LicenseRow: React.FC<{
 }> = ({ listing, isWatchlisted, onView, onToggleWatchlist }) => {
   return (
     <div
-      className="flex items-center gap-4 p-4 rounded-xl transition-all duration-200
-        bg-[rgb(var(--app-surface-secondary))]/50
-        border border-[rgb(var(--app-border-primary))]/20
-        hover:border-purple-500/30 hover:bg-[rgb(var(--app-surface-secondary))]
-        cursor-pointer group"
+      className="group relative rounded-2xl overflow-hidden
+  !transform-none !scale-100 !transition-none
+  bg-gradient-to-br from-[rgb(var(--app-surface-secondary))] to-[rgb(var(--app-surface-primary))]
+  border border-[rgb(var(--app-border-primary))]/30
+  cursor-pointer"
       onClick={onView}
     >
       {/* Icon */}
@@ -329,8 +332,8 @@ const LicenseRow: React.FC<{
           />
         </button>
         <button
-          className="px-3 py-1.5 rounded-lg text-xs font-medium
-            bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/30
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold
+            bg-[#9B5094]/15 text-[#9B5094] dark:bg-purple-500/20 dark:text-purple-300 hover:bg-[#9B5094]/25 border border-[#9B5094]/30 dark:border-purple-500/30
             transition-all duration-200"
           onClick={(e) => {
             e.stopPropagation()
@@ -558,12 +561,12 @@ export function Component() {
 
           {/* Filter toggle */}
           <button
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
               transition-all duration-200 border
               ${
                 showFilters
-                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                  : 'bg-[rgb(var(--app-surface-secondary))] text-[rgb(var(--app-content-secondary))] border-[rgb(var(--app-border-primary))]/30 hover:border-purple-500/30'
+                  ? 'bg-[#9B5094]/15 text-[#9B5094] dark:bg-purple-500/20 dark:text-purple-300 border-[#9B5094]/40 dark:border-purple-500/30'
+                  : 'bg-[rgb(var(--app-surface-secondary))] text-[rgb(var(--app-content-secondary))] border-[rgb(var(--app-border-primary))]/30 hover:border-primary/50'
               }`}
             id="filter-toggle"
             onClick={() => setShowFilters(!showFilters)}
@@ -571,19 +574,19 @@ export function Component() {
             <SlidersHorizontal className="w-4 h-4" />
             Filters
             {activeFilterCount > 0 && (
-              <span className="w-5 h-5 rounded-full bg-purple-500 text-white text-[10px] flex items-center justify-center">
+              <span className="w-5 h-5 rounded-full bg-[#9B5094] text-white text-[10px] flex items-center justify-center font-bold">
                 {activeFilterCount}
               </span>
             )}
           </button>
 
           {/* View mode toggle */}
-          <div className="flex items-center rounded-xl overflow-hidden border border-[rgb(var(--app-border-primary))]/30">
+          <div className="flex items-center rounded-xl overflow-hidden border border-divider/40">
             <button
               className={`p-2.5 transition-all ${
                 viewMode === 'grid'
-                  ? 'bg-purple-500/20 text-purple-300'
-                  : 'bg-[rgb(var(--app-surface-secondary))] text-[rgb(var(--app-content-secondary))] hover:text-[rgb(var(--app-content-primary))]'
+                  ? 'bg-[#9B5094]/15 text-[#9B5094] dark:bg-purple-500/20 dark:text-purple-300'
+                  : 'bg-surface-overlay text-content-secondary hover:text-content-primary'
               }`}
               id="view-grid"
               onClick={() => dispatch(setViewMode('grid'))}
@@ -593,8 +596,8 @@ export function Component() {
             <button
               className={`p-2.5 transition-all ${
                 viewMode === 'list'
-                  ? 'bg-purple-500/20 text-purple-300'
-                  : 'bg-[rgb(var(--app-surface-secondary))] text-[rgb(var(--app-content-secondary))] hover:text-[rgb(var(--app-content-primary))]'
+                  ? 'bg-[#9B5094]/15 text-[#9B5094] dark:bg-purple-500/20 dark:text-purple-300'
+                  : 'bg-surface-overlay text-content-secondary hover:text-content-primary'
               }`}
               id="view-list"
               onClick={() => dispatch(setViewMode('list'))}
@@ -630,7 +633,7 @@ export function Component() {
             </button>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fadeIn">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredListings.map((listing) => (
               <LicenseCard
                 isWatchlisted={isWatchlisted(listing.id)}

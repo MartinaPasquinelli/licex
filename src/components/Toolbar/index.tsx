@@ -176,9 +176,9 @@ const NodeCard: React.FC<NodeCardProps> = ({
 
   return (
     <div
-      className={`group bg-surface-overlay/50 rounded-xl transition-all duration-300
-        hover:bg-surface-overlay relative border overflow-hidden cursor-pointer
-        border-divider/5 hover:border-divider/20 hover:shadow-lg hover:shadow-primary/5
+      className={`group bg-surface-overlay/80 rounded-xl transition-all duration-200
+        hover:bg-surface-elevated relative border overflow-hidden cursor-pointer
+        border-divider/40 hover:border-primary/50 shadow-sm hover:shadow-md
         ${isMenuOpen ? '' : 'hover:-translate-y-0.5'}`}
       onClick={() => onSelect(account)}
     >
@@ -202,16 +202,18 @@ const NodeCard: React.FC<NodeCardProps> = ({
         {/* Node details */}
         {!isCollapsed && (
           <div className="min-w-0 flex-grow">
-            <div className="font-semibold text-content-primary truncate">
+            <div className="font-bold text-content-primary truncate text-sm">
               {account.name}
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span
-                className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium border ${getNetworkChipColor(account.network)}`}
+                className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full font-semibold border ${getNetworkChipColor(account.network)}`}
               >
                 {getNetworkDisplayName(account.network)}
               </span>
-              <span className={`flex items-center ${nodeColor} text-sm`}>
+              <span
+                className={`flex items-center ${nodeColor} text-xs font-medium`}
+              >
                 <NodeIcon className="w-3 h-3 mr-1" />
                 {nodeType}
               </span>
@@ -224,9 +226,9 @@ const NodeCard: React.FC<NodeCardProps> = ({
       {!isCollapsed && (
         <button
           aria-label={`Options for ${account.name}`}
-          className={`absolute top-2 right-2 p-1.5 rounded-lg text-content-tertiary hover:text-white
-            hover:bg-surface-high/60 transition-colors duration-200
-            ${isMenuOpen ? 'opacity-100 bg-surface-high/60 text-white' : 'opacity-0 group-hover:opacity-100'}`}
+          className={`absolute top-2.5 right-2.5 p-1.5 rounded-lg text-content-secondary hover:text-content-primary
+            hover:bg-surface-high transition-colors duration-200
+            ${isMenuOpen ? 'opacity-100 bg-surface-high text-content-primary' : 'opacity-0 group-hover:opacity-100'}`}
           onClick={openMenu}
           ref={btnRef}
         >
@@ -237,7 +239,7 @@ const NodeCard: React.FC<NodeCardProps> = ({
       {/* Dropdown — fixed so it escapes overflow clipping */}
       {isMenuOpen && !isCollapsed && (
         <div
-          className="fixed w-36 bg-surface-overlay border border-border-default/40 rounded-lg shadow-xl py-1"
+          className="fixed w-36 bg-surface-base border border-divider/40 rounded-xl shadow-2xl py-1.5"
           onClick={(e) => e.stopPropagation()}
           ref={menuRef}
           style={{ left: menuPos.left, top: menuPos.top, zIndex: 9999 }}

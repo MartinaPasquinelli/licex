@@ -19,7 +19,7 @@ import { toast } from 'react-toastify'
 
 import { RootState } from '../../app/store'
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
-import kaleidoswapPictogram from '../../assets/logo.svg'
+import kaleidoswapPictogram from '../../assets/logo-licex-notext.svg'
 import { ChannelsNav } from '../../components/Channels/ChannelsNav'
 import { ChannelWizardSteps } from '../../components/Channels/ChannelWizardSteps'
 import { Spinner } from '../../components/Spinner'

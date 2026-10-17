@@ -16,7 +16,7 @@ import {
   WALLET_REMOTE_PATH,
   WALLET_RESTORE_PATH,
 } from '../../app/router/paths'
-import logoIcon from '../../assets/logo.svg'
+import logoIcon from '../../assets/logo-licex-notext.svg'
 import { Layout } from '../../components/Layout'
 import {
   NodeOption,
@@ -117,7 +117,7 @@ export const Component = () => {
                       </div>
                       <h1 className="text-3xl md:text-5xl font-bold mb-3 text-content-primary tracking-tight leading-tight py-2">
                         {t('walletSetup.welcomeTo')}{' '}
-                        <span className="bg-gradient-to-r from-[#CDF7F6] via-[#8FB8DE] to-[#9B5094] bg-clip-text text-transparent">
+                        <span className="bg-gradient-to-r from-[#6885b1] via-[#835a7b] to-[#9e1644] bg-clip-text text-transparent">
                           LicEX
                         </span>
                       </h1>
