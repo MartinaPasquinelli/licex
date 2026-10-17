@@ -41,6 +41,7 @@ import {
   LICEX_WISHLIST_PATH,
   LICEX_ASSISTANT_PATH,
   LICEX_COMPANY_DASHBOARD_PATH,
+  ACCOUNT_PATH,
 } from './paths'
 
 export const router = createBrowserRouter([
@@ -197,6 +198,10 @@ export const router = createBrowserRouter([
       {
         lazy: () => import('../../routes/licex-dashboard'),
         path: LICEX_COMPANY_DASHBOARD_PATH,
+      },
+      {
+        lazy: () => import('../../routes/account'),
+        path: ACCOUNT_PATH,
       },
       {
         lazy: () => import('../../routes/channels'),

@@ -1,7 +1,30 @@
-<svg width="412" height="412" viewBox="0 0 412 412" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M137.306 411.865H0.000244141L68.6795 343.29L137.306 411.865Z" fill="#6F32FF"/>
-<path d="M0 0H137.306L68.6267 68.574L0 0Z" fill="#6F32FF"/>
-<path d="M137.148 274.559H274.455L411.708 411.866H274.401L137.148 274.559Z" fill="#17B581"/>
-<path d="M137.149 274.559L68.6274 205.933L137.201 137.306L274.455 137.411L205.776 206.038L274.456 274.559H137.149Z" fill="#15E99A"/>
-<path d="M274.479 0.104797H411.786L274.533 137.411H137.226L274.479 0.104797Z" fill="#17B581"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 210 210">
+  <defs>
+    <style>
+      .cls-1{fill:url(#linear-gradient-1)}
+      .cls-2{fill:none;stroke:#ffffff;stroke-width:6;stroke-miterlimit:10}
+    </style>
+    <linearGradient id="linear-gradient-1" x1="32.645" y1="96.52" x2="177.355" y2="96.52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cdf7f6"/>
+      <stop offset="1" stop-color="#92a5c8"/>
+    </linearGradient>
+    <mask id="mask-1" maskUnits="userSpaceOnUse" color-interpolation="sRGB" x="1.645" y="-4.566" width="206.71" height="202.171">
+      <rect x="1.645" y="-4.566" width="206.71" height="202.171" fill="#fff"/>
+      <path d="M32.645 26.434 L56.733 26.434 L56.733 146.083 L114.726 146.083 L129.549 132.246 L99.808 98.41 L119.518 98.41 L138.736 118.757 L155.412 98.41 L177.355 98.41 L147.185 132.246 L177.355 166.605 L159.056 166.605 L138.736 146.083 L119.518 166.605 L32.645 166.605 Z" fill="#000"/>
+    </mask>
+  </defs>
+  <title>LicEX</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <g id="Layer_2" data-name="Layer 2" data-vc-layer="sublayer">
+      <g id="Layer_4" data-name="Layer 4" data-vc-layer="sublayer">
+      </g>
+      <g>
+        <path d="M32.645 26.434 L56.733 26.434 L56.733 146.083 L114.726 146.083 L129.549 132.246 L99.808 98.41 L119.518 98.41 L138.736 118.757 L155.412 98.41 L177.355 98.41 L147.185 132.246 L177.355 166.605 L159.056 166.605 L138.736 146.083 L119.518 166.605 L32.645 166.605 Z" class="cls-1"/>
+        <path d="M32.645 26.434 L56.733 26.434 L56.733 146.083 L114.726 146.083 L129.549 132.246 L99.808 98.41 L119.518 98.41 L138.736 118.757 L155.412 98.41 L177.355 98.41 L147.185 132.246 L177.355 166.605 L159.056 166.605 L138.736 146.083 L119.518 166.605 L32.645 166.605 Z" class="cls-2" mask="url(#mask-1)"/>
+      </g>
+    </g>
+    <g id="Layer_3" data-name="Layer 3" data-vc-layer="sublayer">
+    </g>
+  </g>
 </svg>

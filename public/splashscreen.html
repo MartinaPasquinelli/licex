@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
-    <title>Opening KaleidoSwap</title>
+    <meta name="color-scheme" content="light" />
+    <title>Opening LicEX</title>
     <style>
       @font-face {
         font-family: Satoshi;
@@ -19,14 +19,14 @@
         font-display: swap;
       }
       :root {
-        color-scheme: dark;
+        color-scheme: light;
         font-family:
           Satoshi,
           -apple-system,
           BlinkMacSystemFont,
           sans-serif;
-        color: #f4f5fa;
-        background: #11131d;
+        color: #1e1c28;
+        background: #f8f9fc;
       }
       * {
         box-sizing: border-box;
@@ -42,9 +42,9 @@
         place-items: center;
         overflow: hidden;
         background:
-          radial-gradient(ellipse at 65% 30%, #6f32ff12, transparent 60%),
-          radial-gradient(ellipse at 25% 75%, #15e99a0a, transparent 60%),
-          #11131d;
+          radial-gradient(ellipse at 65% 30%, rgba(155, 80, 148, 0.08), transparent 60%),
+          radial-gradient(ellipse at 25% 75%, rgba(143, 184, 222, 0.12), transparent 60%),
+          #f8f9fc;
       }
       .splash {
         display: flex;
@@ -67,12 +67,12 @@
         position: absolute;
         inset: 0;
         border-radius: 50%;
-        background: radial-gradient(circle, #6f32ff1c, transparent 70%);
+        background: radial-gradient(circle, rgba(155, 80, 148, 0.2), transparent 70%);
       }
       .orbit {
         position: absolute;
         inset: 0;
-        border: 1px solid #ffffff08;
+        border: 1px solid rgba(143, 184, 222, 0.25);
         border-radius: 50%;
       }
       .orbit::after {
@@ -80,8 +80,8 @@
         position: absolute;
         inset: -1px;
         border: 1px solid transparent;
-        border-top-color: #15e99a70;
-        border-right-color: #6f32ff50;
+        border-top-color: #CDF7F6;
+        border-right-color: #9B5094;
         border-radius: inherit;
         animation: orbit 4s linear infinite;
       }
@@ -96,19 +96,22 @@
         font-weight: 700;
         line-height: 1.2;
         letter-spacing: -1px;
+        background: linear-gradient(90deg, #CDF7F6, #8FB8DE, #9B5094);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
       }
       .tagline {
         margin: 12px 0 36px;
-        color: #969aaa;
+        color: #9A94BC;
         font-size: 14px;
         line-height: 1.5;
       }
       .loading {
         width: 100%;
         padding: 20px 24px;
-        border: 1px solid #ffffff09;
+        border: 1px solid #8FB8DE40;
         border-radius: 16px;
-        background: #ffffff03;
+        background: rgba(143, 184, 222, 0.06);
       }
       .status {
         display: flex;
@@ -118,26 +121,26 @@
         margin: 0 0 16px;
         font-size: 13px;
         line-height: 20px;
-        color: #c9cbd6;
+        color: #6A605C;
       }
       .status-light {
-        width: 5px;
-        height: 5px;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
-        background: #15e99a;
-        box-shadow: 0 0 10px #15e99a35;
+        background: #8FB8DE;
+        box-shadow: 0 0 10px #8FB8DE80;
       }
       .activity-track {
         height: 3px;
         border-radius: 3px;
         overflow: hidden;
-        background: #ffffff09;
+        background: rgba(143, 184, 222, 0.2);
       }
       .activity-fill {
         width: 40%;
         height: 100%;
         border-radius: inherit;
-        background: linear-gradient(90deg, #17b581, #15e99a, #8560ff);
+        background: linear-gradient(90deg, #CDF7F6, #8FB8DE, #9B5094);
         animation: activity 1.8s ease-in-out infinite;
         will-change: transform;
       }
@@ -196,10 +199,10 @@
     <main class="splash" aria-busy="true">
       <div class="brand-mark" aria-hidden="true">
         <div class="orbit"></div>
-        <img src="/kaleidoswap-pictogram.svg" alt="" class="logo" />
+        <img src="/logo-licex.svg" alt="LicEX" class="logo" />
       </div>
-      <h1>KaleidoSwap</h1>
-      <p class="tagline">Trustless trading on Lightning Network</p>
+      <h1>LicEX</h1>
+      <p class="tagline">Decentralized Software License Exchange</p>
       <div class="loading" role="status" aria-live="polite">
         <p class="status">
           <span class="status-light" aria-hidden="true"></span>

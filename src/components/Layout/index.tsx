@@ -26,7 +26,7 @@ import {
   WALLET_SETUP_PATH,
 } from '../../app/router/paths'
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
-import logoFull from '../../assets/logo-full.svg'
+import logoIcon from '../../assets/logo.svg'
 import { isBtcWalletTx } from '../../helpers/walletHistoryUtils'
 import { useNodeLifecycleEvents } from '../../hooks/useNodeLifecycleEvents'
 import { useOnClickOutside } from '../../hooks/useOnClickOutside'
@@ -134,8 +134,8 @@ const SidebarNavItem = ({ item, isCollapsed, isActive }: NavItemProps) => {
           flex items-center rounded-xl transition-all duration-300
           ${
             isActive
-              ? 'bg-status-success/10 text-status-success font-semibold border-l-2 border-status-success/60 shadow-lg shadow-status-success/5'
-              : 'text-content-secondary hover:text-white hover:bg-surface-overlay/80 hover:shadow-md'
+              ? 'bg-gradient-to-r from-[#9B5094]/25 to-[#8FB8DE]/20 text-[#CDF7F6] font-semibold border-l-2 border-[#8FB8DE] shadow-lg shadow-[#9B5094]/10'
+              : 'text-content-secondary hover:text-content-primary hover:bg-surface-overlay/80 hover:shadow-md'
           }
 
         `}
@@ -183,8 +183,8 @@ const SidebarNavItem = ({ item, isCollapsed, isActive }: NavItemProps) => {
                   className={`
                 flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm cursor-pointer
                 transition-all duration-200
-                ${subItem.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-surface-overlay/80 hover:text-white hover:translate-x-1'}
-                ${location.pathname === subItem.to ? 'bg-status-success/10 text-status-success font-semibold border-l-2 border-status-success/50' : 'text-content-secondary'}
+                ${subItem.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-surface-overlay/80 hover:text-content-primary hover:translate-x-1'}
+                ${location.pathname === subItem.to ? 'bg-gradient-to-r from-[#9B5094]/25 to-[#8FB8DE]/20 text-[#CDF7F6] font-semibold border-l-2 border-[#8FB8DE]' : 'text-content-secondary'}
               `}
                   end
                   key={subItem.to}
@@ -243,7 +243,7 @@ const DropdownMenu = ({
     <div className="relative" ref={menuRef}>
       <div
         className="px-3 py-2 rounded-lg cursor-pointer flex items-center space-x-2
-                  text-content-secondary hover:text-white hover:bg-surface-elevated/50 transition-all duration-300
+                  text-content-secondary hover:text-content-primary hover:bg-surface-elevated/50 transition-all duration-300
                   transform hover:scale-[1.02] active:scale-[0.98]"
         onClick={() => setIsOpen(!isOpen)}
       >
@@ -273,7 +273,7 @@ const DropdownMenu = ({
                 <div className="text-primary transition-transform duration-200 group-hover:scale-110">
                   {item.icon}
                 </div>
-                <span className="text-sm font-medium group-hover:text-white">
+                <span className="text-sm font-medium group-hover:text-content-primary">
                   {item.label}
                 </span>
               </div>
@@ -385,7 +385,7 @@ const UserProfile = ({
           {!isCollapsed && (
             <>
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-white group-hover:text-primary transition-colors duration-300">
+                <span className="text-sm font-medium text-content-primary group-hover:text-primary transition-colors duration-300">
                   {nameText}
                 </span>
                 <span className="text-xs text-content-secondary group-hover:text-content-secondary transition-colors duration-300">
@@ -426,7 +426,9 @@ const UserProfile = ({
                 <User className="w-5 h-5 text-white" />
               </div>
               <div>
-                <div className="text-sm font-medium text-white">{nameText}</div>
+                <div className="text-sm font-medium text-content-primary">
+                  {nameText}
+                </div>
                 <div className="text-xs text-content-secondary flex items-center space-x-1">
                   <div
                     className={`w-2 h-2 rounded-full ${!hasNode ? 'bg-content-tertiary' : isNodeReachable ? 'bg-green animate-pulse' : 'bg-red'}`}
@@ -511,7 +513,7 @@ const UserProfile = ({
                 <div className="text-primary transition-transform duration-200 group-hover:scale-110">
                   {item.icon}
                 </div>
-                <span className="text-sm font-medium group-hover:text-white">
+                <span className="text-sm font-medium group-hover:text-content-primary">
                   {item.label}
                 </span>
               </div>
@@ -863,7 +865,7 @@ export const Layout = (props: Props) => {
       {showCloseConfirmModal && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-md bg-surface-base rounded-xl border border-divider/20 shadow-xl p-6">
-            <h3 className="text-xl font-semibold text-white">
+            <h3 className="text-xl font-semibold text-content-primary">
               {isNodeActive ? 'Close LicEX?' : 'Quit LicEX?'}
             </h3>
             <p className="text-content-secondary mt-3">
@@ -932,7 +934,7 @@ export const Layout = (props: Props) => {
               </div>
 
               <div className="min-w-0">
-                <h3 className="text-xl font-semibold text-white">
+                <h3 className="text-xl font-semibold text-content-primary">
                   {t('nodeReachability.unresponsiveTitle', {
                     defaultValue: 'Node response unavailable',
                   })}
@@ -1017,26 +1019,40 @@ export const Layout = (props: Props) => {
             <div
               className={`flex items-center bg-surface-base py-3 px-3 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}
             >
-              {!isSidebarCollapsed && (
+              {!isSidebarCollapsed ? (
                 <div
-                  className="flex items-center gap-2 cursor-pointer select-none group"
+                  className="flex items-center gap-2.5 cursor-pointer select-none group"
                   onClick={() => {
                     navigate(ROOT_PATH)
                   }}
                 >
                   <img
                     alt="LicEX"
-                    className="h-7 w-auto transition-all duration-300 group-hover:scale-105 active:scale-95"
-                    src={logoFull}
+                    className="h-8 w-8 transition-all duration-300 group-hover:scale-105 active:scale-95 flex-shrink-0"
+                    src={logoIcon}
                   />
                   <div className="flex flex-col leading-tight">
-                    <span className="font-black text-sm tracking-widest bg-gradient-to-r from-emerald-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                    <span className="font-black text-sm tracking-widest bg-gradient-to-r from-[#CDF7F6] via-[#8FB8DE] to-[#9B5094] bg-clip-text text-transparent">
                       LicEX
                     </span>
-                    <span className="text-[8px] uppercase tracking-wider text-content-tertiary font-semibold">
+                    <span className="text-[8px] uppercase tracking-wider text-[#9A94BC] font-semibold">
                       License Exchange
                     </span>
                   </div>
+                </div>
+              ) : (
+                <div
+                  className="cursor-pointer select-none py-1 group flex items-center justify-center"
+                  onClick={() => {
+                    navigate(ROOT_PATH)
+                  }}
+                  title="LicEX"
+                >
+                  <img
+                    alt="LicEX"
+                    className="h-7 w-7 transition-all duration-300 group-hover:scale-110 active:scale-95"
+                    src={logoIcon}
+                  />
                 </div>
               )}
 
@@ -1145,8 +1161,8 @@ export const Layout = (props: Props) => {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     className="flex items-center justify-center gap-2 py-3 px-3 rounded-lg
-                               bg-status-success/15 hover:bg-status-success/25
-                               border border-status-success/30 text-status-success
+                               bg-[#8FB8DE]/15 hover:bg-[#8FB8DE]/25
+                               border border-[#8FB8DE]/30 text-[#CDF7F6]
                                font-semibold text-sm transition-all duration-200
                                transform hover:scale-[1.02] active:scale-[0.98]"
                     onClick={() => handleTransactionAction('deposit')}
@@ -1156,8 +1172,8 @@ export const Layout = (props: Props) => {
                   </button>
                   <button
                     className="flex items-center justify-center gap-2 py-3 px-3 rounded-lg
-                               bg-violet-500/15 hover:bg-violet-500/25
-                               border border-violet-500/30 text-violet-400
+                               bg-[#9B5094]/15 hover:bg-[#9B5094]/25
+                               border border-[#9B5094]/30 text-[#CDF7F6]
                                font-semibold text-sm transition-all duration-200
                                transform hover:scale-[1.02] active:scale-[0.98]"
                     onClick={() => handleTransactionAction('withdraw')}
@@ -1209,7 +1225,7 @@ export const Layout = (props: Props) => {
                         >
                           {icon}
                         </div>
-                        <h1 className="text-xl font-semibold text-white tracking-tight">
+                        <h1 className="text-xl font-semibold text-content-primary tracking-tight">
                           {title}
                         </h1>
                       </>
@@ -1300,7 +1316,7 @@ export const Layout = (props: Props) => {
         pauseOnHover={false}
         position="bottom-right"
         rtl={false}
-        theme="dark"
+        theme="colored"
       />
 
       {/* Add LayoutModal for deposit/withdraw functionality */}

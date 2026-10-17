@@ -20,6 +20,7 @@ import {
   Building2,
   Wallet,
   Key,
+  User,
 } from 'lucide-react'
 import React from 'react'
 
@@ -46,6 +47,7 @@ import {
   LICEX_WISHLIST_PATH,
   LICEX_ASSISTANT_PATH,
   LICEX_COMPANY_DASHBOARD_PATH,
+  ACCOUNT_PATH,
 } from '../../app/router/paths'
 
 // Define types for navigation items
@@ -120,13 +122,14 @@ export const getNavSections = (t: TFunction): NavSection[] => [
   {
     items: [
       {
-        icon: <Wallet className="w-5 h-5" />,
-        label: t('navigation.walletDashboard', 'LicEX Wallet'),
-        to: WALLET_DASHBOARD_PATH,
+        icon: <User className="w-5 h-5" />,
+        label: t('navigation.account', 'Account'),
+        matchPath: ACCOUNT_PATH,
+        to: ACCOUNT_PATH,
       },
     ],
     key: 'wallet',
-    label: 'WALLET',
+    label: 'ACCOUNT',
   },
 ]
 
@@ -240,6 +243,10 @@ export const SUPPORT_RESOURCES = getSupportResources(
 
 // Page configuration mapping
 export const getPageConfig = (t: TFunction) => ({
+  [ACCOUNT_PATH]: {
+    icon: <User className="w-5 h-5" />,
+    title: t('navigation.account', 'Account'),
+  },
   [CHANNELS_PATH]: {
     icon: <Droplets className="w-5 h-5" />,
     title: t('navigation.channels', 'Canali Lightning'),

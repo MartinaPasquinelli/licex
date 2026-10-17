@@ -1,23 +1,30 @@
-<svg width="210" height="210" viewBox="0 0 210 210" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g clip-path="url(#clip0_23_1126)">
-<path d="M69.7141 207.3H0.908203L35.3243 172.936L69.7141 207.3Z" fill="#6F32FF"/>
-<path d="M138.441 0.96106V69.767L104.078 35.3508L138.441 0.96106Z" fill="#17B581"/>
-<path d="M138.415 138.547V207.352L104.051 172.936L138.415 138.547Z" fill="#17B581"/>
-<path d="M138.441 69.7406V0.96106L172.804 35.3772L138.441 69.767V69.7406Z" fill="#17B581"/>
-<path d="M69.6614 138.494V69.6879L104.025 104.104L69.6614 138.494Z" fill="#15E99A"/>
-<path d="M69.6615 69.7142V138.52L35.2981 104.104L69.6615 69.7142Z" fill="#15E99A"/>
-<path d="M138.467 207.379V138.573L172.831 172.989L138.467 207.379Z" fill="#17B581"/>
-<path d="M0.908203 0.908325H69.7141L35.298 35.2718L0.908203 0.908325Z" fill="#6F32FF"/>
-<path d="M207.22 207.3H138.415L172.831 172.936L207.22 207.3Z" fill="#17B581"/>
-<path d="M138.415 0.987427H207.22L172.804 35.3509L138.415 0.987427Z" fill="#17B581"/>
-<path d="M138.467 69.7143H69.6614L104.078 35.3508L138.467 69.7143Z" fill="#17B581"/>
-<path d="M69.635 138.494H138.441L104.025 172.857L69.635 138.494Z" fill="#17B581"/>
-<path d="M138.415 138.494H69.635L104.025 104.157L138.388 138.494H138.415Z" fill="#15E99A"/>
-<path d="M138.415 69.7142L104.051 104.051L69.6614 69.7142H138.441H138.415Z" fill="#15E99A"/>
-</g>
-<defs>
-<clipPath id="clip0_23_1126">
-<rect width="208.183" height="208.183" fill="white" transform="translate(0.908203 0.908325)"/>
-</clipPath>
-</defs>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 210 210">
+  <defs>
+    <style>
+      .cls-1{fill:url(#linear-gradient-1)}
+      .cls-2{fill:none;stroke:#ffffff;stroke-width:6;stroke-miterlimit:10}
+    </style>
+    <linearGradient id="linear-gradient-1" x1="32.645" y1="96.52" x2="177.355" y2="96.52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cdf7f6"/>
+      <stop offset="1" stop-color="#92a5c8"/>
+    </linearGradient>
+    <mask id="mask-1" maskUnits="userSpaceOnUse" color-interpolation="sRGB" x="1.645" y="-4.566" width="206.71" height="202.171">
+      <rect x="1.645" y="-4.566" width="206.71" height="202.171" fill="#fff"/>
+      <path d="M32.645 26.434 L56.733 26.434 L56.733 146.083 L114.726 146.083 L129.549 132.246 L99.808 98.41 L119.518 98.41 L138.736 118.757 L155.412 98.41 L177.355 98.41 L147.185 132.246 L177.355 166.605 L159.056 166.605 L138.736 146.083 L119.518 166.605 L32.645 166.605 Z" fill="#000"/>
+    </mask>
+  </defs>
+  <title>LicEX</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <g id="Layer_2" data-name="Layer 2" data-vc-layer="sublayer">
+      <g id="Layer_4" data-name="Layer 4" data-vc-layer="sublayer">
+      </g>
+      <g>
+        <path d="M32.645 26.434 L56.733 26.434 L56.733 146.083 L114.726 146.083 L129.549 132.246 L99.808 98.41 L119.518 98.41 L138.736 118.757 L155.412 98.41 L177.355 98.41 L147.185 132.246 L177.355 166.605 L159.056 166.605 L138.736 146.083 L119.518 166.605 L32.645 166.605 Z" class="cls-1"/>
+        <path d="M32.645 26.434 L56.733 26.434 L56.733 146.083 L114.726 146.083 L129.549 132.246 L99.808 98.41 L119.518 98.41 L138.736 118.757 L155.412 98.41 L177.355 98.41 L147.185 132.246 L177.355 166.605 L159.056 166.605 L138.736 146.083 L119.518 166.605 L32.645 166.605 Z" class="cls-2" mask="url(#mask-1)"/>
+      </g>
+    </g>
+    <g id="Layer_3" data-name="Layer 3" data-vc-layer="sublayer">
+    </g>
+  </g>
 </svg>

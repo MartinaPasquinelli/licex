@@ -16,7 +16,6 @@ import {
   WALLET_REMOTE_PATH,
   WALLET_RESTORE_PATH,
 } from '../../app/router/paths'
-import logoFull from '../../assets/logo-full.svg'
 import logoIcon from '../../assets/logo.svg'
 import { AppVersion } from '../../components/AppVersion'
 import { Layout } from '../../components/Layout'
@@ -94,12 +93,12 @@ export const Component = () => {
           <div className="flex items-center gap-2.5 p-4 border-b border-divider/10 select-none">
             <img
               alt="LicEX"
-              className="h-7 cursor-pointer"
+              className="h-8 w-8 cursor-pointer flex-shrink-0"
               onClick={() => {}}
-              src={logoFull}
+              src={logoIcon}
             />
             <div className="flex flex-col leading-tight">
-              <span className="font-black text-sm tracking-widest bg-gradient-to-r from-emerald-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent">
+              <span className="font-black text-sm tracking-widest bg-gradient-to-r from-[#CDF7F6] via-[#8FB8DE] to-[#9B5094] bg-clip-text text-transparent">
                 LicEX
               </span>
               <span className="text-[8px] uppercase tracking-wider text-content-tertiary font-semibold">
@@ -143,18 +142,14 @@ export const Component = () => {
                           rounded-2xl shadow-2xl shadow-primary/20
                           relative z-10`}
                         >
-                          <img
-                            alt="LicEX"
-                            className="w-8 h-8 brightness-0 invert"
-                            src={logoIcon}
-                          />
+                          <img alt="LicEX" className="w-8 h-8" src={logoIcon} />
                         </div>
                         {/* Glow */}
                         <div className="absolute inset-0 bg-primary/10 rounded-2xl blur-xl scale-150 opacity-30 [animation:pulse_6s_ease-in-out_infinite]" />
                       </div>
                       <h1 className="text-3xl md:text-5xl font-bold mb-3 text-white tracking-tight leading-tight py-2">
                         {t('walletSetup.welcomeTo')}{' '}
-                        <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                        <span className="bg-gradient-to-r from-[#CDF7F6] via-[#8FB8DE] to-[#9B5094] bg-clip-text text-transparent">
                           LicEX
                         </span>
                       </h1>

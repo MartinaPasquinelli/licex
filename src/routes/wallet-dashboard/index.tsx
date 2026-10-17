@@ -937,7 +937,7 @@ export const Component = () => {
                     )}{' '}
                     {bitcoinUnit}
                   </span>
-                  <span className="flex items-center gap-1 text-emerald-400">
+                  <span className="flex items-center gap-1 text-[#CDF7F6]">
                     {formatBitcoinAmount(totalInboundLiquidity, bitcoinUnit)}{' '}
                     {bitcoinUnit}
                     <ArrowDownRight className="w-3 h-3" />
@@ -945,11 +945,11 @@ export const Component = () => {
                 </div>
                 <div className="relative w-full bg-surface-elevated/60 rounded-full h-1.5 overflow-hidden">
                   <div
-                    className="absolute left-0 top-0 h-full bg-purple rounded-l-full transition-all duration-500"
+                    className="absolute left-0 top-0 h-full bg-[#9B5094] rounded-l-full transition-all duration-500"
                     style={{ width: `${outboundPct}%` }}
                   />
                   <div
-                    className="absolute right-0 top-0 h-full bg-emerald-500 rounded-r-full transition-all duration-500"
+                    className="absolute right-0 top-0 h-full bg-[#8FB8DE] rounded-r-full transition-all duration-500"
                     style={{ width: `${inboundPct}%` }}
                   />
                   <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-surface-high/80" />

@@ -617,7 +617,7 @@ export const Component = () => {
           {/* Sidebar */}
           <div className="w-72 h-full bg-surface-base border-r border-divider/10 flex flex-col shrink-0">
             <div className="flex items-center p-4 border-b border-divider/10">
-              <img alt="KaleidoSwap" className="h-8" src={logoFull} />
+              <img alt="LicEX" className="h-8" src={logoFull} />
             </div>
             <div className="flex-1 overflow-hidden">
               <Toolbar />

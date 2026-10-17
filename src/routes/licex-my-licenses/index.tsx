@@ -167,7 +167,7 @@ export function Component() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#8FB8DE]/15 text-[#CDF7F6] border border-[#8FB8DE]/30 text-xs font-semibold">
                           <ShieldCheck className="w-3.5 h-3.5" />
                           {lic.licenseStatus}
                         </div>
@@ -192,7 +192,7 @@ export function Component() {
                             type="button"
                           >
                             {isCopied ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <Check className="w-3.5 h-3.5 text-[#8FB8DE]" />
                             ) : (
                               <Copy className="w-3.5 h-3.5" />
                             )}
