@@ -1411,7 +1411,11 @@
     "submit": "Emetti Asset",
     "submitting": "Emissione in corso...",
     "success": "Asset emesso con successo!",
-    "failure": "Impossibile emettere l’asset"
+    "failure": "Impossibile emettere l’asset",
+    "demoModeToggle": "Simulazione Demo",
+    "demoModeDescription": "Emissione simulata per la demo (senza bisogno di nodi o UTXO Bitcoin reali)",
+    "demoSuccess": "Asset emesso con successo in Modalità Demo!",
+    "demoFallbackNotice": "Nodo o UTXO non rilevati: asset emesso con successo in Modalità Demo per consentire il test!"
   },
   "updater": {
     "checkingTitle": "Ricerca di aggiornamenti",

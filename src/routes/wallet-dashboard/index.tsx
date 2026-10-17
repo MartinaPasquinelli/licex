@@ -22,7 +22,7 @@ import {
   ZapOff,
   Info,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
@@ -48,6 +48,7 @@ import { InfoModal } from '../../components/ChannelCard'
 import { formatBitcoinAmount } from '../../helpers/number'
 import { useAssetIcon } from '../../helpers/utils'
 import { getAllRgbAssets } from '../../utils/rgbUtils'
+import { getDemoRgbAssets } from '../../utils/demoAssets'
 import { useBitcoinPrice } from '../../hooks/useBitcoinPrice'
 import defaultRgbIcon from '../../assets/rgb-logo.svg'
 import type { AssetNIA as NiaAsset } from 'kaleido-sdk/rln'
@@ -136,6 +137,9 @@ export const Component = () => {
   const [assetBalances, setAssetBalances] = useState<
     Record<string, { offChain: number; onChain: number; incoming: number }>
   >({})
+  const [demoAssets, setDemoAssets] = useState<NiaAsset[]>(() =>
+    getDemoRgbAssets()
+  )
   const [assetsMap, setAssetsMap] = useState<Record<string, NiaAsset>>({})
   const { bitcoinUnit } = useSettings()
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -154,6 +158,7 @@ export const Component = () => {
 
   const refreshData = useCallback(async () => {
     setIsRefreshing(true)
+    setDemoAssets(getDemoRgbAssets())
     try {
       // Settle any incoming RGB transfers BEFORE reading the asset list.
       // refreshtransfers is what registers a newly received asset and moves its
@@ -172,15 +177,22 @@ export const Component = () => {
     }
   }, [assets, btcBalance, listChannels, refreshTransfers])
 
+  const niaAssets = useMemo(() => {
+    const nodeAssets = getAllRgbAssets(assetsResponse.data)
+    const nodeAssetIds = new Set(nodeAssets.map((a) => a.asset_id))
+    return [
+      ...demoAssets.filter((a) => a.asset_id && !nodeAssetIds.has(a.asset_id)),
+      ...nodeAssets,
+    ]
+  }, [demoAssets, assetsResponse.data])
+
   useEffect(() => {
-    if (assetsResponse.data) {
-      const newAssetsMap: Record<string, NiaAsset> = {}
-      getAllRgbAssets(assetsResponse.data).forEach((asset) => {
-        if (asset.asset_id) newAssetsMap[asset.asset_id] = asset
-      })
-      setAssetsMap(newAssetsMap)
-    }
-  }, [assetsResponse.data])
+    const newAssetsMap: Record<string, NiaAsset> = {}
+    niaAssets.forEach((asset) => {
+      if (asset.asset_id) newAssetsMap[asset.asset_id] = asset
+    })
+    setAssetsMap(newAssetsMap)
+  }, [niaAssets])
 
   // Fetch nodeInfo and networkInfo once on mount (they rarely change)
   useEffect(() => {
@@ -200,23 +212,35 @@ export const Component = () => {
         string,
         { offChain: number; onChain: number; incoming: number }
       > = {}
-      for (const asset of getAllRgbAssets(assetsResponse.data)) {
+      for (const asset of niaAssets) {
         if (asset.asset_id) {
-          const balance = await assetBalance({ asset_id: asset.asset_id })
-          const spendable = balance.data?.spendable || 0
-          const future = balance.data?.future || 0
-          newBalances[asset.asset_id] = {
-            incoming: Math.max(0, future - spendable),
-            offChain: balance.data?.offchain_outbound || 0,
-            onChain: spendable,
+          const isDemo = demoAssets.some((d) => d.asset_id === asset.asset_id)
+          if (isDemo) {
+            const spendable =
+              asset.balance?.spendable ?? asset.issued_supply ?? 0
+            newBalances[asset.asset_id] = {
+              incoming: 0,
+              offChain: 0,
+              onChain: spendable,
+            }
+          } else {
+            const balance = await assetBalance({ asset_id: asset.asset_id })
+            const spendable = balance.data?.spendable || 0
+            const future = balance.data?.future || 0
+            newBalances[asset.asset_id] = {
+              incoming: Math.max(0, future - spendable),
+              offChain: balance.data?.offchain_outbound || 0,
+              onChain: spendable,
+            }
           }
         }
       }
       setAssetBalances(newBalances)
     }
-    if (assetsResponse.data) fetchAssetBalances()
+    fetchAssetBalances()
   }, [
-    assetsResponse.data,
+    niaAssets,
+    demoAssets,
     btcBalanceResponse.data,
     listChannelsResponse.data,
     assetBalance,
@@ -282,7 +306,6 @@ export const Component = () => {
     liquidityTotal > 0 ? (totalInboundLiquidity / liquidityTotal) * 100 : 50
 
   const pubkey = nodeInfoResponse.data?.pubkey || ''
-  const niaAssets = getAllRgbAssets(assetsResponse.data)
 
   const handleCopyPubkey = () => {
     if (!pubkey) return

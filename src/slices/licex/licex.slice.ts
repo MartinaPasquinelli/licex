@@ -5,6 +5,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 
 import type {
+  LicenseAssetReference,
   LicenseListing,
   WatchlistItem,
   PriceAlert,
@@ -14,6 +15,7 @@ import type {
   LicenseRecord,
   Order,
   MarketplaceFilters,
+  TransferPolicy,
 } from '../../types/licex'
 import {
   MOCK_LISTINGS,
@@ -139,10 +141,13 @@ export const licexSlice = createSlice({
   initialState,
   name: 'licex',
   reducers: {
-    
-    
-// ── Price Alerts ───────────────────────────────────────────────────
-addPriceAlert(
+    // ── AI Chat ────────────────────────────────────────────────────────
+    addChatMessage(state, action: PayloadAction<ChatMessage>) {
+      state.chatMessages.push(action.payload)
+    },
+
+    // ── Price Alerts ───────────────────────────────────────────────────
+    addPriceAlert(
       state,
       action: PayloadAction<{ listingId: string; thresholdSats: number }>
     ) {
@@ -160,24 +165,9 @@ addPriceAlert(
         })
       }
     },
-    
 
-
-
-
-// ── AI Chat ────────────────────────────────────────────────────────
-addChatMessage(state, action: PayloadAction<ChatMessage>) {
-      state.chatMessages.push(action.payload)
-    },
-    
-
-
-
-
-
-
-// ── Watchlist ──────────────────────────────────────────────────────
-addToWatchlist(state, action: PayloadAction<string>) {
+    // ── Watchlist ──────────────────────────────────────────────────────
+    addToWatchlist(state, action: PayloadAction<string>) {
       const listing = state.listings.find((l) => l.id === action.payload)
       if (
         listing &&
@@ -192,15 +182,8 @@ addToWatchlist(state, action: PayloadAction<string>) {
       }
     },
 
-    
-    
-
-
-
-
-
-// ── Wishlist ───────────────────────────────────────────────────────
-addWishlistItem(
+    // ── Wishlist ───────────────────────────────────────────────────────
+    addWishlistItem(
       state,
       action: PayloadAction<
         Omit<
@@ -225,63 +208,132 @@ addWishlistItem(
       })
     },
 
-    
-    
-
-
-
-
-clearFilters(state) {
+    clearFilters(state) {
       state.filters = initialFilters
       state.filteredListings = applyFilters(state.listings, state.filters)
     },
-    
 
+    // ── Mint / Issue RGB License Listing ────────────────────────────────
+    mintLicenseListing(
+      state,
+      action: PayloadAction<{
+        id: string
+        rgbAsset: LicenseAssetReference
+        productName: string
+        edition: string
+        price: number
+        transferPolicy: TransferPolicy
+        royaltyPercent: number
+        category?: string
+        platforms?: string[]
+      }>
+    ) {
+      const newListing: LicenseListing = {
+        category: action.payload.category || 'Development',
+        company: state.listings[0]?.company || {
+          companyStatus: 'verified',
+          defaultRoyaltyPercent: action.payload.royaltyPercent,
+          defaultTransferPolicy: action.payload.transferPolicy,
+          description: 'Verified Issuer Node',
+          domain: 'jetbrains.com',
+          id: 'comp-1',
+          logoUrl: '',
+          name: 'JetBrains s.r.o.',
+          refundPolicy: 'Standard 14-day policy',
+        },
+        companyId: 'comp-1',
+        createdAt: new Date().toISOString(),
+        durationDays: null,
+        edition: action.payload.edition,
+        id: action.payload.id,
+        imageUrl: '',
+        licenseType: 'perpetual',
+        maxTransfers: null,
+        minHoldingDays: null,
+        paymentAsset: 'RGB-USDT (demo stablecoin)',
+        platforms: action.payload.platforms || ['Windows', 'macOS', 'Linux'],
+        price: action.payload.price,
+        productDescription: `${action.payload.productName} (${action.payload.edition}) - Licenza software ufficiale emessa come asset RGB su Bitcoin.`,
+        productName: action.payload.productName,
+        rgbAsset: action.payload.rgbAsset,
+        royaltyPercent: action.payload.royaltyPercent,
+        status: 'published',
+        tags: ['RGB Asset', 'Verified Issuer', 'Demo Mint'],
+        transferPolicy: action.payload.transferPolicy,
+        updatedAt: new Date().toISOString(),
+        version: '2026.1',
+      }
 
+      state.listings.unshift(newListing)
+      state.filteredListings = applyFilters(state.listings, state.filters)
+      state.companyStats.totalListings += 1
+    },
 
+    recordDemoPurchase(
+      state,
+      action: PayloadAction<{ listingId: string; orderId: string }>
+    ) {
+      const listing = state.listings.find(
+        (item) => item.id === action.payload.listingId
+      )
+      if (
+        !listing ||
+        state.orders.some((order) => order.id === action.payload.orderId)
+      )
+        return
+      state.orders.unshift({
+        buyerId: 'demo-buyer',
+        companyId: listing.companyId,
+        createdAt: new Date().toISOString(),
+        id: action.payload.orderId,
+        licexFee: Math.round(listing.price * 0.01),
+        listing,
+        listingId: listing.id,
+        orderStatus: 'completed',
+        paymentStatus: 'received',
+        price: listing.price,
+        royalty: Math.round(listing.price * (listing.royaltyPercent / 100)),
+        sellerId: listing.companyId,
+        type: 'primary',
+      })
+      state.ownedLicenses.unshift({
+        activationStatus: 'not_supported',
+        id: `owned-${action.payload.orderId}`,
+        licenseStatus: 'active',
+        listing,
+        orderId: action.payload.orderId,
+        transferCount: 0,
+      })
+    },
 
-removeFromWatchlist(state, action: PayloadAction<string>) {
+    removeFromWatchlist(state, action: PayloadAction<string>) {
       state.watchlist = state.watchlist.filter(
         (w) => w.listingId !== action.payload
       )
     },
 
-    
-    
-
-
-
-removePriceAlert(state, action: PayloadAction<string>) {
+    removePriceAlert(state, action: PayloadAction<string>) {
       state.priceAlerts = state.priceAlerts.filter(
         (a) => a.id !== action.payload
       )
     },
-    
 
-
-
-removeWishlistItem(state, action: PayloadAction<string>) {
+    removeWishlistItem(state, action: PayloadAction<string>) {
       state.wishlist = state.wishlist.filter((w) => w.id !== action.payload)
     },
 
-    
-    
-
-// ── Listing Detail ─────────────────────────────────────────────────
-selectListing(state, action: PayloadAction<string | null>) {
+    // ── Listing Detail ─────────────────────────────────────────────────
+    selectListing(state, action: PayloadAction<string | null>) {
       state.selectedListing = action.payload
         ? state.listings.find((l) => l.id === action.payload) || null
         : null
     },
-    
 
-setChatLoading(state, action: PayloadAction<boolean>) {
+    setChatLoading(state, action: PayloadAction<boolean>) {
       state.chatLoading = action.payload
     },
-
-    
     // ── Filters ────────────────────────────────────────────────────────
-setFilters(state, action: PayloadAction<Partial<MarketplaceFilters>>) {
+    setFilters(state, action: PayloadAction<Partial<MarketplaceFilters>>) {
       state.filters = { ...state.filters, ...action.payload }
       state.filteredListings = applyFilters(state.listings, state.filters)
     },
@@ -304,4 +356,6 @@ export const {
   removeWishlistItem,
   addChatMessage,
   setChatLoading,
+  mintLicenseListing,
+  recordDemoPurchase,
 } = licexSlice.actions

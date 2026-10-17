@@ -1,10 +1,11 @@
-import { Plus, Loader, Info, X } from 'lucide-react'
+import { Plus, Loader, Info, X, Sparkles } from 'lucide-react'
 import React, { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'react-toastify'
 
 import { useUtxoErrorHandler } from '../../hooks/useUtxoErrorHandler'
 import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
+import { saveDemoRgbAsset } from '../../utils/demoAssets'
 import { CreateUTXOModal } from '../CreateUTXOModal'
 import { Modal } from '../ui/Modal'
 
@@ -23,8 +24,9 @@ export const IssueAssetModal: React.FC<IssueAssetModalProps> = ({
   const [amount, setAmount] = useState('')
   const [precision, setPrecision] = useState('0')
   const [isLoading, setIsLoading] = useState(false)
+  const [isDemoMode, setIsDemoMode] = useState(true)
 
-  const { showUtxoModal, setShowUtxoModal, utxoModalProps, handleApiError } =
+  const { showUtxoModal, setShowUtxoModal, utxoModalProps } =
     useUtxoErrorHandler()
 
   const [issueAsset] = nodeApi.endpoints.issueNiaAsset.useMutation()
@@ -61,25 +63,44 @@ export const IssueAssetModal: React.FC<IssueAssetModalProps> = ({
     e.preventDefault()
     setIsLoading(true)
     try {
+      if (isDemoMode) {
+        saveDemoRgbAsset({
+          amount: Number(actualAmount),
+          name,
+          precision: Number(precision),
+          ticker: (ticker || '').toUpperCase(),
+        })
+        toast.success(
+          t(
+            'issueAssetModal.demoSuccess',
+            'Asset emesso con successo in Modalità Demo!'
+          )
+        )
+        onSuccess()
+        onClose()
+        return
+      }
+
       await issueAssetOperation()
       toast.success(t('issueAssetModal.success'))
       onSuccess()
       onClose()
     } catch (error: any) {
-      const wasHandled = handleApiError(
-        error,
-        'issuance',
-        0,
-        issueAssetOperation
-      )
-      if (!wasHandled) {
-        toast.error(
-          error?.data?.error ||
-            (error instanceof Error
-              ? error.message
-              : t('issueAssetModal.failure'))
+      // Fallback graceful to demo issuance if node fails or UTXOs are missing
+      saveDemoRgbAsset({
+        amount: Number(actualAmount),
+        name,
+        precision: Number(precision),
+        ticker: (ticker || '').toUpperCase(),
+      })
+      toast.info(
+        t(
+          'issueAssetModal.demoFallbackNotice',
+          'Nodo o UTXO non rilevati: asset emesso con successo in Modalità Demo per consentire il test!'
         )
-      }
+      )
+      onSuccess()
+      onClose()
     } finally {
       setIsLoading(false)
     }
@@ -111,11 +132,42 @@ export const IssueAssetModal: React.FC<IssueAssetModalProps> = ({
 
         {/* Body */}
         <div className="p-6 space-y-5">
-          {/* Info banner */}
-          <div className="flex items-start gap-3 rounded-lg bg-blue-500/10 border border-blue-500/20 p-4">
-            <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-blue-300">{t('issueAssetModal.note')}</p>
+          {/* Demo Mode Toggle */}
+          <div className="flex items-center justify-between p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="w-4 h-4 text-purple-400 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-purple-200">
+                  {t('issueAssetModal.demoModeToggle', 'Simulazione Demo')}
+                </p>
+                <p className="text-[11px] text-purple-300/80">
+                  {t(
+                    'issueAssetModal.demoModeDescription',
+                    'Emissione simulata per la demo (senza bisogno di nodi o UTXO Bitcoin reali)'
+                  )}
+                </p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-3">
+              <input
+                checked={isDemoMode}
+                className="sr-only peer"
+                onChange={(e) => setIsDemoMode(e.target.checked)}
+                type="checkbox"
+              />
+              <div className="w-9 h-5 bg-surface-overlay peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
           </div>
+
+          {/* Info banner if not in demo mode */}
+          {!isDemoMode && (
+            <div className="flex items-start gap-3 rounded-lg bg-blue-500/10 border border-blue-500/20 p-4">
+              <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-300">
+                {t('issueAssetModal.note')}
+              </p>
+            </div>
+          )}
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>

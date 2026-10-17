@@ -1411,7 +1411,11 @@
     "submit": "자산 발행",
     "submitting": "발행 중...",
     "success": "자산이 성공적으로 발행되었습니다!",
-    "failure": "자산 발행 실패"
+    "failure": "자산 발행 실패",
+    "demoModeToggle": "데모 시뮬레이션",
+    "demoModeDescription": "데모용 시뮬레이션 발행 (실제 비트코인 노드 또는 UTXO 불필요)",
+    "demoSuccess": "데모 모드로 자산이 성공적으로 발행되었습니다!",
+    "demoFallbackNotice": "노드 또는 UTXO가 감지되지 않음: 테스트를 위해 데모 모드로 자산이 성공적으로 발행되었습니다!"
   },
   "updater": {
     "checkingTitle": "업데이트 확인 중",

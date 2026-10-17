@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import {
   ArrowLeft,
   Shield,
@@ -22,9 +23,11 @@ import {
   addToWatchlist,
   removeFromWatchlist,
   addPriceAlert,
+  recordDemoPurchase,
 } from '../../slices/licex/licex.slice'
 import type { TransferPolicy } from '../../types/licex'
 import { LICEX_MARKETPLACE_PATH } from '../../app/router/paths'
+import { executeDemoStablecoinSale } from '../../services/licex/demoSale'
 
 function formatSats(sats: number): string {
   if (sats === 0) return 'Free'
@@ -79,6 +82,7 @@ export function Component() {
   const { listings, watchlist } = useAppSelector((s) => s.licex)
   const [showPurchaseModal, setShowPurchaseModal] = useState(false)
   const [alertThreshold, setAlertThreshold] = useState('')
+  const [isPurchasing, setIsPurchasing] = useState(false)
 
   const listing = useMemo(
     () => listings.find((l) => l.id === licenseId),
@@ -537,13 +541,40 @@ export function Component() {
                     bg-gradient-to-r from-purple-600 to-purple-500 text-white
                     hover:from-purple-500 hover:to-purple-400
                     shadow-lg shadow-purple-500/25 transition-all"
+                  disabled={isPurchasing}
                   id="confirm-purchase-btn"
-                  onClick={() => {
-                    setShowPurchaseModal(false)
-                    // Demo: just close
+                  onClick={async () => {
+                    const orderId = `order-demo-${crypto.randomUUID()}`
+                    setIsPurchasing(true)
+                    try {
+                      const sale = await executeDemoStablecoinSale(
+                        listing,
+                        orderId
+                      )
+                      if (
+                        !sale.transferVerified ||
+                        sale.paymentStatus !== 'received'
+                      ) {
+                        throw new Error(
+                          'Pagamento o trasferimento non verificato'
+                        )
+                      }
+                      dispatch(
+                        recordDemoPurchase({ listingId: listing.id, orderId })
+                      )
+                      setShowPurchaseModal(false)
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : 'Acquisto fallito'
+                      )
+                    } finally {
+                      setIsPurchasing(false)
+                    }
                   }}
                 >
-                  Confirm Purchase (Demo)
+                  {isPurchasing ? 'Processing…' : 'Confirm Purchase (Demo)'}
                 </button>
               </div>
             </div>
