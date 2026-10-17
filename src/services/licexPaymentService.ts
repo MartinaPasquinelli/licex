@@ -45,8 +45,10 @@ export async function executeLicenseSwap(
   onStepChange: (step: SwapStep, message?: string) => void
 ): Promise<SwapExecutionResult> {
   const quote = calculatePaymentQuote(listing, orderType)
-  const orderId = 'ord-${Date.now()}'
-  const licenseRecordId = 'lic-${Date.now()}'
+  const timestamp = Date.now()
+  const randomHexId = Math.random().toString(16).substring(2, 6).toUpperCase()
+  const orderId = `ord-${timestamp}`
+  const licenseRecordId = `lic-${listing.id.replace(/^lic-/, '')}-${randomHexId}-${timestamp.toString().slice(-4)}`
   const mockBuyerPubkey =
     '02a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789'
 
