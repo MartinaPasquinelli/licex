@@ -73,13 +73,16 @@ export const KALEIDO_MIND_SKILLS_PATH = makePath([KALEIDO_MIND_PATH, 'skills'])
 export const KALEIDO_MIND_CHAT_PATH = makePath([KALEIDO_MIND_PATH, 'chat'])
 export const KALEIDO_MIND_AGENT_PATH = makePath([KALEIDO_MIND_PATH, 'agent'])
 
-// ── LICEX Marketplace Paths ─────────────────────────────────────────────────
 export const LICEX_MARKETPLACE_PATH = makePath(['marketplace'])
 export const LICEX_LICENSE_DETAIL_PATH = makePath([
   LICEX_MARKETPLACE_PATH,
   ':licenseId',
 ])
+export const LICEX_MY_LICENSES_PATH = makePath(['my-licenses'])
 export const LICEX_WATCHLIST_PATH = makePath(['watchlist'])
 export const LICEX_WISHLIST_PATH = makePath(['wishlist'])
 export const LICEX_ASSISTANT_PATH = makePath(['licex-assistant'])
 export const LICEX_COMPANY_DASHBOARD_PATH = makePath(['company-dashboard'])
+
+// ── Account Section ──────────────────────────────────────────────────────────
+export const ACCOUNT_PATH = makePath(['account'])

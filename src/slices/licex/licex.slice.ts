@@ -168,7 +168,6 @@ export const licexSlice = createSlice({
       }
     },
 
-    // ── Watchlist ──────────────────────────────────────────────────────
     addToWatchlist(state, action: PayloadAction<string>) {
       const listing = state.listings.find((l) => l.id === action.payload)
       if (
@@ -241,7 +240,6 @@ export const licexSlice = createSlice({
       state.wishlist = state.wishlist.filter((w) => w.id !== action.payload)
     },
 
-    // ── Listing Detail ─────────────────────────────────────────────────
     selectListing(state, action: PayloadAction<string | null>) {
       state.selectedListing = action.payload
         ? state.listings.find((l) => l.id === action.payload) || null

@@ -101,16 +101,16 @@ const LicenseCard: React.FC<{
           style={{
             background:
               listing.category === 'Creative & Design'
-                ? 'linear-gradient(135deg, #9365FF, #FF6B9D)'
+                ? 'linear-gradient(135deg, #9B5094, #8FB8DE)'
                 : listing.category === 'Security'
-                  ? 'linear-gradient(135deg, #15E99A, #3B82F6)'
+                  ? 'linear-gradient(135deg, #8FB8DE, #CDF7F6)'
                   : listing.category === 'Development'
-                    ? 'linear-gradient(135deg, #3B82F6, #8FD5EA)'
+                    ? 'linear-gradient(135deg, #9A94BC, #8FB8DE)'
                     : listing.category === 'Analytics & AI'
-                      ? 'linear-gradient(135deg, #FF6B9D, #FFA726)'
+                      ? 'linear-gradient(135deg, #9B5094, #9A94BC)'
                       : listing.category === 'Gaming'
-                        ? 'linear-gradient(135deg, #F43F5E, #9365FF)'
-                        : 'linear-gradient(135deg, #8FD5EA, #15E99A)',
+                        ? 'linear-gradient(135deg, #CDF7F6, #9B5094)'
+                        : 'linear-gradient(135deg, #8FB8DE, #9B5094)',
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[rgb(var(--app-surface-secondary))]" />

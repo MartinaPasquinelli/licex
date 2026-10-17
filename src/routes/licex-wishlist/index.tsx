@@ -144,8 +144,8 @@ export function Component() {
                       item.status === 'matched'
                         ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                         : item.status === 'fulfilled'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                          ? 'bg-[#8FB8DE]/15 text-[#CDF7F6] border border-[#8FB8DE]/30'
+                          : 'bg-[#9B5094]/15 text-[#CDF7F6] border border-[#9B5094]/30'
                     }`}
                   >
                     {item.status === 'matched'

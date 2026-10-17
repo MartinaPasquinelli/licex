@@ -1,0 +1,54 @@
+<svg width="412" height="412" viewBox="0 0 412 412" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="licexGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="50%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="licexGrad2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="50%" stop-color="#06B6D4"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="licexAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#EF4444"/>
+    </linearGradient>
+    <filter id="licexGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Outer Hexagonal / Shield Frame -->
+  <polygon points="206,20 376,110 376,302 206,392 36,302 36,110" 
+           stroke="url(#licexGrad1)" stroke-width="12" fill="#13141F" stroke-linejoin="round"/>
+
+  <!-- Inner Geometric Mesh / Cryptographic License Facets -->
+  <polygon points="206,44 352,122 352,290 206,368 60,290 60,122" 
+           fill="#1A1C2C" opacity="0.85"/>
+
+  <!-- Top Prism facet -->
+  <polygon points="206,44 352,122 206,206" fill="url(#licexGrad1)" opacity="0.35"/>
+  <!-- Left Prism facet -->
+  <polygon points="60,122 206,206 60,290" fill="url(#licexGrad2)" opacity="0.3"/>
+  <!-- Right Prism facet -->
+  <polygon points="352,122 352,290 206,206" fill="url(#licexGrad1)" opacity="0.25"/>
+  <!-- Bottom Prism facet -->
+  <polygon points="60,290 206,206 206,368" fill="url(#licexGrad2)" opacity="0.45"/>
+  <polygon points="352,290 206,206 206,368" fill="url(#licexGrad1)" opacity="0.4"/>
+
+  <!-- Central License Key Symbol (L + Cryptographic Node) -->
+  <!-- Digital Certificate Outline -->
+  <rect x="156" y="146" width="100" height="120" rx="14" fill="#0E1018" stroke="url(#licexGrad1)" stroke-width="5" />
+  
+  <!-- Certificate Chip Lines -->
+  <line x1="176" y1="174" x2="236" y2="174" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round"/>
+  <line x1="176" y1="192" x2="220" y2="192" stroke="#06B6D4" stroke-width="4" stroke-linecap="round"/>
+  <line x1="176" y1="210" x2="236" y2="210" stroke="#10B981" stroke-width="4" stroke-linecap="round"/>
+  <line x1="176" y1="228" x2="204" y2="228" stroke="#F59E0B" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Bitcoin RGB seal dot -->
+  <circle cx="230" cy="232" r="12" fill="url(#licexAccent)" filter="url(#licexGlow)"/>
+  <circle cx="230" cy="232" r="6" fill="#FFFFFF"/>
+</svg>

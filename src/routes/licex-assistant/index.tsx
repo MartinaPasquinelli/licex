@@ -58,7 +58,7 @@ export function Component() {
       ) {
         reply =
           '**Analisi Politiche di Trasferimento LICEX (Layer 1 + 2):**\n\n' +
-          '• **Freely Transferable**: Il token RGB su Bitcoin può essere scambiato atomicamente su DEX (come KaleidoSwap). Al termine dello swap, il server di autenticazione del vendor riceve il consignment RGB, invalida la chiave precedente e rilascia un nuovo token JWT o licenza hardware-bound.\n' +
+          '• **Freely Transferable**: Il token RGB su Bitcoin può essere scambiato atomicamente su LicEX Marketplace o via swap RGB peer-to-peer. Al termine del transfer, il server di autenticazione del vendor valida il consignment RGB, invalida la chiave precedente e rilascia un nuovo token JWT o licenza hardware-bound.\n' +
           "• **Transferable with Approval**: Richiede firma crittografica bilaterale prima del broadcast. Consente ai vendor enterprise di verificare la compliance dell'acquirente.\n" +
           '• **Royalty on Resale**: Il venditore imposta una percentuale (es. 5-10%) che viene pagata automaticamente al mint creator in satoshi.'
       } else if (
@@ -109,9 +109,9 @@ export function Component() {
       <div className="flex-shrink-0 px-6 py-4 border-b border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-secondary))]/40">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-400 p-0.5 flex items-center justify-center shadow-lg shadow-purple-500/20">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#9B5094] via-[#8FB8DE] to-[#CDF7F6] p-0.5 flex items-center justify-center shadow-lg shadow-[#9B5094]/20">
               <div className="w-full h-full bg-[rgb(var(--app-surface-secondary))] rounded-[10px] flex items-center justify-center">
-                <Bot className="w-5 h-5 text-purple-400" />
+                <Bot className="w-5 h-5 text-[#CDF7F6]" />
               </div>
             </div>
             <div>
@@ -119,8 +119,8 @@ export function Component() {
                 <h1 className="text-base font-bold text-[rgb(var(--app-content-primary))]">
                   LICEX Assistant
                 </h1>
-                <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-[#8FB8DE]/15 text-[#CDF7F6] border border-[#8FB8DE]/30 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#CDF7F6] animate-pulse" />
                   QVAC Agent Engine
                 </span>
               </div>
@@ -131,8 +131,8 @@ export function Component() {
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-2 text-xs text-[rgb(var(--app-content-secondary))] bg-[rgb(var(--app-surface-primary))] px-3 py-1.5 rounded-lg border border-[rgb(var(--app-border-primary))]/30">
-            <Cpu className="w-4 h-4 text-purple-400" />
+          <div className="hidden md:flex items-center gap-2 text-xs text-[#9A94BC] bg-[rgb(var(--app-surface-primary))] px-3 py-1.5 rounded-lg border border-[rgb(var(--app-border-primary))]/30">
+            <Cpu className="w-4 h-4 text-[#8FB8DE]" />
             <span>Local Inference Ready</span>
           </div>
         </div>
@@ -150,8 +150,8 @@ export function Component() {
             <div
               className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${
                 msg.role === 'user'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-[rgb(var(--app-surface-secondary))] border border-purple-500/30 text-purple-400'
+                  ? 'bg-[#9B5094] text-white'
+                  : 'bg-[rgb(var(--app-surface-secondary))] border border-[#8FB8DE]/30 text-[#CDF7F6]'
               }`}
             >
               {msg.role === 'user' ? 'ME' : <Bot className="w-4 h-4" />}
@@ -160,7 +160,7 @@ export function Component() {
             <div
               className={`p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === 'user'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+                  ? 'bg-gradient-to-r from-[#9B5094] to-[#8FB8DE] text-white shadow-md'
                   : 'bg-[rgb(var(--app-surface-secondary))] border border-[rgb(var(--app-border-primary))]/30 text-[rgb(var(--app-content-primary))]'
               }`}
             >
@@ -168,7 +168,7 @@ export function Component() {
               <div
                 className={`text-[10px] mt-2 opacity-60 text-right ${
                   msg.role === 'user'
-                    ? 'text-purple-200'
+                    ? 'text-[#CDF7F6]'
                     : 'text-[rgb(var(--app-content-secondary))]'
                 }`}
               >
@@ -183,11 +183,11 @@ export function Component() {
 
         {chatLoading && (
           <div className="flex gap-3 max-w-xl animate-pulse">
-            <div className="w-8 h-8 rounded-xl bg-[rgb(var(--app-surface-secondary))] border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <div className="w-8 h-8 rounded-xl bg-[rgb(var(--app-surface-secondary))] border border-[#8FB8DE]/30 flex items-center justify-center text-[#CDF7F6]">
               <Bot className="w-4 h-4" />
             </div>
             <div className="p-4 rounded-2xl bg-[rgb(var(--app-surface-secondary))] border border-[rgb(var(--app-border-primary))]/30 text-xs text-[rgb(var(--app-content-secondary))] flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-spin" />
+              <Sparkles className="w-3.5 h-3.5 text-[#CDF7F6] animate-spin" />
               <span>Analyzing RGB protocol metadata & contract clauses...</span>
             </div>
           </div>
@@ -201,11 +201,11 @@ export function Component() {
         <div className="px-6 py-2 flex flex-wrap gap-2">
           {SUGGESTED_PROMPTS.map((prompt) => (
             <button
-              className="text-xs px-3 py-1.5 rounded-full bg-[rgb(var(--app-surface-secondary))] text-[rgb(var(--app-content-secondary))] border border-[rgb(var(--app-border-primary))]/30 hover:border-purple-500/40 hover:text-purple-300 transition-colors flex items-center gap-1.5"
+              className="text-xs px-3 py-1.5 rounded-full bg-[rgb(var(--app-surface-secondary))] text-[rgb(var(--app-content-secondary))] border border-[rgb(var(--app-border-primary))]/30 hover:border-[#8FB8DE]/40 hover:text-[#CDF7F6] transition-colors flex items-center gap-1.5"
               key={prompt}
               onClick={() => handleSend(prompt)}
             >
-              <Lightbulb className="w-3 h-3 text-amber-400" />
+              <Lightbulb className="w-3 h-3 text-[#8FB8DE]" />
               {prompt}
             </button>
           ))}
@@ -228,7 +228,7 @@ export function Component() {
                 border border-[rgb(var(--app-border-primary))]/30
                 text-[rgb(var(--app-content-primary))]
                 placeholder-[rgb(var(--app-content-secondary))]/50
-                focus:border-purple-500/50 focus:outline-none"
+                focus:border-[#8FB8DE]/50 focus:outline-none"
               disabled={chatLoading}
               id="licex-chat-input"
               onChange={(e) => setInput(e.target.value)}
@@ -239,7 +239,7 @@ export function Component() {
           </div>
 
           <button
-            className="p-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:from-purple-500 hover:to-indigo-500 shadow-md shadow-purple-500/20 transition-all"
+            className="p-3 rounded-xl bg-gradient-to-r from-[#9B5094] to-[#8FB8DE] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 shadow-md shadow-[#9B5094]/20 transition-all"
             disabled={!input.trim() || chatLoading}
             id="licex-chat-send-btn"
             type="submit"

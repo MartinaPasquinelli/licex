@@ -36,10 +36,12 @@ import {
   KALEIDO_MIND_AGENT_PATH,
   LICEX_MARKETPLACE_PATH,
   LICEX_LICENSE_DETAIL_PATH,
+  LICEX_MY_LICENSES_PATH,
   LICEX_WATCHLIST_PATH,
   LICEX_WISHLIST_PATH,
   LICEX_ASSISTANT_PATH,
   LICEX_COMPANY_DASHBOARD_PATH,
+  ACCOUNT_PATH,
 } from './paths'
 
 export const router = createBrowserRouter([
@@ -178,6 +180,10 @@ export const router = createBrowserRouter([
         path: LICEX_LICENSE_DETAIL_PATH,
       },
       {
+        lazy: () => import('../../routes/licex-my-licenses'),
+        path: LICEX_MY_LICENSES_PATH,
+      },
+      {
         lazy: () => import('../../routes/licex-watchlist'),
         path: LICEX_WATCHLIST_PATH,
       },
@@ -192,6 +198,10 @@ export const router = createBrowserRouter([
       {
         lazy: () => import('../../routes/licex-dashboard'),
         path: LICEX_COMPANY_DASHBOARD_PATH,
+      },
+      {
+        lazy: () => import('../../routes/account'),
+        path: ACCOUNT_PATH,
       },
       {
         lazy: () => import('../../routes/channels'),

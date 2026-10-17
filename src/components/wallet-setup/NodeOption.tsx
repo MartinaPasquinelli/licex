@@ -37,7 +37,7 @@ export const NodeOption: React.FC<NodeOptionProps> = ({
           {React.cloneElement(icon as React.ReactElement, { strokeWidth: 2 })}
         </div>
         <h2
-          className={`text-2xl font-bold ${selected ? 'text-primary' : 'text-white'}`}
+          className={`text-2xl font-bold ${selected ? 'text-primary' : 'text-content-primary'}`}
         >
           {title}
         </h2>
