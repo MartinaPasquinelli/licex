@@ -140,15 +140,36 @@ export interface WantedSoftwareRequest {
   title: string
   description: string
   useCase: string
+  category?: string
   platforms: string[]
   requirements: string[]
   budget: number | null // sats
+  budgetFiat?: number | null
   status: WishlistStatus
   matchCount: number
   pledgeTotal: number
   consentToAggregation: boolean
   createdAt: string
   updatedAt: string
+}
+
+export type WishlistRequestRelation = 'similar' | 'complementary'
+
+export interface WishlistGroupMatch {
+  requestId: string
+  relation: WishlistRequestRelation
+  reason: string
+}
+
+export interface WishlistDemandGroup {
+  id: string
+  requestIds: string[]
+  summary: string
+  combinedRequirements: string[]
+  platforms: string[]
+  matches: WishlistGroupMatch[]
+  createdAt: string
+  source: 'local-model' | 'rules'
 }
 
 // ── AI Assistant ─────────────────────────────────────────────────────────────
@@ -160,6 +181,7 @@ export interface ChatMessage {
   content: string
   timestamp: string
   suggestions?: string[]
+  listingIds?: string[]
 }
 
 // ── Company Dashboard Stats ──────────────────────────────────────────────────

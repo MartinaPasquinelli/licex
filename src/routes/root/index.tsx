@@ -4,8 +4,8 @@ import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { webSocketService } from '../../app/hubs/websocketService'
 import {
   ROOT_PATH,
-  WALLET_SETUP_PATH,
   TRADE_MARKET_MAKER_PATH,
+  LICEX_MARKETPLACE_PATH,
 } from '../../app/router/paths'
 import { Layout } from '../../components/Layout'
 import { logger } from '../../utils/logger'
@@ -35,10 +35,9 @@ export const RootRoute = () => {
     }
   }, [])
 
-  // The welcome (account picker + mode + connect) lives on the wallet-setup
-  // screen, which is always the entry point. "/" simply forwards there.
+  // The default entry point for LICEX is the Marketplace
   if (isIndexRoute) {
-    return <Navigate replace to={WALLET_SETUP_PATH} />
+    return <Navigate replace to={LICEX_MARKETPLACE_PATH} />
   }
 
   return (

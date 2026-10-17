@@ -27,6 +27,7 @@ import {
 import { CATEGORIES } from '../../constants/licex-mock-data'
 import type { LicenseListing, TransferPolicy } from '../../types/licex'
 import { LICEX_MARKETPLACE_PATH } from '../../app/router/paths'
+import { cleanMarkdownForPreview } from '../../components/LicexMarkdown'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function formatSats(sats: number): string {
@@ -178,7 +179,7 @@ const LicenseCard: React.FC<{
 
         {/* Description */}
         <p className="text-xs text-[rgb(var(--app-content-secondary))] line-clamp-2 leading-relaxed">
-          {listing.productDescription}
+          {cleanMarkdownForPreview(listing.productDescription)}
         </p>
 
         {/* Platforms */}
