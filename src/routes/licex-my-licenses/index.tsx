@@ -40,6 +40,7 @@ import {
 } from '../../services/licex/licexStorage'
 import { issueDemoLicenseAsset } from '../../services/licex/licenseAssetIssuer'
 import { logger } from '../../utils/logger'
+import { removeDemoRgbAsset, saveDemoRgbAsset } from '../../utils/demoAssets'
 import {
   adjustP2PSimulationUsdtBalance,
   createP2PSimulationSwapString,
@@ -69,7 +70,6 @@ interface IncomingP2PPurchase {
   request: NostrMarketplacePurchaseRequest
   offer: NostrLicenseOffer
 }
-import type { LicenseListing } from '../../types/licex'
 import { EulaAnalyzerTab } from '../licex-assistant/EulaAnalyzerTab'
 
 const formatContractDetails = (details?: string): string => {
@@ -97,14 +97,16 @@ export function Component() {
     null
   )
   const [, setTestAssetBalanceRevision] = useState(0)
-  const { data: nodeAssets } = nodeApi.useListAssetsQuery(undefined, {
-    skip: isTestModeEnabled,
-  })
+  const { data: nodeAssets, refetch: refetchNodeAssets } =
+    nodeApi.useListAssetsQuery(undefined, {
+      skip: isTestModeEnabled,
+    })
   const { data: nodeInfo } = nodeApi.endpoints.nodeInfo.useQuery(undefined, {
     skip: isTestModeEnabled,
   })
   const [makerInit] = nodeApi.useMakerInitMutation()
   const [makerExecute] = nodeApi.useMakerExecuteMutation()
+  const [refreshRgbTransfers] = nodeApi.endpoints.refresh.useMutation()
   const [getAssetBalance] = nodeApi.endpoints.assetBalance.useLazyQuery()
   const [activeTab, setActiveTab] = useState<'licenses' | 'orders'>('licenses')
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
@@ -128,6 +130,9 @@ export function Component() {
   const [isSyncingP2PPurchases, setIsSyncingP2PPurchases] = useState(false)
   const [p2pSyncMessage, setP2pSyncMessage] = useState<string | null>(null)
   const [isPortfolioLoaded, setIsPortfolioLoaded] = useState(false)
+  const [marketplaceIdentity, setMarketplaceIdentity] = useState<string | null>(
+    null
+  )
 
   // Interroga direttamente le tabelle SQLite native al montaggio della pagina
   useEffect(() => {
@@ -148,11 +153,11 @@ export function Component() {
     let isCurrent = true
     const loadIncomingPurchases = async () => {
       try {
-        const [identity, snapshot] = await Promise.all([
-          getMarketplaceIdentity(),
-          fetchMarketplaceSnapshot(),
-        ])
-        if (!identity || !isCurrent) return
+        const identity = await getMarketplaceIdentity()
+        if (!isCurrent) return
+        setMarketplaceIdentity(identity)
+        if (!identity) return
+        const snapshot = await fetchMarketplaceSnapshot()
         const ownOffers = snapshot.offers.filter(
           (offer) => offer.sellerNpub === identity && offer.status === 'active'
         )
@@ -195,69 +200,15 @@ export function Component() {
     (listing) =>
       listing.status === 'published' &&
       listing.rgbAsset?.schema === 'UDA' &&
-      listing.rgbAsset.mode === 'rgb-node'
+      (listing.publisherNpub
+        ? listing.publisherNpub === marketplaceIdentity
+        : Boolean(
+            listing.rgbAsset.issuerPubkey &&
+            listing.rgbAsset.issuerPubkey === nodeInfo?.pubkey
+          )) &&
+      (listing.rgbAsset.mode === 'rgb-node' ||
+        (isTestModeEnabled && listing.rgbAsset.mode === 'demo'))
   )
-
-  const handleCreateDemoUda = async () => {
-    if (isCreatingUda) return
-    setIsCreatingUda(true)
-    try {
-      const network = await getNetworkInfo().unwrap()
-      if (network.network === 'Mainnet') {
-        throw new Error(
-          'Emissione demo bloccata su Mainnet. Collega il nodo a Signet o Regtest.'
-        )
-      }
-      const issuer = await getNodeInfo().unwrap()
-      const requestId = crypto.randomUUID()
-      const issuanceInput = createIssuanceInputFromEula(
-        MOCK_EULA_ANALYSIS,
-        requestId
-      )
-      const issue = () =>
-        issueLicenseRgbAsset(
-          issuanceInput,
-          (request) => issueUda(request).unwrap(),
-          async (message) =>
-            (await signMessage({ message }).unwrap()).signed_message,
-          issuer.pubkey
-        )
-      let issuedAsset: IssuedLicenseAsset
-      try {
-        issuedAsset = await issue()
-      } catch (error) {
-        if (!isMissingUncoloredUtxo(error)) throw error
-        toast.info('Preparo un UTXO Bitcoin per l’emissione UDA…')
-        await createUtxos({
-          fee_rate: 2,
-          num: 1,
-          size: 32500,
-          up_to: false,
-        }).unwrap()
-        issuedAsset = await issue()
-      }
-
-      dispatch(
-        mintLicenseListing({
-          category: 'Creative & Design',
-          edition: issuanceInput.edition,
-          id: `lic-${requestId}`,
-          platforms: [...MOCK_EULA_ANALYSIS.suggestedListing.platforms],
-          price: MOCK_EULA_ANALYSIS.suggestedListing.priceSats,
-          productName: issuanceInput.productName,
-          rgbAsset: issuedAsset,
-          royaltyPercent: issuanceInput.royaltyPercent,
-          transferPolicy: issuanceInput.transferPolicy,
-        })
-      )
-      toast.success(`UDA demo creata e pubblicata su ${network.network}.`)
-    } catch (error) {
-      const message = getIssuanceErrorMessage(error)
-      toast.error(message)
-    } finally {
-      setIsCreatingUda(false)
-    }
-  }
 
   const handleTestHandshake = (id: string) => {
     setTestedHandshakeId(id)
@@ -493,6 +444,12 @@ export function Component() {
         throw new Error('Sincronizzazione disponibile nell’app desktop LICEX.')
       }
 
+      if (!isTestModeEnabled) {
+        setP2pSyncMessage('Aggiorno i trasferimenti RGB in arrivo…')
+        await refreshRgbTransfers(undefined).unwrap()
+        await refetchNodeAssets()
+      }
+
       const snapshot = await fetchMarketplaceSnapshot()
       const buyerResults = snapshot.purchaseResults.filter(
         (result) =>
@@ -524,6 +481,15 @@ export function Component() {
 
         if (result.simulation && offer.simulation && isTestModeEnabled) {
           setP2PSimulationAssetBalance(assetId, 1)
+          saveDemoRgbAsset({
+            amount: 1,
+            assetId,
+            name: `${offer.listing.productName} (${offer.listing.edition})`,
+            precision: 0,
+            ticker:
+              offer.listing.productName.replace(/[^a-zA-Z]/g, '').slice(0, 8) ||
+              'LIC',
+          })
         } else {
           if (assetReference.mode !== 'rgb-node') continue
           let spendableBalance = 0
@@ -610,6 +576,7 @@ export function Component() {
           throw new Error('Il venditore non possiede più questa licenza demo.')
         }
         setP2PSimulationAssetBalance(assetId, 0)
+        removeDemoRgbAsset(assetId)
         setTestWalletBalance(
           adjustP2PSimulationUsdtBalance(offer.resalePriceUsdt)
         )
@@ -727,12 +694,12 @@ export function Component() {
               </div>
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-content-primary tracking-tight">
-              Le Mie Licenze (Asset RGB)
+              My Licenses (RGB Assets)
             </h1>
             <p className="text-content-secondary text-sm mt-1 max-w-xl">
-              Portafoglio delle tue licenze software tokenizzate come asset RGB
-              su Bitcoin. Ogni licenza è salvata persistentemente nel tuo
-              database locale e legata crittograficamente al tuo nodo.
+              Your software licenses tokenized as RGB assets on Bitcoin. Each
+              license is persisted in your local database and cryptographically
+              linked to your node.
             </p>
           </div>
 
@@ -752,7 +719,7 @@ export function Component() {
               type="button"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              Reset DB Locale
+              Reset Local DB
             </button>
             <button
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#9B5094]/40 bg-[#9B5094]/10 hover:bg-[#9B5094]/20 text-[#9B5094] dark:text-[#CDF7F6] font-bold text-sm transition-all"
@@ -760,14 +727,14 @@ export function Component() {
               type="button"
             >
               <FileSearch className="w-4 h-4" />
-              {showEulaAnalyzer ? 'Chiudi analizzatore' : 'Analizza EULA'}
+              {showEulaAnalyzer ? 'Close analyzer' : 'Analyze EULA'}
             </button>
             <button
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#8FB8DE] to-[#9B5094] hover:opacity-95 text-white font-bold text-sm shadow-md transition-all transform hover:scale-[1.02] active:scale-[0.98]"
               onClick={() => navigate(LICEX_MARKETPLACE_PATH)}
               type="button"
             >
-              Esplora Marketplace
+              Browse Marketplace
             </button>
           </div>
         </div>
@@ -784,7 +751,7 @@ export function Component() {
             type="button"
           >
             <Key className="w-4 h-4" />
-            Licenze Possedute ({ownedLicenses.length})
+            Owned Licenses ({ownedLicenses.length})
           </button>
           <button
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
@@ -796,31 +763,31 @@ export function Component() {
             type="button"
           >
             <Clock className="w-4 h-4" />
-            Storico Ordini & Transazioni ({orders.length})
+            Order & Transaction History ({orders.length})
           </button>
         </div>
       </div>
 
       {/* Content Area */}
       {isP2PSimulationAvailable() && (
-        <section className="rounded-2xl border border-violet-400/30 bg-violet-400/5 p-4 space-y-3">
+        <section className="rounded-2xl border border-violet-200 bg-violet-50 p-4 space-y-3 dark:border-violet-400/30 dark:bg-violet-400/5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-content-primary">
-                  Portafoglio P2P di test
+                  P2P Test Wallet
                 </h2>
-                <span className="rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-300">
-                  Solo sviluppo
+                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-700 dark:bg-violet-400/15 dark:text-violet-300">
+                  Development only
                 </span>
               </div>
               <p className="mt-1 text-xs text-content-secondary">
-                Simula saldo e trasferimento per verificare il flusso Nostr. Non
-                crea fondi né asset RGB reali.
+                Simulate balances and transfers to test the Nostr flow. No real
+                funds or RGB assets are created.
               </p>
               {isTestModeEnabled && (
-                <p className="mt-2 text-sm font-semibold text-violet-200">
-                  Saldo demo:{' '}
+                <p className="mt-2 text-sm font-semibold text-violet-800 dark:text-violet-200">
+                  Demo balance:{' '}
                   {testWalletBalance.toLocaleString(undefined, {
                     maximumFractionDigits: 2,
                   })}{' '}
@@ -838,19 +805,19 @@ export function Component() {
             </div>
             <div className="flex flex-wrap gap-2">
               <button
-                className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white"
+                className="rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-800"
                 onClick={activateTestWallet}
                 type="button"
               >
-                Attiva / finanzia test
+                Enable / fund test wallet
               </button>
               <button
-                className="rounded-lg border border-violet-400/30 px-3 py-2 text-xs font-semibold text-violet-200 disabled:opacity-50"
+                className="rounded-lg border border-violet-300 px-3 py-2 text-xs font-semibold text-violet-800 disabled:opacity-50 dark:border-violet-400/30 dark:text-violet-200"
                 disabled={!isTestModeEnabled}
                 onClick={() => void createTestLicense()}
                 type="button"
               >
-                Crea licenza demo
+                Create demo license
               </button>
               <button
                 className="rounded-lg border border-border-default px-3 py-2 text-xs font-semibold text-content-secondary disabled:opacity-50"
@@ -865,7 +832,7 @@ export function Component() {
                 }}
                 type="button"
               >
-                Ripristina test
+                Reset test wallet
               </button>
             </div>
           </div>
@@ -874,7 +841,7 @@ export function Component() {
       <section className="flex flex-col gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold text-content-primary">
-            Acquisti P2P completati
+            Completed P2P Purchases
           </h2>
           <p className="mt-1 text-xs text-content-secondary">
             Verifica gli esiti Nostr e aggiungi al portafoglio le licenze già
@@ -960,7 +927,9 @@ export function Component() {
                 Analizzatore EULA
               </h2>
               <p className="text-xs text-content-secondary">
-                Analizza i termini e pubblica la licenza come RGB UDA.
+                {isTestModeEnabled
+                  ? 'Analizza i termini e crea una licenza simulata acquistabile con demo-USDT.'
+                  : 'Analizza i termini e pubblica la licenza come RGB UDA.'}
               </p>
             </div>
             <button
@@ -972,7 +941,10 @@ export function Component() {
               <X className="h-5 w-5" />
             </button>
           </div>
-          <EulaAnalyzerTab onPublished={() => setShowEulaAnalyzer(false)} />
+          <EulaAnalyzerTab
+            demoModeEnabled={isTestModeEnabled}
+            onPublished={() => setShowEulaAnalyzer(false)}
+          />
         </section>
       ) : activeTab === 'licenses' ? (
         <div className="space-y-4">
@@ -1013,7 +985,12 @@ export function Component() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-content-secondary">Prezzo</span>
                       <span className="font-bold text-content-primary">
-                        {listing.price.toLocaleString()} sats
+                        {listing.price.toLocaleString(undefined, {
+                          maximumFractionDigits: 2,
+                        })}{' '}
+                        {listing.paymentAsset === 'demo-USDT'
+                          ? 'demo-USDT'
+                          : 'sats'}
                       </span>
                     </div>
                     <p className="text-[11px] font-mono text-content-tertiary truncate">
@@ -1069,7 +1046,7 @@ export function Component() {
             <div className="p-12 text-center rounded-2xl border border-dashed border-border-default bg-surface-overlay/50">
               <Key className="w-10 h-10 text-content-tertiary mx-auto mb-3 opacity-60" />
               <h3 className="text-lg font-bold text-content-primary">
-                Nessuna licenza trovata
+                No licenses found
               </h3>
               <p className="text-sm text-content-secondary mt-1">
                 Non hai ancora acquistato licenze software o nessuna corrisponde
@@ -1162,7 +1139,9 @@ export function Component() {
 
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-green-500/10 text-green-600 border border-green-500/20 text-xs font-semibold">
                           <ShieldCheck className="w-3.5 h-3.5" />
-                          {lic.licenseStatus}
+                          {lic.licenseStatus === 'active'
+                            ? 'Active'
+                            : lic.licenseStatus}
                         </div>
                       </div>
 
@@ -1236,7 +1215,7 @@ export function Component() {
                       <div className="grid grid-cols-2 gap-2 mt-4 text-xs">
                         <div className="p-2 rounded-lg bg-surface-elevated/40 border border-border-subtle">
                           <span className="text-content-tertiary block text-[10px]">
-                            Policy Trasferimento
+                            Transfer Policy
                           </span>
                           <span className="font-semibold text-content-primary">
                             {lic.listing.transferPolicy === 'transferable_free'
@@ -1246,7 +1225,7 @@ export function Component() {
                         </div>
                         <div className="p-2 rounded-lg bg-surface-elevated/40 border border-border-subtle">
                           <span className="text-content-tertiary block text-[10px]">
-                            Trasferimenti
+                            Transfers
                           </span>
                           <span className="font-semibold text-content-primary">
                             {lic.transferCount} volte
@@ -1320,7 +1299,7 @@ export function Component() {
                     <th className="p-3.5 font-semibold">Ordine ID</th>
                     <th className="p-3.5 font-semibold">Software / Licenza</th>
                     <th className="p-3.5 font-semibold">Tipo</th>
-                    <th className="p-3.5 font-semibold">Prezzo (sats)</th>
+                    <th className="p-3.5 font-semibold">Prezzo</th>
                     <th className="p-3.5 font-semibold">Stato Ordine</th>
                     <th className="p-3.5 font-semibold">Data</th>
                   </tr>
@@ -1343,7 +1322,12 @@ export function Component() {
                         </span>
                       </td>
                       <td className="p-3.5 font-bold text-content-primary">
-                        {order.price.toLocaleString()} sats
+                        {order.price.toLocaleString(undefined, {
+                          maximumFractionDigits: 2,
+                        })}{' '}
+                        {order.listing.paymentAsset === 'demo-USDT'
+                          ? 'demo-USDT'
+                          : 'sats'}
                       </td>
                       <td className="p-3.5">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 text-[11px] font-semibold">
@@ -1360,6 +1344,167 @@ export function Component() {
               </table>
             </div>
           </div>
+        </div>
+      )}
+      {selectedLicense && (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={() => setSellingLicenseId(null)}
+          role="dialog"
+        >
+          <section
+            className="w-full max-w-md rounded-2xl border border-border-default bg-surface-overlay p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-content-primary">
+                  Metti in vendita la licenza
+                </h2>
+                <p className="mt-1 text-sm text-content-secondary">
+                  {selectedLicense.listing.productName} · usata.{' '}
+                  {selectedLicense.listing.rgbAsset?.mode === 'demo'
+                    ? 'Verrà pubblicata un’offerta di scambio simulata sui relay Nostr.'
+                    : 'Verrà creato uno swap atomico RGB-USDT dal nodo.'}
+                </p>
+              </div>
+              <Tag className="h-5 w-5 shrink-0 text-primary" />
+            </div>
+            <label className="mt-5 block text-sm font-medium text-content-primary">
+              Prezzo di rivendita (USDT)
+              <input
+                autoFocus
+                className="mt-2 w-full rounded-xl border border-border-default bg-surface-elevated px-3 py-2.5 text-content-primary outline-none focus:border-primary"
+                min="0.01"
+                onChange={(event) => setResalePrice(event.target.value)}
+                placeholder="es. 65"
+                step="0.01"
+                type="number"
+                value={resalePrice}
+              />
+            </label>
+            {sellMessage && (
+              <p
+                aria-live="polite"
+                className={`mt-3 text-sm ${
+                  sellMessage.startsWith('Offerta pubblicata')
+                    ? 'text-emerald-400'
+                    : 'text-rose-400'
+                }`}
+              >
+                {sellMessage}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                className="rounded-xl border border-border-default px-4 py-2 text-sm text-content-secondary hover:text-content-primary"
+                disabled={isPublishingOffer}
+                onClick={() => setSellingLicenseId(null)}
+                type="button"
+              >
+                Chiudi
+              </button>
+              <button
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                disabled={
+                  isPublishingOffer ||
+                  sellMessage?.startsWith('Offerta pubblicata')
+                }
+                onClick={() => void submitResaleOffer()}
+                type="button"
+              >
+                {isPublishingOffer ? 'Pubblicazione…' : 'Pubblica offerta'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {contractListing?.rgbAsset && (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={() => setContractListing(null)}
+          role="dialog"
+        >
+          <section
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border-default bg-surface-overlay shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="sticky top-0 flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-overlay p-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                  Contratto RGB UDA
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-content-primary">
+                  {contractListing.productName} · {contractListing.edition}
+                </h2>
+              </div>
+              <button
+                aria-label="Chiudi contratto"
+                className="rounded-lg p-2 text-content-secondary hover:bg-surface-elevated hover:text-content-primary"
+                onClick={() => setContractListing(null)}
+                type="button"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+            <div className="space-y-4 p-5">
+              <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-lg bg-surface-elevated p-3">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Contract / Asset ID
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.contractId}
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Schema e stato
+                  </dt>
+                  <dd className="mt-1 text-sm font-semibold text-content-primary">
+                    {contractListing.rgbAsset.schema} · In vendita
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
+                  <dt className="text-[11px] text-content-tertiary">
+                    SHA-256 dei termini EULA
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.metadataHash}
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Chiave pubblica issuer
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.issuerPubkey ?? 'Non disponibile'}
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Firma issuer
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.issuerSignature ??
+                      'Non disponibile'}
+                  </dd>
+                </div>
+              </dl>
+              <div>
+                <h3 className="mb-2 text-sm font-bold text-content-primary">
+                  Metadati inclusi nel contratto
+                </h3>
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border-subtle bg-surface-elevated p-4 text-[11px] leading-relaxed text-content-secondary">
+                  {formatContractDetails(
+                    contractListing.rgbAsset.contractDetails
+                  )}
+                </pre>
+              </div>
+            </div>
+          </section>
         </div>
       )}
     </div>

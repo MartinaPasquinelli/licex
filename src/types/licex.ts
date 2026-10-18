@@ -45,6 +45,7 @@ export type LicenseType =
 
 export interface LicenseListing {
   id: string
+  publisherNpub?: string
   companyId: string
   company: Company
   productName: string

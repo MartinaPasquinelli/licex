@@ -165,7 +165,7 @@ export const AssetRow: React.FC<AssetRowProps> = ({
                   ),
               },
               {
-                color: 'text-violet-400 hover:bg-violet-500/15',
+                color: 'text-status-danger hover:bg-status-danger/15',
                 icon: <Upload className="w-3.5 h-3.5" />,
                 label: 'Withdraw',
                 onClick: () =>

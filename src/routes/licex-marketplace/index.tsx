@@ -15,6 +15,8 @@ import {
   Package,
   X,
   RefreshCw,
+  Building2,
+  UserRound,
 } from 'lucide-react'
 
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
@@ -54,6 +56,13 @@ function formatSats(sats: number): string {
   return `${sats.toLocaleString()} sats`
 }
 
+function formatListingPrice(listing: LicenseListing): string {
+  if (listing.rgbAsset?.mode === 'demo') {
+    return `${listing.price.toLocaleString(undefined, { maximumFractionDigits: 2 })} demo-USDT`
+  }
+  return formatSats(listing.price)
+}
+
 function transferPolicyLabel(policy: TransferPolicy): string {
   switch (policy) {
     case 'not_transferable':
@@ -74,6 +83,16 @@ function transferPolicyColor(policy: TransferPolicy): string {
     case 'transferable_free':
       return 'text-green-400 bg-green-400/10'
   }
+}
+
+function SellerBadge({ privateSeller = false }: { privateSeller?: boolean }) {
+  const Icon = privateSeller ? UserRound : Building2
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800/70 dark:text-slate-200">
+      <Icon className="h-3 w-3" />
+      {privateSeller ? 'Private seller' : 'Company seller'}
+    </span>
+  )
 }
 
 import {
@@ -146,6 +165,11 @@ const LicenseCard: React.FC<{
           <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-surface-base/90 backdrop-blur-sm text-content-primary border border-divider/40 shadow-sm flex items-center gap-1.5">
             {categoryIcon(listing.category)} {listing.category}
           </span>
+          {listing.rgbAsset?.mode === 'demo' && (
+            <span className="rounded-full border border-violet-400/40 bg-violet-950/80 px-2.5 py-1 text-xs font-semibold text-violet-200">
+              Demo
+            </span>
+          )}
         </div>
 
         {/* Watchlist heart */}
@@ -180,6 +204,7 @@ const LicenseCard: React.FC<{
           {listing.company.companyStatus === 'verified' && (
             <Shield className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
           )}
+          <SellerBadge />
           {listing.status === 'published' &&
             listing.rgbAsset?.mode === 'rgb-node' && (
               <span className="ml-auto rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
@@ -242,7 +267,7 @@ const LicenseCard: React.FC<{
         <div className="flex items-center justify-between">
           <div>
             <p className="text-lg font-bold text-[rgb(var(--app-content-primary))]">
-              {formatSats(listing.price)}
+              {formatListingPrice(listing)}
             </p>
             {listing.durationDays && (
               <p className="text-[10px] text-[rgb(var(--app-content-secondary))]">
@@ -277,7 +302,7 @@ const LicenseRow: React.FC<{
 }> = ({ listing, isWatchlisted, onView, onToggleWatchlist }) => {
   return (
     <div
-      className="group relative rounded-2xl overflow-hidden
+      className="group relative flex flex-col gap-4 rounded-2xl overflow-hidden p-4 sm:flex-row sm:items-center
   !transform-none !scale-100 !transition-none
   bg-gradient-to-br from-[rgb(var(--app-surface-secondary))] to-[rgb(var(--app-surface-primary))]
   border border-[rgb(var(--app-border-primary))]/30
@@ -286,7 +311,7 @@ const LicenseRow: React.FC<{
     >
       {/* Icon */}
       <div
-        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0
+        className="w-12 h-12 rounded-xl flex items-center justify-center text-content-primary flex-shrink-0
         bg-gradient-to-br from-purple-500/10 to-cyan-500/10 border border-purple-500/20"
       >
         {categoryIcon(listing.category)}
@@ -301,14 +326,15 @@ const LicenseRow: React.FC<{
           {listing.company.companyStatus === 'verified' && (
             <Shield className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
           )}
+          <SellerBadge />
           <span className="text-xs text-[rgb(var(--app-content-secondary))]">
             by {listing.company.name}
           </span>
         </div>
-        <p className="text-xs text-[rgb(var(--app-content-secondary))] truncate mt-0.5">
-          {listing.productDescription}
+        <p className="text-xs text-[rgb(var(--app-content-secondary))] line-clamp-2 mt-0.5">
+          {cleanMarkdownForPreview(listing.productDescription)}
         </p>
-        <div className="flex items-center gap-3 mt-1.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1.5">
           <span className="text-[10px] px-2 py-0.5 rounded bg-[rgb(var(--app-surface-primary))] text-[rgb(var(--app-content-secondary))]">
             {listing.edition} · v{listing.version}
           </span>
@@ -332,9 +358,9 @@ const LicenseRow: React.FC<{
       </div>
 
       {/* Price */}
-      <div className="text-right flex-shrink-0">
+      <div className="text-left sm:text-right flex-shrink-0 sm:w-28">
         <p className="text-base font-bold text-[rgb(var(--app-content-primary))]">
-          {formatSats(listing.price)}
+          {formatListingPrice(listing)}
         </p>
         {listing.durationDays && (
           <p className="text-[10px] text-[rgb(var(--app-content-secondary))]">
@@ -344,7 +370,7 @@ const LicenseRow: React.FC<{
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
         <button
           className={`p-2 rounded-lg transition-all ${
             isWatchlisted
@@ -362,7 +388,7 @@ const LicenseRow: React.FC<{
           />
         </button>
         <button
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
             bg-[#9B5094]/15 text-[#9B5094] dark:bg-purple-500/20 dark:text-purple-300 hover:bg-[#9B5094]/25 border border-[#9B5094]/30 dark:border-purple-500/30
             transition-all duration-200"
           onClick={(e) => {
@@ -371,6 +397,7 @@ const LicenseRow: React.FC<{
           }}
         >
           <Eye className="w-3.5 h-3.5" />
+          <span>Details</span>
         </button>
       </div>
     </div>
@@ -521,6 +548,9 @@ export function Component() {
   const { filteredListings, filters, viewMode, watchlist } = useAppSelector(
     (s) => s.licex
   )
+  const marketplaceListings = filteredListings.filter(
+    (listing) => listing.rgbAsset?.mode !== 'demo' || isP2PSimulationEnabled()
+  )
   const resaleOffers = useAppSelector((s) =>
     s.licex.p2pOffers.filter((offer) => offer.status === 'active')
   )
@@ -602,10 +632,10 @@ export function Component() {
               }`}
             >
               {relaySyncStatus === 'loading'
-                ? 'Relay: sincronizzazione…'
+                ? 'Relay: syncing…'
                 : relaySyncStatus === 'error'
-                  ? 'Relay: non raggiungibili'
-                  : `Relay: ${relayListingCount} inserzioni`}
+                  ? 'Relay: unreachable'
+                  : `Relay: ${relayListingCount} listings`}
             </div>
             <button
               aria-label="Sincronizza marketplace dai relay"
@@ -620,8 +650,8 @@ export function Component() {
               />
             </button>
             <span className="text-xs text-[rgb(var(--app-content-secondary))] bg-[rgb(var(--app-surface-secondary))] px-3 py-1.5 rounded-full">
-              {filteredListings.length} license
-              {filteredListings.length !== 1 ? 's' : ''}
+              {marketplaceListings.length} license
+              {marketplaceListings.length !== 1 ? 's' : ''}
             </span>
           </div>
         </div>
@@ -704,7 +734,7 @@ export function Component() {
 
       {/* Listings grid/list */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
-        {filteredListings.length === 0 ? (
+        {marketplaceListings.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center animate-fadeIn">
             <Package className="w-16 h-16 text-[rgb(var(--app-content-secondary))]/30 mb-4" />
             <h3 className="text-lg font-semibold text-[rgb(var(--app-content-primary))] mb-1">
@@ -722,7 +752,7 @@ export function Component() {
           </div>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredListings.map((listing) => (
+            {marketplaceListings.map((listing) => (
               <LicenseCard
                 isWatchlisted={isWatchlisted(listing.id)}
                 key={listing.id}
@@ -736,7 +766,7 @@ export function Component() {
           </div>
         ) : (
           <div className="space-y-2 animate-fadeIn">
-            {filteredListings.map((listing) => (
+            {marketplaceListings.map((listing) => (
               <LicenseRow
                 isWatchlisted={isWatchlisted(listing.id)}
                 key={listing.id}
@@ -760,10 +790,10 @@ export function Component() {
                 className="text-lg font-bold text-[rgb(var(--app-content-primary))]"
                 id="resale-offers-heading"
               >
-                Licenze usate in vendita
+                Used Licenses for Sale
               </h2>
               <p className="text-xs text-[rgb(var(--app-content-secondary))] mt-1">
-                Offerte pubblicate dai proprietari tramite Nostr Relay.
+                Offers published by owners through Nostr relays.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -901,8 +931,9 @@ const ResaleOfferCard: React.FC<{ offer: NostrLicenseOffer }> = ({ offer }) => {
   return (
     <article className="rounded-2xl border border-amber-400/20 bg-gradient-to-br from-[rgb(var(--app-surface-secondary))] to-[rgb(var(--app-surface-primary))] p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
+        <SellerBadge privateSeller />
         <span className="text-[10px] uppercase tracking-wide font-semibold rounded-full px-2 py-1 bg-amber-400/10 text-amber-300 border border-amber-400/20">
-          Usata · rivendita P2P
+          Used · P2P resale
         </span>
         <span className="text-sm font-bold text-[rgb(var(--app-content-primary))]">
           {offer.resalePriceUsdt.toLocaleString(undefined, {
@@ -913,12 +944,12 @@ const ResaleOfferCard: React.FC<{ offer: NostrLicenseOffer }> = ({ offer }) => {
       </div>
       {isSimulationOffer && (
         <span className="inline-flex rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-violet-300">
-          Simulazione · nessun trasferimento RGB reale
+          Simulation · no real RGB transfer
         </span>
       )}
       {isSimulationOffer && !simulationEnabled && (
         <p className="text-xs text-violet-200">
-          Per acquistare, attiva prima il portafoglio test in “Le Mie Licenze”.
+          To purchase, first enable the test wallet in “My Licenses”.
         </p>
       )}
       <div>
@@ -930,8 +961,8 @@ const ResaleOfferCard: React.FC<{ offer: NostrLicenseOffer }> = ({ offer }) => {
         </p>
       </div>
       <div className="border-t border-[rgb(var(--app-border-primary))]/20 pt-2 flex items-center justify-between text-xs text-[rgb(var(--app-content-secondary))]">
-        <span>Venditore: {offer.sellerName}</span>
-        <span>{offer.transferCount} trasferimenti</span>
+        <span>Seller: {offer.sellerName}</span>
+        <span>{offer.transferCount} transfers</span>
       </div>
       <button
         className="w-full rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
@@ -944,12 +975,12 @@ const ResaleOfferCard: React.FC<{ offer: NostrLicenseOffer }> = ({ offer }) => {
         type="button"
       >
         {isBuying
-          ? 'Autorizzazione swap…'
+          ? 'Authorizing swap…'
           : isSimulationOffer
             ? simulationEnabled
-              ? 'Acquista in simulazione'
-              : 'Portafoglio test non attivo'
-            : 'Acquista con swap atomico'}
+              ? 'Purchase in simulation'
+              : 'Test wallet inactive'
+            : 'Purchase with atomic swap'}
       </button>
       {purchaseMessage && (
         <p className="text-xs text-[rgb(var(--app-content-secondary))]">

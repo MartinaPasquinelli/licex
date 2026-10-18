@@ -446,7 +446,7 @@ export function Component() {
                         ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                         : item.status === 'fulfilled'
                           ? 'bg-[#8FB8DE]/15 text-[#CDF7F6] border border-[#8FB8DE]/30'
-                          : 'wishlist-open-request bg-[#9B5094]/15 text-[#CDF7F6] border border-[#9B5094]/30'
+                          : 'wishlist-open-request bg-[#14532d] text-[#dcfce7] border border-[#166534] dark:bg-[#14532d] dark:text-[#dcfce7] dark:border-[#166534]'
                     }`}
                   >
                     {item.status === 'matched'

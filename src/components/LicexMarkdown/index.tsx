@@ -57,7 +57,7 @@ export const licexMarkdownComponents: Components = {
     <p className="mb-2.5 leading-relaxed text-slate-300 last:mb-0" {...p} />
   ),
   strong: ({ node: _node, ...p }) => (
-    <strong className="font-semibold text-white" {...p} />
+    <strong className="font-semibold" {...p} />
   ),
   ul: ({ node: _node, ...p }) => (
     <ul

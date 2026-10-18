@@ -255,14 +255,17 @@ pub async fn fetch(account_id: i32) -> Result<Vec<MarketplaceRelayEvent>, String
         .filter_map(|event| {
             let payload: Value = serde_json::from_str(&event.content).ok()?;
             let expected_identifier = event_identifier_from_payload(&payload).ok()?;
-            (event.tags.identifier() == Some(expected_identifier.as_str())).then(|| {
-                MarketplaceRelayEvent {
+            let publisher_pubkey = event.pubkey.to_bech32().ok()?;
+            if event.tags.identifier() == Some(expected_identifier.as_str()) {
+                Some(MarketplaceRelayEvent {
                     event_id: event.id.to_hex(),
-                    publisher_pubkey: event.pubkey.to_hex(),
+                    publisher_pubkey,
                     created_at: event.created_at.as_secs(),
                     payload,
-                }
-            })
+                })
+            } else {
+                None
+            }
         })
         .collect())
 }

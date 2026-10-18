@@ -117,14 +117,29 @@ export async function fetchMarketplaceSnapshot(): Promise<{
 
   const events = await fetchMarketplaceEvents()
   const listings = events
-    .map((event) => event.payload)
+    .map((event) => ({ event, payload: event.payload }))
     .filter(
-      (payload): payload is NostrMarketplaceListingPayload =>
-        payload?.schema === 'licex-marketplace-listing' &&
-        payload.version === 1 &&
-        (payload.status === 'published' || payload.status === 'withdrawn') &&
-        typeof payload.listing?.id === 'string'
+      (
+        item
+      ): item is {
+        event: MarketplaceRelayEvent
+        payload: NostrMarketplaceListingPayload
+      } =>
+        item.payload?.schema === 'licex-marketplace-listing' &&
+        item.payload.version === 1 &&
+        (item.payload.status === 'published' ||
+          item.payload.status === 'withdrawn') &&
+        (item.payload.listing?.rgbAsset?.mode !== 'demo' ||
+          isP2PSimulationEnabled()) &&
+        typeof item.payload.listing?.id === 'string'
     )
+    .map(({ event, payload }) => ({
+      ...payload,
+      listing: {
+        ...payload.listing,
+        publisherNpub: event.publisherPubkey,
+      },
+    }))
   const offers = events.flatMap((event) => {
     const payload = event.payload
     if (

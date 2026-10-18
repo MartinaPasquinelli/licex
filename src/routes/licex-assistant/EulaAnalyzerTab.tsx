@@ -24,6 +24,7 @@ import {
 
 import { useAppDispatch } from '../../app/store/hooks'
 import { mintLicenseListing } from '../../slices/licex/licex.slice'
+import { getMarketplaceIdentity } from '../../services/licexNostrMarketplace'
 import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { QvacEulaAnalyzer } from '../../services/qvac/eula-analyzer'
 import {
@@ -43,12 +44,14 @@ import { isUsableQvacStatus } from '../../services/qvac/licex-assistant'
 import { getRecommendedModelId } from '../kaleido-mind/modelCatalog'
 import {
   createIssuanceInputFromEula,
+  issueDemoLicenseAsset,
   issueLicenseRgbAsset,
 } from '../../services/licex/licenseAssetIssuer'
 import type { IssuedLicenseAsset } from '../../services/licex/licenseAssetIssuer'
 import { toast } from 'react-toastify'
 
 interface EulaAnalyzerTabProps {
+  demoModeEnabled?: boolean
   onPublished?: () => void
 }
 
@@ -77,7 +80,10 @@ const getNodeErrorMessage = (error: unknown): string => {
 const isMissingUncoloredUtxo = (error: unknown): boolean =>
   getNodeErrorMessage(error).toLowerCase().includes('no uncolored utxos')
 
-export function EulaAnalyzerTab({ onPublished }: EulaAnalyzerTabProps) {
+export function EulaAnalyzerTab({
+  demoModeEnabled = false,
+  onPublished,
+}: EulaAnalyzerTabProps) {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const mind = useMind()
@@ -98,6 +104,7 @@ export function EulaAnalyzerTab({ onPublished }: EulaAnalyzerTabProps) {
   const [publishedSuccess, setPublishedSuccess] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
+  const [demoPrice, setDemoPrice] = useState('49.99')
   const [showContract, setShowContract] = useState(false)
   const [expandedSampleIds, setExpandedSampleIds] = useState<Set<string>>(
     new Set()
@@ -213,54 +220,65 @@ export function EulaAnalyzerTab({ onPublished }: EulaAnalyzerTabProps) {
     setIsPublishing(true)
     setPublishError(null)
     try {
-      const network = await getNetworkInfo().unwrap()
-      if (network.network === 'Mainnet') {
-        throw new Error(
-          'Pubblicazione dei termini EULA bloccata su Mainnet. Collega il nodo a Mutinynet o Regtest.'
-        )
-      }
-
-      const issuer = await getNodeInfo().unwrap()
       const requestId = crypto.randomUUID()
       const { extracted, suggestedListing } = analysisResult
       const issuanceInput = createIssuanceInputFromEula(
         analysisResult,
         requestId
       )
-      const issue = () =>
-        issueLicenseRgbAsset(
-          issuanceInput,
-          (request) => issueUda(request).unwrap(),
-          async (message) =>
-            (await signMessage({ message }).unwrap()).signed_message,
-          issuer.pubkey
-        )
-
       let issuedAsset: IssuedLicenseAsset
-      try {
-        issuedAsset = await issue()
-      } catch (error) {
-        if (!isMissingUncoloredUtxo(error)) throw error
-        toast.info('Preparo un UTXO Bitcoin per l’emissione UDA…')
-        await createUtxos({
-          fee_rate: 2,
-          num: 1,
-          size: 32500,
-          up_to: false,
-        }).unwrap()
-        issuedAsset = await issue()
-      }
+      let price: number
 
-      const suggestedPrice = Number(suggestedListing.price)
-      const price =
-        suggestedPrice > 0
-          ? suggestedPrice
-          : extracted.licenseType === 'perpetual'
-            ? 45000
-            : 15000
+      if (demoModeEnabled) {
+        price = Number(demoPrice)
+        if (!Number.isFinite(price) || price <= 0) {
+          throw new Error('Inserisci un prezzo demo USDT maggiore di zero.')
+        }
+        issuedAsset = await issueDemoLicenseAsset(issuanceInput)
+      } else {
+        const network = await getNetworkInfo().unwrap()
+        if (network.network === 'Mainnet') {
+          throw new Error(
+            'Pubblicazione dei termini EULA bloccata su Mainnet. Collega il nodo a Mutinynet o Regtest.'
+          )
+        }
+
+        const issuer = await getNodeInfo().unwrap()
+        const issue = () =>
+          issueLicenseRgbAsset(
+            issuanceInput,
+            (request) => issueUda(request).unwrap(),
+            async (message) =>
+              (await signMessage({ message }).unwrap()).signed_message,
+            issuer.pubkey
+          )
+
+        try {
+          issuedAsset = await issue()
+        } catch (error) {
+          if (!isMissingUncoloredUtxo(error)) throw error
+          toast.info('Preparo un UTXO Bitcoin per l’emissione UDA…')
+          await createUtxos({
+            fee_rate: 2,
+            num: 1,
+            size: 32500,
+            up_to: false,
+          }).unwrap()
+          issuedAsset = await issue()
+        }
+
+        const suggestedPrice = Number(suggestedListing.price)
+        price =
+          suggestedPrice > 0
+            ? suggestedPrice
+            : extracted.licenseType === 'perpetual'
+              ? 45000
+              : 15000
+      }
       const productSlug =
         extracted.productName.toLowerCase().replace(/[^a-z0-9]/g, '') ||
         'unverified-publisher'
+      const publisherNpub = await getMarketplaceIdentity().catch(() => null)
 
       dispatch(
         mintLicenseListing({
@@ -271,10 +289,12 @@ export function EulaAnalyzerTab({ onPublished }: EulaAnalyzerTabProps) {
           },
           edition: issuanceInput.edition,
           id: `lic-${requestId}`,
+          ...(publisherNpub ? { publisherNpub } : {}),
           listingDetails: {
             category: suggestedListing.category || 'Software & Tools',
             durationDays: extracted.durationDays,
             licenseType: extracted.licenseType,
+            ...(demoModeEnabled ? { paymentAsset: 'demo-USDT' } : {}),
             platforms: [...extracted.platforms],
             productDescription: analysisResult.executiveSummary,
             tags: suggestedListing.tags || [
@@ -292,7 +312,11 @@ export function EulaAnalyzerTab({ onPublished }: EulaAnalyzerTabProps) {
         })
       )
 
-      toast.success(`UDA emessa e inserzione pubblicata su ${network.network}.`)
+      toast.success(
+        demoModeEnabled
+          ? 'Licenza demo pubblicata. Puoi acquistarla con demo-USDT.'
+          : 'UDA emessa e inserzione pubblicata sul network del nodo.'
+      )
       setPublishedSuccess(true)
       onPublished?.()
     } catch (error) {
@@ -812,6 +836,26 @@ export function EulaAnalyzerTab({ onPublished }: EulaAnalyzerTabProps) {
 
               {/* Action Bar (Export JSON and save a non-published draft) */}
               <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                {demoModeEnabled && (
+                  <div className="w-full rounded-lg border border-violet-400/30 bg-violet-500/10 p-3 text-xs text-violet-100">
+                    <label className="flex flex-wrap items-center gap-2 font-semibold">
+                      Prezzo demo (USDT)
+                      <input
+                        className="w-28 rounded-md border border-violet-300/30 bg-slate-950 px-2 py-1 text-white"
+                        min="0.01"
+                        onChange={(event) => setDemoPrice(event.target.value)}
+                        step="0.01"
+                        type="number"
+                        value={demoPrice}
+                      />
+                    </label>
+                    <p className="mt-2 text-[11px] text-violet-100/80">
+                      Crea un asset locale simulato senza usare il nodo. Poi
+                      puoi acquistare l’inserzione dal Marketplace con il saldo
+                      demo-USDT.
+                    </p>
+                  </div>
+                )}
                 {publishError && (
                   <div
                     className="w-full rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200"
@@ -851,7 +895,9 @@ export function EulaAnalyzerTab({ onPublished }: EulaAnalyzerTabProps) {
                   {isPublishing ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      Firma, crea UDA e pubblica…
+                      {demoModeEnabled
+                        ? 'Crea licenza demo e pubblica…'
+                        : 'Firma, crea UDA e pubblica…'}
                     </>
                   ) : publishedSuccess ? (
                     <>

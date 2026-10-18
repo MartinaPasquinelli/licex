@@ -279,7 +279,15 @@ const DropdownMenu = ({
                 <div className="text-primary transition-transform duration-200 group-hover:scale-110">
                   {item.icon}
                 </div>
-                <span className="text-sm font-medium group-hover:text-content-primary">
+                <span
+                  className={`text-sm font-medium group-hover:text-content-primary ${
+                    item.action === 'deposit'
+                      ? 'text-status-success'
+                      : item.action === 'withdraw'
+                        ? 'text-status-danger'
+                        : ''
+                  }`}
+                >
                   {item.label}
                 </span>
               </div>
@@ -457,13 +465,13 @@ const UserProfile = ({
                           transition-all duration-200 group"
                 onClick={() => {
                   setIsOpen(false)
-                  navigate(ROOT_PATH)
+                  navigate(WALLET_SETUP_PATH)
                 }}
               >
                 <div className="text-primary transition-transform duration-200 group-hover:scale-110">
                   <Activity className="w-4 h-4" />
                 </div>
-                <span className="text-sm font-medium group-hover:text-white">
+                <span className="text-sm font-medium text-content-primary group-hover:text-primary">
                   {t('userProfile.connectNode', {
                     defaultValue: 'Connect a node',
                   })}
@@ -494,7 +502,7 @@ const UserProfile = ({
                     <RefreshCw className="w-4 h-4" />
                   )}
                 </div>
-                <span className="text-sm font-medium group-hover:text-white">
+                <span className="text-sm font-medium text-content-primary group-hover:text-primary">
                   {isReconnecting
                     ? t('userProfile.reconnecting', {
                         defaultValue: 'Reconnecting…',
@@ -1176,8 +1184,8 @@ export const Layout = (props: Props) => {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     className="flex items-center justify-center gap-2 py-3 px-3 rounded-lg
-                               bg-[#8FB8DE]/25 hover:bg-[#8FB8DE]/35
-                               border border-[#8FB8DE]/50 text-[#6A605C] dark:text-[#CDF7F6]
+                               bg-status-success/15 hover:bg-status-success/25
+                               border border-status-success/30 hover:border-status-success/50 text-status-success
                                font-bold text-sm transition-all duration-200
                                transform hover:scale-[1.02] active:scale-[0.98]"
                     onClick={() => handleTransactionAction('deposit')}
@@ -1187,8 +1195,8 @@ export const Layout = (props: Props) => {
                   </button>
                   <button
                     className="flex items-center justify-center gap-2 py-3 px-3 rounded-lg
-                               bg-[#9B5094]/25 hover:bg-[#9B5094]/35
-                               border border-[#9B5094]/50 text-[#6A605C] dark:text-[#CDF7F6]
+                               bg-status-danger/15 hover:bg-status-danger/25
+                               border border-status-danger/30 hover:border-status-danger/50 text-status-danger
                                font-bold text-sm transition-all duration-200
                                transform hover:scale-[1.02] active:scale-[0.98]"
                     onClick={() => handleTransactionAction('withdraw')}
