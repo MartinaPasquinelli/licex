@@ -163,6 +163,12 @@ const LicenseCard: React.FC<{
           {listing.company.companyStatus === 'verified' && (
             <Shield className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
           )}
+          {listing.status === 'published' &&
+            listing.rgbAsset?.mode === 'rgb-node' && (
+              <span className="ml-auto rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                In vendita
+              </span>
+            )}
         </div>
 
         {/* Product name */}
@@ -289,6 +295,12 @@ const LicenseRow: React.FC<{
           <span className="text-[10px] px-2 py-0.5 rounded bg-[rgb(var(--app-surface-primary))] text-[rgb(var(--app-content-secondary))]">
             {listing.edition} · v{listing.version}
           </span>
+          {listing.status === 'published' &&
+            listing.rgbAsset?.mode === 'rgb-node' && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 font-semibold text-emerald-600 dark:text-emerald-400">
+                In vendita
+              </span>
+            )}
           <span
             className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${transferPolicyColor(listing.transferPolicy)}`}
           >

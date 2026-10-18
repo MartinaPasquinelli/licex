@@ -24,6 +24,8 @@ import type {
   InitRequest,
   IssueAssetNIARequest,
   IssueAssetNIAResponse,
+  IssueAssetUDARequest,
+  IssueAssetUDAResponse,
   ListAssetsResponse,
   ListChannelsResponse,
   ListPaymentsResponse,
@@ -195,6 +197,12 @@ export class NodeApiWrapper {
     request: IssueAssetNIARequest
   ): Promise<ApiResult<IssueAssetNIAResponse>> {
     return this.execute(() => this.client.issueAssetNIA(request))
+  }
+
+  async issueAssetUDA(
+    request: IssueAssetUDARequest
+  ): Promise<ApiResult<IssueAssetUDAResponse>> {
+    return this.execute(() => this.client.issueAssetUDA(request))
   }
 
   async sendRgb(request: SendRgbInput): Promise<ApiResult<SendRgbResponse>> {

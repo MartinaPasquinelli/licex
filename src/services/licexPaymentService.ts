@@ -13,9 +13,9 @@ import {
 
 import type {
   LicenseListing,
-  OrderType,
-  Order,
   LicenseRecord,
+  Order,
+  OrderType,
 } from '../types/licex'
 
 export type SwapStep =
@@ -56,6 +56,7 @@ export interface SwapExecutionResult {
   quote: PaymentQuote | LightningPaymentQuote
 }
 
+/** Fail closed until the caller supplies node-backed RGB payment callbacks. */
 export async function executeLicenseSwap(
   listing: LicenseListing,
   orderType: OrderType = 'primary',

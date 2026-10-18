@@ -55,7 +55,7 @@ export const UTXOManagementModal = ({
   const { t } = useTranslation()
   const dispatch = useAppDispatch()
   const [step, setStep] = useState<'list' | 'create'>('list')
-  const [isDemoMode, setIsDemoMode] = useState(true)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [demoUtxos, setDemoUtxos] = useState<DemoUtxo[]>(() => getDemoUtxos())
 
   // ── List step state ──────────────────────────────────────────────────────
