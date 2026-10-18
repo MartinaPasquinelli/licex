@@ -29,6 +29,7 @@ import {
 } from '../../slices/licex/licex.slice'
 import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import type { TransferPolicy } from '../../types/licex'
+import { LicexMarkdown } from '../../components/LicexMarkdown'
 import {
   LICEX_MARKETPLACE_PATH,
   ACCOUNT_PATH,
@@ -304,9 +305,9 @@ export function Component() {
                 </div>
 
                 {/* Description */}
-                <p className="text-sm text-[rgb(var(--app-content-secondary))] leading-relaxed">
-                  {listing.productDescription}
-                </p>
+                <div className="text-sm text-[rgb(var(--app-content-secondary))] leading-relaxed">
+                  <LicexMarkdown content={listing.productDescription} />
+                </div>
 
                 {/* Tags */}
                 <div className="flex flex-wrap gap-1.5">

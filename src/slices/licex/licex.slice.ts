@@ -17,6 +17,8 @@ import type {
   Order,
   MarketplaceFilters,
   TransferPolicy,
+  WishlistDemandGroup,
+  WishlistGroupMatch,
 } from '../../types/licex'
 import {
   MOCK_LISTINGS,
@@ -49,6 +51,17 @@ import {
   resetLocalLicexDatabase,
 } from '../../services/licex/licexStorage'
 
+function uniqueWishlistValues(values: string[]): string[] {
+  const unique = new Map<string, string>()
+  for (const value of values) {
+    const normalized = value.trim().toLocaleLowerCase()
+    if (normalized && !unique.has(normalized)) {
+      unique.set(normalized, value.trim())
+    }
+  }
+  return [...unique.values()]
+}
+
 interface LicexState {
   listings: LicenseListing[]
   filteredListings: LicenseListing[]
@@ -56,6 +69,7 @@ interface LicexState {
   watchlist: WatchlistItem[]
   priceAlerts: PriceAlert[]
   wishlist: WantedSoftwareRequest[]
+  wishlistGroups: WishlistDemandGroup[]
   chatMessages: ChatMessage[]
   chatLoading: boolean
   companyStats: CompanyDashboardStats
@@ -101,6 +115,7 @@ const initialState: LicexState = {
   viewMode: 'grid',
   watchlist: initialWatchlist,
   wishlist: initialWishlist,
+  wishlistGroups: [],
 }
 
 // Helper: apply filters and sorting to listings
@@ -173,14 +188,17 @@ export const licexSlice = createSlice({
   initialState,
   name: 'licex',
   reducers: {
-    
     addChatMessage(state, action: PayloadAction<ChatMessage>) {
       state.chatMessages.push(action.payload)
       saveLocalChatMessages(state.chatMessages)
     },
+    addListing(state, action: PayloadAction<LicenseListing>) {
+      state.listings.unshift(action.payload)
+      state.filteredListings = applyFilters(state.listings, state.filters)
+    },
 
     // ── Price Alerts ───────────────────────────────────────────────────
-addPriceAlert(
+    addPriceAlert(
       state,
       action: PayloadAction<{ listingId: string; thresholdSats: number }>
     ) {
@@ -200,7 +218,6 @@ addPriceAlert(
       }
     },
 
-    
     addToWatchlist(state, action: PayloadAction<string>) {
       const listing = state.listings.find((l) => l.id === action.payload)
       if (
@@ -217,8 +234,69 @@ addPriceAlert(
       }
     },
 
+    addWishlistGroup(
+      state,
+      action: PayloadAction<{
+        id: string
+        requestId: string
+        summary: string
+        matches: WishlistGroupMatch[]
+        source: WishlistDemandGroup['source']
+      }>
+    ) {
+      const { id, requestId, summary, matches, source } = action.payload
+      const existingIds = new Set(state.wishlist.map((request) => request.id))
+      const validMatches = matches.filter(
+        (match) =>
+          match.requestId !== requestId && existingIds.has(match.requestId)
+      )
+      if (!existingIds.has(requestId) || validMatches.length === 0) return
+
+      const requestIds = new Set([
+        requestId,
+        ...validMatches.map((match) => match.requestId),
+      ])
+      const mergedGroups = state.wishlistGroups.filter((group) =>
+        group.requestIds.some((memberId) => requestIds.has(memberId))
+      )
+      for (const group of mergedGroups) {
+        group.requestIds.forEach((memberId) => requestIds.add(memberId))
+      }
+
+      const mergedMatches = new Map<string, WishlistGroupMatch>()
+      for (const group of mergedGroups) {
+        for (const match of group.matches) {
+          mergedMatches.set(match.requestId, match)
+        }
+      }
+      for (const match of validMatches) {
+        mergedMatches.set(match.requestId, match)
+      }
+
+      const groupedRequests = state.wishlist.filter((request) =>
+        requestIds.has(request.id)
+      )
+      const createdAt = new Date().toISOString()
+      state.wishlistGroups = state.wishlistGroups.filter(
+        (group) => !mergedGroups.some((merged) => merged.id === group.id)
+      )
+      state.wishlistGroups.push({
+        combinedRequirements: uniqueWishlistValues(
+          groupedRequests.flatMap((request) => request.requirements)
+        ),
+        createdAt,
+        id,
+        matches: [...mergedMatches.values()],
+        platforms: uniqueWishlistValues(
+          groupedRequests.flatMap((request) => request.platforms)
+        ),
+        requestIds: [...requestIds],
+        source,
+        summary,
+      })
+    },
     // ── Wishlist ───────────────────────────────────────────────────────
-addWishlistItem(
+    addWishlistItem(
       state,
       action: PayloadAction<
         Omit<
@@ -229,13 +307,13 @@ addWishlistItem(
           | 'matchCount'
           | 'pledgeTotal'
           | 'status'
-        >
+        > & { id?: string }
       >
     ) {
       state.wishlist.push({
         ...action.payload,
         createdAt: new Date().toISOString(),
-        id: `wish-${Date.now()}`,
+        id: action.payload.id ?? `wish-${Date.now()}`,
         matchCount: 0,
         pledgeTotal: 0,
         status: 'submitted',
@@ -243,26 +321,19 @@ addWishlistItem(
       })
       saveLocalWishlist(state.wishlist)
     },
-
     clearChatMessages(state) {
       state.chatMessages = []
       saveLocalChatMessages(state.chatMessages)
     },
-
-    
     clearFilters(state) {
       state.filters = initialFilters
       state.filteredListings = applyFilters(state.listings, state.filters)
     },
-
-    
-completePurchase(
+    completePurchase(
       state,
       action: PayloadAction<{ order: Order; licenseRecord: LicenseRecord }>
     ) {
-      // Salva l'ordine in cima alla cronologia ordini
       state.orders.unshift(action.payload.order)
-      // Aggiunge la licenza tra quelle possedute dall'utente
       state.ownedLicenses.unshift(action.payload.licenseRecord)
       // Salva persistentemente nel database locale
       saveLocalOrders(state.orders)
@@ -270,7 +341,7 @@ completePurchase(
     },
 
     // ── Mint / Issue RGB License Listing ────────────────────────────────
-mintLicenseListing(
+    mintLicenseListing(
       state,
       action: PayloadAction<{
         id: string
@@ -304,8 +375,9 @@ mintLicenseListing(
         id: action.payload.id,
         imageUrl: '',
         licenseType: 'perpetual',
-        maxTransfers: null,
-        minHoldingDays: null,
+        maxTransfers:
+          action.payload.transferPolicy === 'not_transferable' ? 0 : 5,
+        minHoldingDays: 0,
         paymentAsset: 'RGB-USDT (demo stablecoin)',
         platforms: action.payload.platforms || ['Windows', 'macOS', 'Linux'],
         price: action.payload.price,
@@ -326,23 +398,49 @@ mintLicenseListing(
       saveLocalListings(state.listings)
       saveLocalCompanyStats(state.companyStats)
     },
-
+    recordDemoPurchase(state, action: PayloadAction<Order>) {
+      state.orders.unshift(action.payload)
+    },
     removeFromWatchlist(state, action: PayloadAction<string>) {
       state.watchlist = state.watchlist.filter(
-        (w) => w.listingId !== action.payload
+        (item) => item.listingId !== action.payload
       )
       saveLocalWatchlist(state.watchlist)
     },
-
     removePriceAlert(state, action: PayloadAction<string>) {
       state.priceAlerts = state.priceAlerts.filter(
-        (a) => a.id !== action.payload
+        (alert) => alert.id !== action.payload
       )
       saveLocalPriceAlerts(state.priceAlerts)
     },
-
     removeWishlistItem(state, action: PayloadAction<string>) {
-      state.wishlist = state.wishlist.filter((w) => w.id !== action.payload)
+      state.wishlist = state.wishlist.filter(
+        (request) => request.id !== action.payload
+      )
+      state.wishlistGroups = state.wishlistGroups.flatMap((group) => {
+        const requestIds = group.requestIds.filter(
+          (requestId) => requestId !== action.payload
+        )
+        if (requestIds.length <= 1) return []
+        const groupedRequests = state.wishlist.filter((request) =>
+          requestIds.includes(request.id)
+        )
+        return [
+          {
+            ...group,
+            combinedRequirements: uniqueWishlistValues(
+              groupedRequests.flatMap((request) => request.requirements)
+            ),
+            matches: group.matches.filter(
+              (match) => match.requestId !== action.payload
+            ),
+            platforms: uniqueWishlistValues(
+              groupedRequests.flatMap((request) => request.platforms)
+            ),
+            requestIds,
+          },
+        ]
+      })
       saveLocalWishlist(state.wishlist)
     },
 
@@ -354,34 +452,32 @@ mintLicenseListing(
       state.watchlist = MOCK_WATCHLIST
       state.priceAlerts = MOCK_PRICE_ALERTS
       state.wishlist = MOCK_WISHLIST
+      state.wishlistGroups = []
       state.companyStats = MOCK_COMPANY_STATS
       state.chatMessages = MOCK_CHAT_MESSAGES
       state.listings = MOCK_LISTINGS
       state.filteredListings = applyFilters(MOCK_LISTINGS, state.filters)
     },
-
     selectListing(state, action: PayloadAction<string | null>) {
       state.selectedListing = action.payload
-        ? state.listings.find((l) => l.id === action.payload) || null
+        ? (state.listings.find((listing) => listing.id === action.payload) ??
+          null)
         : null
     },
-
     setChatLoading(state, action: PayloadAction<boolean>) {
       state.chatLoading = action.payload
     },
 
     // ── Filters ────────────────────────────────────────────────────────
-setFilters(state, action: PayloadAction<Partial<MarketplaceFilters>>) {
+    setFilters(state, action: PayloadAction<Partial<MarketplaceFilters>>) {
       state.filters = { ...state.filters, ...action.payload }
       state.filteredListings = applyFilters(state.listings, state.filters)
     },
 
-    
-setOrders(state, action: PayloadAction<Order[]>) {
+    setOrders(state, action: PayloadAction<Order[]>) {
       state.orders = action.payload
     },
 
-    
     setOwnedLicenses(state, action: PayloadAction<LicenseRecord[]>) {
       state.ownedLicenses = action.payload
     },
@@ -404,25 +500,28 @@ setOrders(state, action: PayloadAction<Order[]>) {
 })
 
 export const {
-  setFilters,
-  clearFilters,
-  setViewMode,
-  selectListing,
-  addToWatchlist,
-  removeFromWatchlist,
+  addChatMessage,
+  addListing,
   addPriceAlert,
-  removePriceAlert,
+  addToWatchlist,
+  addWishlistGroup,
   addWishlistItem,
+  clearChatMessages,
+  clearFilters,
+  completePurchase,
+  mintLicenseListing,
+  recordDemoPurchase,
+  removeFromWatchlist,
+  removePriceAlert,
   removeWishlistItem,
+  resetDatabase,
+  selectListing,
+  setChatLoading,
+  setFilters,
+  setOrders,
+  setOwnedLicenses,
+  setPriceAlerts,
+  setViewMode,
   setWatchlist,
   setWishlist,
-  setPriceAlerts,
-  addChatMessage,
-  clearChatMessages,
-  setChatLoading,
-  completePurchase,
-  setOwnedLicenses,
-  setOrders,
-  mintLicenseListing,
-  resetDatabase,
 } = licexSlice.actions
