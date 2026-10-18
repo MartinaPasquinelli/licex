@@ -400,13 +400,13 @@ export const validateChannelParams = (
   // Validate channel capacity
   if (capacitySat < effectiveMinCapacity) {
     return {
-      error: `Channel capacity must be at least ${effectiveMinCapacity.toLocaleString()} sats`,
+      error: `Channel capacity must be at least ${effectiveMinCapacity.toLocaleString('en-US')} sats`,
       isValid: false,
     }
   }
   if (capacitySat > effectiveMaxCapacity) {
     return {
-      error: `Channel capacity cannot exceed ${effectiveMaxCapacity.toLocaleString()} sats`,
+      error: `Channel capacity cannot exceed ${effectiveMaxCapacity.toLocaleString('en-US')} sats`,
       isValid: false,
     }
   }

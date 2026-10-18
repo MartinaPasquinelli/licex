@@ -221,6 +221,38 @@ export const licexSlice = createSlice({
       state.ownedLicenses.unshift(action.payload.licenseRecord)
     },
 
+    mintLicenseListing(
+      state,
+      action: PayloadAction<{
+        edition: string
+        id: string
+        price: number
+        productName: string
+        rgbAsset: LicenseAssetReference
+        royaltyPercent: number
+        transferPolicy: TransferPolicy
+      }>
+    ) {
+      const template = MOCK_LISTINGS[0]
+      const now = new Date().toISOString()
+      const listing: LicenseListing = {
+        ...template,
+        company: template.company,
+        createdAt: now,
+        edition: action.payload.edition,
+        id: action.payload.id,
+        price: action.payload.price,
+        productName: action.payload.productName,
+        rgbAsset: action.payload.rgbAsset,
+        royaltyPercent: action.payload.royaltyPercent,
+        status: 'published',
+        transferPolicy: action.payload.transferPolicy,
+        updatedAt: now,
+      }
+      state.listings.unshift(listing)
+      state.filteredListings = applyFilters(state.listings, state.filters)
+    },
+
     removeFromWatchlist(state, action: PayloadAction<string>) {
       state.watchlist = state.watchlist.filter(
         (w) => w.listingId !== action.payload
@@ -272,4 +304,5 @@ export const {
   removeWishlistItem,
   setChatLoading,
   completePurchase,
+  mintLicenseListing,
 } = licexSlice.actions

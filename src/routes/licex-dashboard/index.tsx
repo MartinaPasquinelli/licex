@@ -16,8 +16,9 @@ import {
 import { toast } from 'react-toastify'
 
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
+import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { mintLicenseListing } from '../../slices/licex/licex.slice'
-import { issueDemoLicenseAsset } from '../../services/licex/licenseAssetIssuer'
+import { issueLicenseRgbAsset } from '../../services/licex/licenseAssetIssuer'
 
 function formatSats(sats: number): string {
   if (sats >= 1000000) return `${(sats / 1000000).toFixed(2)}M sats`
@@ -41,6 +42,7 @@ export function Component() {
   const [mintRoyalty, setMintRoyalty] = useState('5')
   const [mintNotice, setMintNotice] = useState<string | null>(null)
   const [isIssuing, setIsIssuing] = useState(false)
+  const [issueUda] = nodeApi.endpoints.issueUdaAsset.useMutation()
 
   const companyListings = listings.filter(
     (l) => l.companyId === 'comp-1' || l.companyId === 'comp-2'
@@ -54,14 +56,20 @@ export function Component() {
     const requestId = crypto.randomUUID()
     setIsIssuing(true)
     try {
-      const issuedAsset = await issueDemoLicenseAsset({
-        edition: mintEdition,
-        productName: mintName,
-        requestId,
-        royaltyPercent: royalty,
-        transferPolicy: mintTransferPolicy as any,
-        version: '2026.1',
-      })
+      const issuedAsset = await issueLicenseRgbAsset(
+        {
+          edition: mintEdition,
+          productName: mintName,
+          requestId,
+          royaltyPercent: royalty,
+          transferPolicy: mintTransferPolicy as
+            | 'transferable_free'
+            | 'transferable_with_approval'
+            | 'not_transferable',
+          version: '2026.1',
+        },
+        (request) => issueUda(request).unwrap()
+      )
 
       dispatch(
         mintLicenseListing({
@@ -75,9 +83,9 @@ export function Component() {
         })
       )
 
-      toast.success('Licenza RGB UDA demo emessa e pubblicata!')
+      toast.success('Licenza RGB UDA emessa sul nodo e pubblicata!')
       setMintNotice(
-        `✓ Licenza pubblicata solo dopo emissione asset. Asset ID: ${issuedAsset.assetId}; contratto UDA: ${issuedAsset.contractId}; hash metadati: ${issuedAsset.metadataHash.slice(0, 16)}…`
+        `✓ Licenza pubblicata dopo conferma del nodo RGB. Asset/contratto: ${issuedAsset.contractId}; hash metadati: ${issuedAsset.metadataHash.slice(0, 16)}…`
       )
       setMintName('')
       setMintEdition('')
@@ -424,7 +432,7 @@ export function Component() {
                 disabled={isIssuing}
                 type="submit"
               >
-                {isIssuing ? 'Issuing UDA…' : 'Mint & Deploy RGB UDA (Demo)'}
+                {isIssuing ? 'Issuing UDA…' : 'Mint & Deploy RGB UDA'}
               </button>
             </form>
           </div>

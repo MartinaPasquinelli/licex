@@ -3,7 +3,7 @@
 // Analyzes license terms, transferability, vendor reputation, and drafts terms.
 
 import { useState, useRef, useEffect } from 'react'
-import { Bot, Send, Sparkles, Cpu, Lightbulb } from 'lucide-react'
+import { Bot, Send, Sparkles, Lightbulb } from 'lucide-react'
 
 import { useAppSelector } from '../../app/store/hooks'
 import { MOCK_CHAT_MESSAGES } from '../../constants/licex-mock-data'

@@ -5,6 +5,7 @@ import type {
   RgbAssetStatus,
   TransferPolicy,
 } from '../../types/licex'
+import type { IssueAssetUDAResponse } from 'kaleido-sdk/rln'
 
 const ISSUANCE_STORAGE_KEY = 'licex_demo_license_issuances'
 
@@ -20,6 +21,10 @@ export interface LicenseAssetIssuanceInput {
 export interface IssuedLicenseAsset extends LicenseAssetReference {
   requestId: string
 }
+
+export type IssueRgbUda = (
+  request: Parameters<import('kaleido-sdk/rln').RlnClient['issueAssetUDA']>[0]
+) => Promise<IssueAssetUDAResponse>
 
 type IssuanceRecord = IssuedLicenseAsset
 
@@ -60,6 +65,58 @@ const validateInput = (input: LicenseAssetIssuanceInput): void => {
   if (!Number.isInteger(input.royaltyPercent) || input.royaltyPercent < 0) {
     throw new Error('Royalty percent must be a non-negative integer')
   }
+  if (input.royaltyPercent > 100) {
+    throw new Error('Royalty percent must not exceed 100')
+  }
+}
+
+const createPublicTerms = (input: LicenseAssetIssuanceInput): string =>
+  JSON.stringify({
+    edition: input.edition,
+    productName: input.productName,
+    royaltyPercent: input.royaltyPercent,
+    transferPolicy: input.transferPolicy,
+    version: input.version,
+  })
+
+/**
+ * Issue a real, unique RGB asset through the connected node.
+ * The returned asset id is the RGB contract identifier; no local/demo id is
+ * created before the node confirms issuance.
+ */
+export const issueLicenseRgbAsset = async (
+  input: LicenseAssetIssuanceInput,
+  issueUda: IssueRgbUda
+): Promise<IssuedLicenseAsset> => {
+  validateInput(input)
+
+  const publicTerms = createPublicTerms(input)
+  const metadataHash = await hashText(publicTerms)
+  const ticker =
+    input.productName
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .slice(0, 8)
+      .toUpperCase() || 'LICEX'
+  const response = await issueUda({
+    attachments_file_digests: [],
+    details: JSON.stringify({ metadataHash, terms: publicTerms }),
+    name: `${input.productName} (${input.edition})`,
+    precision: 0,
+    ticker,
+  })
+  const asset = response.asset
+  if (!asset?.asset_id) throw new Error('RGB node returned no asset id')
+
+  return {
+    assetId: asset.asset_id,
+    contractId: asset.asset_id,
+    issuedAt: new Date().toISOString(),
+    metadataHash,
+    mode: 'rgb-node',
+    requestId: input.requestId,
+    schema: 'UDA',
+    status: 'issued',
+  }
 }
 
 /**
@@ -79,13 +136,7 @@ export const issueDemoLicenseAsset = async (
   )
   if (existing) return existing
 
-  const publicTerms = JSON.stringify({
-    edition: input.edition,
-    productName: input.productName,
-    royaltyPercent: input.royaltyPercent,
-    transferPolicy: input.transferPolicy,
-    version: input.version,
-  })
+  const publicTerms = createPublicTerms(input)
   const metadataHash = await hashText(publicTerms)
   const issuanceHash = await hashText(`${input.requestId}:${metadataHash}`)
   const asset = saveDemoRgbAsset({

@@ -3,7 +3,6 @@
 
 import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { toast } from 'react-toastify'
 import {
   ArrowLeft,
   Shield,
@@ -24,7 +23,6 @@ import {
   addToWatchlist,
   removeFromWatchlist,
   addPriceAlert,
-  recordDemoPurchase,
 } from '../../slices/licex/licex.slice'
 import type { TransferPolicy } from '../../types/licex'
 import {
@@ -40,11 +38,6 @@ import {
   type SwapExecutionResult,
 } from '../../services/licexPaymentService'
 import { completePurchase } from '../../slices/licex/licex.slice'
-
-function formatSats(sats: number): string {
-  if (sats === 0) return 'Free'
-  return `${sats.toLocaleString()} sats`
-}
 
 function transferPolicyLabel(policy: TransferPolicy): string {
   switch (policy) {

@@ -39,7 +39,7 @@ export const CreateUTXOModal: React.FC<CreateUTXOModalProps> = ({
   const [creationError, setCreationError] = useState<string>()
   const [feeRate, setFeeRate] = useState(0)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [isDemoMode, setIsDemoMode] = useState(true)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [numUtxos, setNumUtxos] = useState(() => {
     // For channel creation with no uncolored UTXOs, always use 1 UTXO
     if (
