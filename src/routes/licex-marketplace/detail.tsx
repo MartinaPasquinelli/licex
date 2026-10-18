@@ -29,6 +29,7 @@ import {
 } from '../../slices/licex/licex.slice'
 import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import type { TransferPolicy } from '../../types/licex'
+import type { Order, LicenseRecord } from '../../types/licex'
 import { LicexMarkdown } from '../../components/LicexMarkdown'
 import {
   LICEX_MARKETPLACE_PATH,
@@ -46,6 +47,16 @@ import {
   type SwapStep,
   type SwapExecutionResult,
 } from '../../services/licexPaymentService'
+import { issueDemoLicenseAsset } from '../../services/licex/licenseAssetIssuer'
+import {
+  adjustP2PSimulationUsdtBalance,
+  enableP2PSimulation,
+  getP2PSimulationNodePubkey,
+  getP2PSimulationUsdtBalance,
+  isP2PSimulationAvailable,
+  isP2PSimulationEnabled,
+  setP2PSimulationAssetBalance,
+} from '../../services/licexP2PSimulation'
 
 function transferPolicyLabel(policy: TransferPolicy): string {
   switch (policy) {
@@ -98,6 +109,12 @@ export function Component() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [purchaseSuccess, setPurchaseSuccess] = useState(false)
   const [alertThreshold, setAlertThreshold] = useState('')
+  const [isTestModeEnabled, setIsTestModeEnabled] = useState(
+    isP2PSimulationEnabled()
+  )
+  const [testWalletBalance, setTestWalletBalance] = useState(
+    getP2PSimulationUsdtBalance()
+  )
 
   const hasAccount = Boolean(
     nodeSettingsData?.name || localStorage.getItem('licex_account_email')
@@ -171,6 +188,7 @@ export function Component() {
   )
 
   const usdtSpendable = useMemo(() => {
+    if (isTestModeEnabled) return testWalletBalance
     if (!usdtAsset) return 0
     const precision = usdtAsset.precision ?? 6
     const onChainRaw = usdtBalanceData?.spendable ?? 0
@@ -185,7 +203,13 @@ export function Component() {
       )
 
     return onChainUsdt + channelUsdt
-  }, [usdtAsset, usdtBalanceData, readyChannels])
+  }, [
+    isTestModeEnabled,
+    testWalletBalance,
+    usdtAsset,
+    usdtBalanceData,
+    readyChannels,
+  ])
 
   const hasSufficientUsdtBalance = useMemo(() => {
     if (!quote) return false
@@ -196,6 +220,89 @@ export function Component() {
     () => watchlist.some((w) => w.listingId === licenseId),
     [watchlist, licenseId]
   )
+
+  const executeTestPurchase = async () => {
+    if (!listing || !quote || !isTestModeEnabled) return
+    if (testWalletBalance < quote.totalPrice) {
+      setSwapStep('error')
+      setSwapMessage('Saldo demo USDT insufficiente per questo acquisto.')
+      return
+    }
+    try {
+      const requestId = `test-purchase-${crypto.randomUUID()}`
+      const asset = await issueDemoLicenseAsset({
+        edition: listing.edition,
+        productName: listing.productName,
+        requestId,
+        royaltyPercent: listing.royaltyPercent,
+        transferPolicy: listing.transferPolicy,
+        version: listing.version,
+      })
+      // The development purchase fixture has no simulated waiting period, so
+      // a transferable demo license can be resold immediately during testing.
+      const purchasedListing = {
+        ...listing,
+        minHoldingDays: 0,
+        rgbAsset: asset,
+      }
+      const orderId = `test-order-${crypto.randomUUID()}`
+      const licenseRecord: LicenseRecord = {
+        activatedAt: new Date().toISOString(),
+        activationStatus: 'confirmed',
+        id: `test-license-${requestId}`,
+        licenseStatus: 'active',
+        listing: purchasedListing,
+        orderId,
+        transferCount: 0,
+      }
+      const order: Order = {
+        buyerId: 'test-buyer',
+        companyId: listing.companyId,
+        createdAt: new Date().toISOString(),
+        id: orderId,
+        licexFee: quote.licexFee,
+        listing: purchasedListing,
+        listingId: listing.id,
+        orderStatus: 'completed',
+        paymentMethod: 'usdt_swap',
+        paymentStatus: 'received',
+        price: listing.price,
+        royalty: quote.royaltyFee,
+        sellerId: listing.companyId,
+        totalPrice: quote.totalPrice,
+        type: 'primary',
+      }
+      const nextBalance = adjustP2PSimulationUsdtBalance(-quote.totalPrice)
+      setP2PSimulationAssetBalance(asset.assetId, 1)
+      setTestWalletBalance(nextBalance)
+      const now = new Date().toISOString()
+      setSwapResult({
+        certificate: {
+          activationMode: 'wallet_handshake',
+          contractId: asset.contractId,
+          genesisAnchor: 'demo:local-only',
+          holderPubkey: getP2PSimulationNodePubkey(),
+          issuedAt: asset.issuedAt,
+          issuerKey: `demo:${listing.companyId}`,
+          paymentMethod: 'usdt_swap',
+          proofOfHoldingHash: asset.metadataHash,
+          schemaType: 'Demo UDA License Asset',
+          sealUtxo: `demo:${asset.assetId}`,
+        },
+        licenseRecord,
+        order,
+        quote,
+      })
+      dispatch(completePurchase({ licenseRecord, order }))
+      setSwapMessage(`Acquisto simulato completato il ${now}.`)
+      setSwapStep('completed')
+    } catch (error) {
+      setSwapStep('error')
+      setSwapMessage(
+        error instanceof Error ? error.message : 'Acquisto demo non riuscito.'
+      )
+    }
+  }
 
   if (!listing) {
     return (
@@ -890,7 +997,9 @@ export function Component() {
                       <div className="p-3 rounded-xl bg-black/20 border border-[#9a94bc]/20 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="text-[#9a94bc]">
-                            Saldo USDT Disponibile:
+                            {isTestModeEnabled
+                              ? 'Saldo demo USDT Disponibile:'
+                              : 'Saldo USDT Disponibile:'}
                           </span>
                           <span
                             className={`font-mono font-semibold ${
@@ -919,6 +1028,50 @@ export function Component() {
                         </span>
                       </div>
 
+                      {isP2PSimulationAvailable() && (
+                        <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-400/30 text-xs text-violet-100 space-y-2">
+                          <div className="font-semibold">
+                            {isTestModeEnabled
+                              ? 'Modalità test attiva · pagamento simulato'
+                              : 'Test acquisto e rivendita'}
+                          </div>
+                          <p className="text-[11px] text-violet-100/80">
+                            {isTestModeEnabled
+                              ? 'Il saldo mostrato sopra è demo-USDT. L’acquisto crea un asset demo locale, non un trasferimento o pagamento RGB reale.'
+                              : 'Attiva demo-USDT per simulare l’acquisto della licenza e poi provarne la rivendita P2P.'}
+                          </p>
+                          <button
+                            className="rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-semibold text-white"
+                            onClick={() => {
+                              try {
+                                if (isTestModeEnabled) {
+                                  setTestWalletBalance(
+                                    adjustP2PSimulationUsdtBalance(1000)
+                                  )
+                                } else {
+                                  enableP2PSimulation()
+                                  setIsTestModeEnabled(true)
+                                  setTestWalletBalance(
+                                    getP2PSimulationUsdtBalance()
+                                  )
+                                }
+                              } catch (error) {
+                                setSwapMessage(
+                                  error instanceof Error
+                                    ? error.message
+                                    : 'Attivazione del portafoglio test non riuscita.'
+                                )
+                              }
+                            }}
+                            type="button"
+                          >
+                            {isTestModeEnabled
+                              ? 'Aggiungi 1.000 demo-USDT'
+                              : 'Attiva portafoglio test · 1.000 demo-USDT'}
+                          </button>
+                        </div>
+                      )}
+
                       {/* Warning se il saldo USDT è insufficiente */}
                       {!hasSufficientUsdtBalance && (
                         <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 space-y-2 text-xs text-red-200">
@@ -926,25 +1079,36 @@ export function Component() {
                             <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-400 mt-0.5" />
                             <div>
                               <strong className="text-red-300">
-                                Saldo USDT insufficiente nel wallet
+                                {isTestModeEnabled
+                                  ? 'Saldo demo USDT insufficiente'
+                                  : 'Saldo USDT insufficiente nel wallet'}
                               </strong>
                               <p className="mt-1 text-[11px] text-red-200/80 leading-relaxed">
                                 Disponi di {usdtSpendable.toFixed(2)} USDT, ma
-                                l'acquisto richiede {quote.formattedTotal}. Per
-                                effettuare lo scambio atomico in USDT, effettua
-                                prima un deposito.
+                                l'acquisto richiede {quote.formattedTotal}.
+                                {isTestModeEnabled
+                                  ? ' Aggiungi demo-USDT con il pulsante qui sopra.'
+                                  : ' Per un acquisto reale, effettua prima un deposito.'}
                               </p>
                             </div>
                           </div>
                           <button
                             className="w-full py-1.5 px-3 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-white font-medium text-[11px] transition-colors border border-red-500/30"
                             onClick={() => {
-                              setShowPurchaseModal(false)
-                              navigate('/wallet-dashboard')
+                              if (isTestModeEnabled) {
+                                setTestWalletBalance(
+                                  adjustP2PSimulationUsdtBalance(1000)
+                                )
+                              } else {
+                                setShowPurchaseModal(false)
+                                navigate('/wallet-dashboard')
+                              }
                             }}
                             type="button"
                           >
-                            → Vai al Wallet per Depositare USDT
+                            {isTestModeEnabled
+                              ? '→ Aggiungi 1.000 demo-USDT'
+                              : '→ Vai al Wallet per Depositare USDT'}
                           </button>
                         </div>
                       )}
@@ -978,6 +1142,10 @@ export function Component() {
                           id="confirm-atomic-swap-btn"
                           onClick={async () => {
                             if (!hasSufficientUsdtBalance) return
+                            if (isTestModeEnabled) {
+                              await executeTestPurchase()
+                              return
+                            }
                             try {
                               const result = await executeLicenseSwap(
                                 listing,
@@ -1048,9 +1216,12 @@ export function Component() {
                   <div className="p-4 rounded-xl bg-black/40 border border-[#10b981]/30 space-y-3">
                     <div className="flex items-center gap-2 text-xs text-[#10b981] font-semibold">
                       <CheckCircle className="w-4 h-4" />
-                      {swapResult.order.paymentMethod === 'lightning'
-                        ? 'Pagamento Lightning Verificato & Ricevuta Emessa'
-                        : 'Token UDA RGB25 assegnato al tuo Single-Use-Seal UTXO'}
+                      {swapResult.licenseRecord.listing.rgbAsset?.mode ===
+                      'demo'
+                        ? 'Acquisto simulato completato · asset locale demo'
+                        : swapResult.order.paymentMethod === 'lightning'
+                          ? 'Pagamento Lightning Verificato & Ricevuta Emessa'
+                          : 'Token UDA RGB25 assegnato al tuo Single-Use-Seal UTXO'}
                     </div>
 
                     <div className="bg-[#13141f] p-3.5 rounded-xl border border-[#9a94bc]/20 space-y-2">
@@ -1059,13 +1230,17 @@ export function Component() {
                           Modalità di Licenza
                         </div>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30 font-bold uppercase tracking-wider">
-                          Nativa RGB · Senza Codici
+                          {swapResult.licenseRecord.listing.rgbAsset?.mode ===
+                          'demo'
+                            ? 'DEMO · Non RGB reale'
+                            : 'Nativa RGB · Senza Codici'}
                         </span>
                       </div>
                       <p className="text-xs text-white leading-relaxed">
-                        Nessun codice seriale o chiave di testo: la licenza è
-                        legata crittograficamente al tuo wallet. Il software si
-                        attiva automaticamente interrogando il database locale.
+                        {swapResult.licenseRecord.listing.rgbAsset?.mode ===
+                        'demo'
+                          ? 'Asset e pagamento sono simulati localmente per testare il percorso di acquisto e rivendita. Non è avvenuto alcun trasferimento RGB reale.'
+                          : 'Nessun codice seriale o chiave di testo: la licenza è legata crittograficamente al tuo wallet. Il software si attiva automaticamente interrogando il database locale.'}
                       </p>
                       {swapResult.order.lightningPreimage && (
                         <div className="pt-1 text-[11px] text-amber-300 font-mono break-all">

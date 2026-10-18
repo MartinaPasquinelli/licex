@@ -15,6 +15,7 @@ import {
   Zap,
   Database,
   RefreshCw,
+  Tag,
   FileText,
   X,
   FileSearch,
@@ -22,16 +23,52 @@ import {
 import { useNavigate } from 'react-router-dom'
 
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
+import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import {
+  completePurchase,
+  addP2pOffer,
   resetDatabase,
   setOwnedLicenses,
   setOrders,
 } from '../../slices/licex/licex.slice'
+import type { LicenseListing, LicenseRecord, Order } from '../../types/licex'
+import { MOCK_LISTINGS } from '../../constants/licex-mock-data'
 import {
   loadLicensesFromSqlite,
   loadOrdersFromSqlite,
+  saveLocalOwnedLicenses,
 } from '../../services/licex/licexStorage'
+import { issueDemoLicenseAsset } from '../../services/licex/licenseAssetIssuer'
+import { logger } from '../../utils/logger'
+import {
+  adjustP2PSimulationUsdtBalance,
+  createP2PSimulationSwapString,
+  enableP2PSimulation,
+  getP2PSimulationAssetBalance,
+  getP2PSimulationNodePubkey,
+  getP2PSimulationUsdtBalance,
+  isP2PSimulationAvailable,
+  isP2PSimulationEnabled,
+  resetP2PSimulationWallet,
+  setP2PSimulationAssetBalance,
+} from '../../services/licexP2PSimulation'
 import { LICEX_MARKETPLACE_PATH } from '../../app/router/paths'
+import type { NostrLicenseOffer } from '../../types/licexNostr'
+import {
+  deleteP2PSwapSecret,
+  fetchMarketplaceSnapshot,
+  getP2PSwapSecret,
+  getMarketplaceIdentity,
+  publishMarketplacePurchaseResult,
+  publishMarketplaceResaleOffer,
+  saveP2PSwapSecret,
+  type NostrMarketplacePurchaseRequest,
+} from '../../services/licexNostrMarketplace'
+
+interface IncomingP2PPurchase {
+  request: NostrMarketplacePurchaseRequest
+  offer: NostrLicenseOffer
+}
 import type { LicenseListing } from '../../types/licex'
 import { EulaAnalyzerTab } from '../licex-assistant/EulaAnalyzerTab'
 
@@ -47,29 +84,109 @@ const formatContractDetails = (details?: string): string => {
 export function Component() {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const { ownedLicenses, orders, listings } = useAppSelector(
+  const { ownedLicenses, orders, p2pOffers, listings } = useAppSelector(
     (state) => state.licex
   )
+  const [isTestModeEnabled, setIsTestModeEnabled] = useState(
+    isP2PSimulationEnabled()
+  )
+  const [testWalletBalance, setTestWalletBalance] = useState(
+    getP2PSimulationUsdtBalance()
+  )
+  const [testWalletMessage, setTestWalletMessage] = useState<string | null>(
+    null
+  )
+  const [, setTestAssetBalanceRevision] = useState(0)
+  const { data: nodeAssets } = nodeApi.useListAssetsQuery(undefined, {
+    skip: isTestModeEnabled,
+  })
+  const { data: nodeInfo } = nodeApi.endpoints.nodeInfo.useQuery(undefined, {
+    skip: isTestModeEnabled,
+  })
+  const [makerInit] = nodeApi.useMakerInitMutation()
+  const [makerExecute] = nodeApi.useMakerExecuteMutation()
+  const [getAssetBalance] = nodeApi.endpoints.assetBalance.useLazyQuery()
   const [activeTab, setActiveTab] = useState<'licenses' | 'orders'>('licenses')
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [testedHandshakeId, setTestedHandshakeId] = useState<string | null>(
     null
   )
+  const [sellingLicenseId, setSellingLicenseId] = useState<string | null>(null)
+  const [resalePrice, setResalePrice] = useState('')
+  const [isPublishingOffer, setIsPublishingOffer] = useState(false)
+  const [sellMessage, setSellMessage] = useState<string | null>(null)
+  const [incomingPurchases, setIncomingPurchases] = useState<
+    IncomingP2PPurchase[]
+  >([])
+  const [executingPurchaseId, setExecutingPurchaseId] = useState<string | null>(
+    null
+  )
+  const [purchaseExecutionMessage, setPurchaseExecutionMessage] = useState<
+    string | null
+  >(null)
+  const [isSyncingP2PPurchases, setIsSyncingP2PPurchases] = useState(false)
+  const [p2pSyncMessage, setP2pSyncMessage] = useState<string | null>(null)
+  const [isPortfolioLoaded, setIsPortfolioLoaded] = useState(false)
 
   // Interroga direttamente le tabelle SQLite native al montaggio della pagina
   useEffect(() => {
-    loadLicensesFromSqlite().then((sqliteLicenses) => {
-      if (sqliteLicenses && sqliteLicenses.length > 0) {
-        dispatch(setOwnedLicenses(sqliteLicenses))
+    Promise.all([loadLicensesFromSqlite(), loadOrdersFromSqlite()]).then(
+      ([sqliteLicenses, sqliteOrders]) => {
+        if (sqliteLicenses && sqliteLicenses.length > 0) {
+          dispatch(setOwnedLicenses(sqliteLicenses))
+        }
+        if (sqliteOrders && sqliteOrders.length > 0) {
+          dispatch(setOrders(sqliteOrders))
+        }
+        setIsPortfolioLoaded(true)
       }
-    })
-    loadOrdersFromSqlite().then((sqliteOrders) => {
-      if (sqliteOrders && sqliteOrders.length > 0) {
-        dispatch(setOrders(sqliteOrders))
-      }
-    })
+    )
   }, [dispatch])
+
+  useEffect(() => {
+    let isCurrent = true
+    const loadIncomingPurchases = async () => {
+      try {
+        const [identity, snapshot] = await Promise.all([
+          getMarketplaceIdentity(),
+          fetchMarketplaceSnapshot(),
+        ])
+        if (!identity || !isCurrent) return
+        const ownOffers = snapshot.offers.filter(
+          (offer) => offer.sellerNpub === identity && offer.status === 'active'
+        )
+        const ownOfferIds = new Set(ownOffers.map((offer) => offer.id))
+        const requests = snapshot.purchaseRequests
+          .filter((request) => ownOfferIds.has(request.offerId))
+          .flatMap((request) => {
+            const offer = ownOffers.find((item) => item.id === request.offerId)
+            return offer
+              ? [
+                  {
+                    offer,
+                    request,
+                  },
+                ]
+              : []
+          })
+        if (isCurrent) setIncomingPurchases(requests)
+      } catch (error) {
+        logger.warn(
+          '[LICEX Marketplace] Failed to load purchase requests:',
+          error
+        )
+      }
+    }
+    void loadIncomingPurchases()
+    const refreshTimer = window.setInterval(() => {
+      void loadIncomingPurchases()
+    }, 15_000)
+    return () => {
+      isCurrent = false
+      window.clearInterval(refreshTimer)
+    }
+  }, [])
   const [contractListing, setContractListing] = useState<LicenseListing | null>(
     null
   )
@@ -151,6 +268,435 @@ export function Component() {
     navigator.clipboard.writeText(key)
     setCopiedKey(id)
     setTimeout(() => setCopiedKey(null), 2000)
+  }
+
+  const activateTestWallet = () => {
+    try {
+      enableP2PSimulation()
+      setIsTestModeEnabled(true)
+      setTestWalletBalance(getP2PSimulationUsdtBalance())
+      setTestWalletMessage(
+        'Portafoglio simulato attivo. Saldo iniziale: 1.000 demo-USDT.'
+      )
+    } catch (error) {
+      setTestWalletMessage(
+        error instanceof Error
+          ? error.message
+          : 'Attivazione test non riuscita.'
+      )
+    }
+  }
+
+  const createTestLicense = async () => {
+    try {
+      enableP2PSimulation()
+      setIsTestModeEnabled(true)
+      const requestId = crypto.randomUUID()
+      const asset = await issueDemoLicenseAsset({
+        edition: 'P2P Test',
+        productName: 'LICEX License Test',
+        requestId,
+        royaltyPercent: 0,
+        transferPolicy: 'transferable_free',
+        version: 'test-1',
+      })
+      const template = MOCK_LISTINGS[0]
+      const listing: LicenseListing = {
+        ...template,
+        edition: 'P2P Test',
+        id: `listing-${requestId}`,
+        maxTransfers: null,
+        minHoldingDays: 0,
+        productName: 'LICEX License Test',
+        rgbAsset: asset,
+        royaltyPercent: 0,
+        status: 'published',
+        transferPolicy: 'transferable_free',
+      }
+      const license: LicenseRecord = {
+        activatedAt: new Date().toISOString(),
+        activationStatus: 'unknown',
+        id: `license-${requestId}`,
+        licenseStatus: 'active',
+        listing,
+        orderId: `test-order-${requestId}`,
+        transferCount: 0,
+      }
+      const updatedLicenses = [license, ...ownedLicenses]
+      setP2PSimulationAssetBalance(asset.assetId, 1)
+      dispatch(setOwnedLicenses(updatedLicenses))
+      saveLocalOwnedLicenses(updatedLicenses)
+      setTestWalletBalance(getP2PSimulationUsdtBalance())
+      setTestAssetBalanceRevision((revision) => revision + 1)
+      setTestWalletMessage(
+        'Licenza demo aggiunta al portafoglio e pronta per la rivendita simulata.'
+      )
+    } catch (error) {
+      setTestWalletMessage(
+        error instanceof Error
+          ? error.message
+          : 'Creazione licenza test non riuscita.'
+      )
+    }
+  }
+
+  const selectedLicense = ownedLicenses.find(
+    (license) => license.id === sellingLicenseId
+  )
+  const submitResaleOffer = async () => {
+    if (!selectedLicense || isPublishingOffer) return
+    const price = Number(resalePrice)
+    if (!Number.isFinite(price) || price <= 0) {
+      setSellMessage('Inserisci un prezzo USDT maggiore di zero.')
+      return
+    }
+    if (selectedLicense.listing.transferPolicy !== 'transferable_free') {
+      setSellMessage(
+        'La licenza richiede l’approvazione dell’editore prima del trasferimento.'
+      )
+      return
+    }
+    const isSimulationLicense =
+      isTestModeEnabled && selectedLicense.listing.rgbAsset?.mode === 'demo'
+    if (
+      !isSimulationLicense &&
+      selectedLicense.listing.minHoldingDays !== null &&
+      selectedLicense.activatedAt &&
+      Date.now() - new Date(selectedLicense.activatedAt).getTime() <
+        selectedLicense.listing.minHoldingDays * 24 * 60 * 60 * 1000
+    ) {
+      setSellMessage('Non è ancora trascorso il periodo minimo di possesso.')
+      return
+    }
+
+    setIsPublishingOffer(true)
+    setSellMessage(null)
+    try {
+      const licenseAssetId = selectedLicense.listing.rgbAsset?.assetId
+      const isSimulationOffer =
+        isTestModeEnabled && selectedLicense.listing.rgbAsset?.mode === 'demo'
+      if (!licenseAssetId) {
+        throw new Error('La licenza non ha un riferimento asset.')
+      }
+
+      let swapString: string
+      let paymentSecret: string | null = null
+      if (isSimulationOffer) {
+        if (getP2PSimulationAssetBalance(licenseAssetId) < 1) {
+          throw new Error(
+            'Il portafoglio demo non possiede più questa licenza.'
+          )
+        }
+        swapString = createP2PSimulationSwapString(licenseAssetId, price)
+      } else {
+        const licenseAsset = [
+          ...(nodeAssets?.nia ?? []),
+          ...(nodeAssets?.uda ?? []),
+          ...(nodeAssets?.cfa ?? []),
+          ...(nodeAssets?.ifa ?? []),
+        ].find((asset) => asset.asset_id === licenseAssetId)
+        const usdtAsset = (nodeAssets?.nia ?? []).find(
+          (asset) => asset.ticker === 'USDT'
+        )
+
+        if (
+          selectedLicense.listing.rgbAsset?.mode !== 'rgb-node' ||
+          selectedLicense.listing.rgbAsset.status !== 'issued' ||
+          !licenseAsset
+        ) {
+          throw new Error(
+            'Questa licenza non è un asset RGB reale presente nel nodo.'
+          )
+        }
+        if (!usdtAsset) {
+          throw new Error('Il nodo non contiene un asset RGB-USDT spendibile.')
+        }
+
+        const licenseBalance = await getAssetBalance({
+          asset_id: licenseAssetId,
+        }).unwrap()
+        if ((licenseBalance.spendable ?? 0) < 1) {
+          throw new Error(
+            'Il nodo non ha una unità spendibile di questa licenza.'
+          )
+        }
+
+        const usdtAmount = Math.round(price * 10 ** (usdtAsset.precision ?? 0))
+        if (usdtAmount <= 0) {
+          throw new Error('Il prezzo è inferiore all’unità minima di RGB-USDT.')
+        }
+        const swap = await makerInit({
+          from_asset: usdtAsset.asset_id,
+          qty_from: usdtAmount,
+          qty_to: 1,
+          timeout_sec: 3600,
+          to_asset: licenseAssetId,
+        }).unwrap()
+        if (!swap.swapstring || !swap.payment_secret) {
+          throw new Error(
+            'Il nodo non ha restituito i dati dello swap atomico.'
+          )
+        }
+        paymentSecret = swap.payment_secret
+        swapString = swap.swapstring
+      }
+
+      const offerId = `resale-${crypto.randomUUID()}`
+      if (paymentSecret) await saveP2PSwapSecret(offerId, paymentSecret)
+      const sellerNpub = await getMarketplaceIdentity()
+      if (!sellerNpub) {
+        throw new Error('La pubblicazione richiede l’app desktop LICEX.')
+      }
+      const offer = {
+        createdAt: new Date().toISOString(),
+        id: offerId,
+        licenseRecordId: selectedLicense.id,
+        listing: selectedLicense.listing,
+        resalePriceUsdt: price,
+        royaltyPercent: selectedLicense.listing.royaltyPercent,
+        swapString,
+        ...(isSimulationOffer ? { simulation: true } : {}),
+        sellerName: `${sellerNpub.slice(0, 13)}…`,
+        sellerNpub,
+        status: 'active' as const,
+        transferCount: selectedLicense.transferCount,
+        transferPolicy: selectedLicense.listing.transferPolicy,
+      }
+      const nostrEventId = await publishMarketplaceResaleOffer(offer)
+      if (!nostrEventId) {
+        throw new Error('Il relay non ha confermato la pubblicazione.')
+      }
+      dispatch(addP2pOffer({ ...offer, nostrEventId }))
+      setSellMessage('Offerta pubblicata sui Nostr Relay.')
+    } catch (error) {
+      setSellMessage(
+        error instanceof Error ? error.message : 'Pubblicazione non riuscita.'
+      )
+    } finally {
+      setIsPublishingOffer(false)
+    }
+  }
+
+  const syncCompletedP2PPurchases = async () => {
+    if (isSyncingP2PPurchases) return
+    setIsSyncingP2PPurchases(true)
+    setP2pSyncMessage(null)
+    try {
+      if (!isPortfolioLoaded) {
+        throw new Error('Attendi il caricamento del portafoglio locale.')
+      }
+      if (!isTestModeEnabled && !nodeInfo?.pubkey) {
+        throw new Error('Connetti e sblocca il nodo RGB prima della verifica.')
+      }
+      const identity = await getMarketplaceIdentity()
+      if (!identity) {
+        throw new Error('Sincronizzazione disponibile nell’app desktop LICEX.')
+      }
+
+      const snapshot = await fetchMarketplaceSnapshot()
+      const buyerResults = snapshot.purchaseResults.filter(
+        (result) =>
+          result.buyerNpub === identity &&
+          result.buyerNodePubkey ===
+            (result.simulation && isTestModeEnabled
+              ? getP2PSimulationNodePubkey()
+              : nodeInfo?.pubkey)
+      )
+      let importedCount = 0
+      let waitingForAsset = false
+
+      for (const result of buyerResults) {
+        if (
+          orders.some((order) => order.id === result.requestId) ||
+          ownedLicenses.some((license) => license.orderId === result.requestId)
+        ) {
+          continue
+        }
+        const offer = snapshot.offers.find(
+          (item) =>
+            item.id === result.offerId && item.sellerNpub === result.sellerNpub
+        )
+        const assetReference = offer?.listing.rgbAsset
+        if (!offer || !assetReference?.assetId) {
+          continue
+        }
+        const assetId = assetReference.assetId
+
+        if (result.simulation && offer.simulation && isTestModeEnabled) {
+          setP2PSimulationAssetBalance(assetId, 1)
+        } else {
+          if (assetReference.mode !== 'rgb-node') continue
+          let spendableBalance = 0
+          try {
+            const balance = await getAssetBalance({
+              asset_id: assetId,
+            }).unwrap()
+            spendableBalance = balance.spendable ?? 0
+          } catch {
+            waitingForAsset = true
+            continue
+          }
+          if (spendableBalance < 1) {
+            waitingForAsset = true
+            continue
+          }
+        }
+
+        const createdAt = result.completedAt || new Date().toISOString()
+        const licenseRecord: LicenseRecord = {
+          activationStatus: 'unknown',
+          id: `license-${result.requestId}`,
+          licenseStatus: 'active',
+          listing: {
+            ...offer.listing,
+            rgbAsset: {
+              ...assetReference,
+              status: 'issued',
+            },
+          },
+          orderId: result.requestId,
+          transferCount: offer.transferCount + 1,
+        }
+        const order: Order = {
+          buyerId: result.buyerNpub,
+          companyId: offer.listing.companyId,
+          createdAt,
+          id: result.requestId,
+          licexFee: 0,
+          listing: offer.listing,
+          listingId: offer.listing.id,
+          orderStatus: 'completed',
+          paymentMethod: 'usdt_swap',
+          paymentStatus: 'received',
+          price: offer.resalePriceUsdt,
+          royalty: 0,
+          sellerId: result.sellerNpub,
+          totalPrice: offer.resalePriceUsdt,
+          type: 'resale',
+        }
+        dispatch(completePurchase({ licenseRecord, order }))
+        importedCount += 1
+      }
+
+      setP2pSyncMessage(
+        importedCount > 0
+          ? `${importedCount} licenza/e ricevuta/e aggiunta/e al portafoglio.`
+          : waitingForAsset
+            ? 'Swap confermato dal relay; il nodo non mostra ancora la licenza ricevuta. Riprova tra poco.'
+            : 'Nessun nuovo acquisto P2P completato per questo nodo.'
+      )
+    } catch (error) {
+      setP2pSyncMessage(
+        error instanceof Error
+          ? error.message
+          : 'Sincronizzazione acquisti P2P non riuscita.'
+      )
+    } finally {
+      setIsSyncingP2PPurchases(false)
+    }
+  }
+
+  const executeP2PPurchase = async (purchase: IncomingP2PPurchase) => {
+    const { offer, request } = purchase
+    if (executingPurchaseId || !offer.swapString) return
+    const isSimulationOffer =
+      offer.simulation === true || offer.listing.rgbAsset?.mode === 'demo'
+    setExecutingPurchaseId(request.id)
+    setPurchaseExecutionMessage(null)
+    try {
+      if (isSimulationOffer && isTestModeEnabled) {
+        const assetId = offer.listing.rgbAsset?.assetId
+        if (!assetId || getP2PSimulationAssetBalance(assetId) < 1) {
+          throw new Error('Il venditore non possiede più questa licenza demo.')
+        }
+        setP2PSimulationAssetBalance(assetId, 0)
+        setTestWalletBalance(
+          adjustP2PSimulationUsdtBalance(offer.resalePriceUsdt)
+        )
+      } else {
+        const secret = await getP2PSwapSecret(offer.id)
+        if (!secret) {
+          throw new Error(
+            'Segreto dello swap non disponibile su questo account o dispositivo.'
+          )
+        }
+        await makerExecute({
+          payment_secret: secret,
+          swapstring: offer.swapString,
+          taker_pubkey: request.buyerNodePubkey,
+        }).unwrap()
+      }
+
+      const { nostrEventId: _nostrEventId, ...offerPayload } = offer
+      const completedOffer = { ...offerPayload, status: 'completed' as const }
+      dispatch(
+        addP2pOffer({
+          ...completedOffer,
+          nostrEventId: offer.nostrEventId,
+        })
+      )
+      const updatedLicenses = ownedLicenses.map((license) =>
+        license.id === offer.licenseRecordId && license.listing.rgbAsset
+          ? {
+              ...license,
+              listing: {
+                ...license.listing,
+                rgbAsset: {
+                  ...license.listing.rgbAsset,
+                  status: 'transferred' as const,
+                },
+              },
+            }
+          : license
+      )
+      dispatch(setOwnedLicenses(updatedLicenses))
+      saveLocalOwnedLicenses(updatedLicenses)
+      setIncomingPurchases((current) =>
+        current.filter((item) => item.request.id !== request.id)
+      )
+
+      let publishedEvent: string | null = null
+      let publishedResult: string | null = null
+      try {
+        publishedEvent = await publishMarketplaceResaleOffer(completedOffer)
+        publishedResult = await publishMarketplacePurchaseResult({
+          buyerNodePubkey: request.buyerNodePubkey,
+          buyerNpub: request.buyerNpub,
+          completedAt: new Date().toISOString(),
+          offerId: offer.id,
+          requestId: request.id,
+          sellerNpub: offer.sellerNpub,
+          status: 'completed',
+          ...(isSimulationOffer ? { simulation: true } : {}),
+        })
+      } catch (error) {
+        logger.warn(
+          '[LICEX Marketplace] Could not publish swap completion:',
+          error
+        )
+      }
+      try {
+        await deleteP2PSwapSecret(offer.id)
+      } catch (error) {
+        logger.warn(
+          '[LICEX Marketplace] Could not remove completed swap secret:',
+          error
+        )
+      }
+      setPurchaseExecutionMessage(
+        publishedEvent && publishedResult
+          ? `Swap completato: ${offer.listing.productName} trasferita e offerta chiusa.`
+          : 'Swap completato, ma il relay non ha confermato la chiusura o l’esito. Verifica la sincronizzazione prima di riprovare.'
+      )
+    } catch (error) {
+      setPurchaseExecutionMessage(
+        error instanceof Error
+          ? error.message
+          : 'Completamento dello swap non riuscito.'
+      )
+    } finally {
+      setExecutingPurchaseId(null)
+    }
   }
 
   // Filter licenses by search
@@ -256,6 +802,156 @@ export function Component() {
       </div>
 
       {/* Content Area */}
+      {isP2PSimulationAvailable() && (
+        <section className="rounded-2xl border border-violet-400/30 bg-violet-400/5 p-4 space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-content-primary">
+                  Portafoglio P2P di test
+                </h2>
+                <span className="rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-300">
+                  Solo sviluppo
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-content-secondary">
+                Simula saldo e trasferimento per verificare il flusso Nostr. Non
+                crea fondi né asset RGB reali.
+              </p>
+              {isTestModeEnabled && (
+                <p className="mt-2 text-sm font-semibold text-violet-200">
+                  Saldo demo:{' '}
+                  {testWalletBalance.toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}{' '}
+                  USDT
+                </p>
+              )}
+              {testWalletMessage && (
+                <p
+                  aria-live="polite"
+                  className="mt-2 text-xs text-content-secondary"
+                >
+                  {testWalletMessage}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white"
+                onClick={activateTestWallet}
+                type="button"
+              >
+                Attiva / finanzia test
+              </button>
+              <button
+                className="rounded-lg border border-violet-400/30 px-3 py-2 text-xs font-semibold text-violet-200 disabled:opacity-50"
+                disabled={!isTestModeEnabled}
+                onClick={() => void createTestLicense()}
+                type="button"
+              >
+                Crea licenza demo
+              </button>
+              <button
+                className="rounded-lg border border-border-default px-3 py-2 text-xs font-semibold text-content-secondary disabled:opacity-50"
+                disabled={!isTestModeEnabled}
+                onClick={() => {
+                  resetP2PSimulationWallet()
+                  setTestWalletBalance(getP2PSimulationUsdtBalance())
+                  setTestAssetBalanceRevision((revision) => revision + 1)
+                  setTestWalletMessage(
+                    'Portafoglio demo ripristinato a 1.000 USDT; gli asset demo sono stati azzerati.'
+                  )
+                }}
+                type="button"
+              >
+                Ripristina test
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+      <section className="flex flex-col gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-content-primary">
+            Acquisti P2P completati
+          </h2>
+          <p className="mt-1 text-xs text-content-secondary">
+            Verifica gli esiti Nostr e aggiungi al portafoglio le licenze già
+            ricevute dal nodo.
+          </p>
+          {p2pSyncMessage && (
+            <p
+              aria-live="polite"
+              className="mt-2 text-xs text-content-secondary"
+            >
+              {p2pSyncMessage}
+            </p>
+          )}
+        </div>
+        <button
+          className="w-fit rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          disabled={
+            !isPortfolioLoaded ||
+            isSyncingP2PPurchases ||
+            (!isTestModeEnabled && !nodeInfo?.pubkey)
+          }
+          onClick={() => void syncCompletedP2PPurchases()}
+          type="button"
+        >
+          {isSyncingP2PPurchases ? 'Verifica…' : 'Sincronizza acquisti'}
+        </button>
+      </section>
+      {(incomingPurchases.length > 0 || purchaseExecutionMessage) && (
+        <section className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5 space-y-3">
+          <div>
+            <h2 className="text-lg font-bold text-content-primary">
+              Richieste d’acquisto P2P
+            </h2>
+            <p className="mt-1 text-xs text-content-secondary">
+              {incomingPurchases.length > 0
+                ? 'Gli acquirenti hanno autorizzato lo swap sul proprio nodo. Completa qui il trasferimento atomico.'
+                : 'Ultimo esito della compravendita atomica.'}
+            </p>
+          </div>
+          {purchaseExecutionMessage && (
+            <p aria-live="polite" className="text-sm text-content-secondary">
+              {purchaseExecutionMessage}
+            </p>
+          )}
+          {incomingPurchases.map((purchase) => (
+            <article
+              className="flex flex-col gap-2 rounded-xl border border-border-default/50 bg-surface-overlay p-3 sm:flex-row sm:items-center sm:justify-between"
+              key={purchase.request.id}
+            >
+              <div>
+                <p className="text-sm font-semibold text-content-primary">
+                  {purchase.offer.listing.productName}
+                </p>
+                <p className="text-xs text-content-secondary">
+                  {purchase.offer.resalePriceUsdt.toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}{' '}
+                  USDT · nodo acquirente{' '}
+                  {purchase.request.buyerNodePubkey.slice(0, 14)}…
+                </p>
+              </div>
+              <button
+                className="w-fit rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-black disabled:opacity-50"
+                disabled={
+                  executingPurchaseId !== null || !purchase.offer.swapString
+                }
+                onClick={() => void executeP2PPurchase(purchase)}
+                type="button"
+              >
+                {executingPurchaseId === purchase.request.id
+                  ? 'Completamento swap…'
+                  : 'Completa scambio atomico'}
+              </button>
+            </article>
+          ))}
+        </section>
+      )}
       {showEulaAnalyzer ? (
         <section className="space-y-4 rounded-2xl border border-border-default bg-surface-overlay p-5">
           <div className="flex items-center justify-between gap-3">
@@ -392,6 +1088,59 @@ export function Component() {
                 const contractId = `rgb1${lic.id.replace(/-/g, '').slice(0, 10)}...licex`
                 const sealUtxo = `txid:${lic.id.replace(/-/g, '').slice(0, 8)}...:1`
                 const isCopied = copiedKey === lic.id
+                const hasActiveOffer = p2pOffers.some(
+                  (offer) =>
+                    offer.licenseRecordId === lic.id &&
+                    offer.status === 'active'
+                )
+                const withinTransferLimit =
+                  lic.listing.maxTransfers === null ||
+                  lic.transferCount < lic.listing.maxTransfers
+                const licenseAssetId = lic.listing.rgbAsset?.assetId
+                const isNodeBackedLicense =
+                  (lic.listing.rgbAsset?.mode === 'rgb-node' &&
+                    lic.listing.rgbAsset.status === 'issued' &&
+                    [
+                      ...(nodeAssets?.nia ?? []),
+                      ...(nodeAssets?.uda ?? []),
+                      ...(nodeAssets?.cfa ?? []),
+                      ...(nodeAssets?.ifa ?? []),
+                    ].some((asset) => asset.asset_id === licenseAssetId)) ||
+                  (isTestModeEnabled &&
+                    lic.listing.rgbAsset?.mode === 'demo' &&
+                    getP2PSimulationAssetBalance(licenseAssetId ?? '') >= 1)
+                const isDemoAsset =
+                  isTestModeEnabled && lic.listing.rgbAsset?.mode === 'demo'
+                const meetsHoldingPeriod =
+                  isDemoAsset ||
+                  lic.listing.minHoldingDays === null ||
+                  !lic.activatedAt ||
+                  Date.now() - new Date(lic.activatedAt).getTime() >=
+                    lic.listing.minHoldingDays * 24 * 60 * 60 * 1000
+                const remainingHoldingDays =
+                  lic.listing.minHoldingDays !== null && lic.activatedAt
+                    ? Math.ceil(
+                        (lic.listing.minHoldingDays * 24 * 60 * 60 * 1000 -
+                          (Date.now() - new Date(lic.activatedAt).getTime())) /
+                          (24 * 60 * 60 * 1000)
+                      )
+                    : 0
+                const resaleBlockReason =
+                  lic.listing.transferPolicy !== 'transferable_free'
+                    ? 'La policy della licenza non consente la rivendita libera.'
+                    : !withinTransferLimit
+                      ? 'È stato raggiunto il numero massimo di trasferimenti.'
+                      : !isNodeBackedLicense
+                        ? 'Asset non disponibile nel nodo o nel portafoglio demo.'
+                        : !meetsHoldingPeriod
+                          ? `Periodo minimo di possesso: attendi ancora ${remainingHoldingDays} giorni.`
+                          : 'Pubblica un’offerta di rivendita.'
+                const canResell =
+                  lic.licenseStatus === 'active' &&
+                  lic.listing.transferPolicy === 'transferable_free' &&
+                  withinTransferLimit &&
+                  isNodeBackedLicense &&
+                  meetsHoldingPeriod
                 return (
                   <div
                     className="group relative flex flex-col justify-between p-5 rounded-2xl bg-surface-overlay border border-border-default hover:border-primary/50 transition-all duration-300 shadow-md hover:shadow-xl"
@@ -513,11 +1262,29 @@ export function Component() {
                           : 'Non ancora attivata'}
                       </span>
                       <button
-                        className="flex items-center gap-1 text-primary hover:underline font-semibold transition-colors"
-                        onClick={() => navigate(LICEX_MARKETPLACE_PATH)}
+                        className="flex items-center gap-1 text-primary hover:underline font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!canResell || hasActiveOffer}
+                        onClick={() => {
+                          setSellingLicenseId(lic.id)
+                          setResalePrice('')
+                          setSellMessage(null)
+                        }}
+                        title={
+                          hasActiveOffer
+                            ? 'Questa licenza ha già un’offerta attiva'
+                            : resaleBlockReason
+                        }
                         type="button"
                       >
-                        Rivendi o Trasferisci
+                        {hasActiveOffer
+                          ? 'Offerta attiva'
+                          : canResell
+                            ? 'Metti in vendita'
+                            : !meetsHoldingPeriod
+                              ? `Attendi ${remainingHoldingDays} gg`
+                              : !isNodeBackedLicense
+                                ? 'Asset non disponibile'
+                                : 'Non rivendibile'}
                         <ArrowUpRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -593,93 +1360,6 @@ export function Component() {
               </table>
             </div>
           </div>
-        </div>
-      )}
-      {contractListing?.rgbAsset && (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-          onClick={() => setContractListing(null)}
-          role="dialog"
-        >
-          <section
-            className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-border-default bg-surface-overlay shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="sticky top-0 flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-overlay p-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-                  Contratto RGB UDA
-                </p>
-                <h2 className="mt-1 text-lg font-bold text-content-primary">
-                  {contractListing.productName} · {contractListing.edition}
-                </h2>
-              </div>
-              <button
-                aria-label="Chiudi contratto"
-                className="rounded-lg p-2 text-content-secondary hover:bg-surface-elevated hover:text-content-primary"
-                onClick={() => setContractListing(null)}
-                type="button"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </header>
-            <div className="space-y-4 p-5">
-              <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-lg bg-surface-elevated p-3">
-                  <dt className="text-[11px] text-content-tertiary">
-                    Contract / Asset ID
-                  </dt>
-                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
-                    {contractListing.rgbAsset.contractId}
-                  </dd>
-                </div>
-                <div className="rounded-lg bg-surface-elevated p-3">
-                  <dt className="text-[11px] text-content-tertiary">
-                    Schema e stato
-                  </dt>
-                  <dd className="mt-1 text-sm font-semibold text-content-primary">
-                    {contractListing.rgbAsset.schema} · In vendita
-                  </dd>
-                </div>
-                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
-                  <dt className="text-[11px] text-content-tertiary">
-                    SHA-256 dei termini EULA
-                  </dt>
-                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
-                    {contractListing.rgbAsset.metadataHash}
-                  </dd>
-                </div>
-                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
-                  <dt className="text-[11px] text-content-tertiary">
-                    Chiave pubblica issuer
-                  </dt>
-                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
-                    {contractListing.rgbAsset.issuerPubkey ?? 'Non disponibile'}
-                  </dd>
-                </div>
-                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
-                  <dt className="text-[11px] text-content-tertiary">
-                    Firma issuer
-                  </dt>
-                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
-                    {contractListing.rgbAsset.issuerSignature ??
-                      'Non disponibile'}
-                  </dd>
-                </div>
-              </dl>
-              <div>
-                <h3 className="mb-2 text-sm font-bold text-content-primary">
-                  Metadati inclusi nel contratto
-                </h3>
-                <pre className="max-h-80 overflow-auto rounded-xl border border-border-subtle bg-surface-elevated p-4 text-[11px] leading-relaxed text-content-secondary whitespace-pre-wrap break-words">
-                  {formatContractDetails(
-                    contractListing.rgbAsset.contractDetails
-                  )}
-                </pre>
-              </div>
-            </div>
-          </section>
         </div>
       )}
     </div>
