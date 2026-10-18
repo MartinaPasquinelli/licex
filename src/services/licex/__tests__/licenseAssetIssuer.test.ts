@@ -65,12 +65,15 @@ describe('demo license asset issuer', () => {
         transferPolicy: 'transferable_free',
         version: '2026.1',
       },
-      issueUda
+      issueUda,
+      vi.fn().mockResolvedValue('mock-schnorr-signature'),
+      '02mock-issuer-public-key'
     )
 
     expect(issueUda).toHaveBeenCalledWith(
       expect.objectContaining({
         attachments_file_digests: [],
+        details: expect.stringContaining('mock-schnorr-signature'),
         precision: 0,
       })
     )

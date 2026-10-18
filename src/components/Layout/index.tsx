@@ -1054,7 +1054,10 @@ export const Layout = (props: Props) => {
                       LicEX
                     </span>
                     <span className="text-[8px] uppercase tracking-wider text-[#9A94BC] font-semibold">
-                      License Exchange
+                      from{' '}
+                      <span className="font-blac ktext-[8px] tracking-widest bg-gradient-to-r from-[#7135FF] via-[#19C994] to-[#19C994] bg-clip-text text-transparent">
+                        KaleidoSwap
+                      </span>
                     </span>
                   </div>
                 </div>

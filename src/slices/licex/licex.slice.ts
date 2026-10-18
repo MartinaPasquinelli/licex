@@ -6,6 +6,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import type { NostrLicenseOffer } from '../../types/licexNostr'
 
 import type {
+  Company,
   LicenseAssetReference,
   LicenseListing,
   WatchlistItem,
@@ -231,16 +232,33 @@ export const licexSlice = createSlice({
         rgbAsset: LicenseAssetReference
         royaltyPercent: number
         transferPolicy: TransferPolicy
+        listingDetails?: Partial<
+          Pick<
+            LicenseListing,
+            | 'category'
+            | 'durationDays'
+            | 'licenseType'
+            | 'platforms'
+            | 'productDescription'
+            | 'tags'
+            | 'version'
+          >
+        >
+        company?: Pick<Company, 'companyStatus' | 'domain' | 'name'>
       }>
     ) {
       const template = MOCK_LISTINGS[0]
       const now = new Date().toISOString()
       const listing: LicenseListing = {
         ...template,
-        company: template.company,
+        company: action.payload.company
+          ? { ...template.company, ...action.payload.company }
+          : template.company,
+        companyId: action.payload.company ? 'issuer-demo' : template.companyId,
         createdAt: now,
         edition: action.payload.edition,
         id: action.payload.id,
+        ...action.payload.listingDetails,
         price: action.payload.price,
         productName: action.payload.productName,
         rgbAsset: action.payload.rgbAsset,

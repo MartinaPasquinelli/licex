@@ -27,6 +27,9 @@ export interface LicenseAssetReference {
   assetId: string
   contractId: string
   metadataHash: string
+  contractDetails?: string
+  issuerSignature?: string
+  issuerPubkey?: string
   schema: 'UDA' | 'NIA'
   status: RgbAssetStatus
   mode: LicenseAssetMode

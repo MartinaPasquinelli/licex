@@ -13,21 +13,163 @@ import {
   Search,
   Sparkles,
   Zap,
+  FileText,
+  X,
+  Plus,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
 
-import { useAppSelector } from '../../app/store/hooks'
+import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
 import { LICEX_MARKETPLACE_PATH } from '../../app/router/paths'
+import { MOCK_EULA_ANALYSIS } from '../../constants/licex-mock-data'
+import { mintLicenseListing } from '../../slices/licex/licex.slice'
+import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
+import {
+  createIssuanceInputFromEula,
+  issueLicenseRgbAsset,
+} from '../../services/licex/licenseAssetIssuer'
+import type { IssuedLicenseAsset } from '../../services/licex/licenseAssetIssuer'
+import type { LicenseListing } from '../../types/licex'
+
+const formatContractDetails = (details?: string): string => {
+  if (!details) return 'Il nodo non ha restituito i dettagli del contratto.'
+  try {
+    return JSON.stringify(JSON.parse(details), null, 2)
+  } catch {
+    return details
+  }
+}
+
+const getIssuanceErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object') {
+    const value = error as Record<string, unknown>
+    const data = value.data
+    if (data && typeof data === 'object') {
+      const details = data as Record<string, unknown>
+      for (const key of ['error', 'message', 'detail']) {
+        if (typeof details[key] === 'string' && details[key]) {
+          return details[key] as string
+        }
+      }
+    }
+    for (const key of ['error', 'message', 'detail']) {
+      if (typeof value[key] === 'string' && value[key]) {
+        return value[key] as string
+      }
+    }
+    if (typeof value.status === 'number') {
+      return `Il nodo RGB ha rifiutato la richiesta (errore ${value.status}).`
+    }
+  }
+  return 'Errore sconosciuto durante la comunicazione con il nodo RGB.'
+}
+
+const isMissingUncoloredUtxo = (error: unknown): boolean =>
+  getIssuanceErrorMessage(error).toLowerCase().includes('no uncolored utxos')
 
 export function Component() {
   const navigate = useNavigate()
-  const { ownedLicenses, orders } = useAppSelector((state) => state.licex)
+  const dispatch = useAppDispatch()
+  const { ownedLicenses, orders, listings } = useAppSelector(
+    (state) => state.licex
+  )
   const [activeTab, setActiveTab] = useState<'licenses' | 'orders'>('licenses')
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [testedHandshakeId, setTestedHandshakeId] = useState<string | null>(
     null
   )
+  const [contractListing, setContractListing] = useState<LicenseListing | null>(
+    null
+  )
+  const [isCreatingUda, setIsCreatingUda] = useState(false)
+  const [issueUda] = nodeApi.endpoints.issueUdaAsset.useMutation()
+  const [createUtxos] = nodeApi.endpoints.createUtxos.useMutation()
+  const [signMessage] = nodeApi.endpoints.signMessage.useMutation()
+  const [getNetworkInfo] = nodeApi.endpoints.networkInfo.useLazyQuery()
+  const [getNodeInfo] = nodeApi.endpoints.nodeInfo.useLazyQuery()
+  const publishedLicenseListings = listings.filter(
+    (listing) =>
+      listing.status === 'published' &&
+      listing.rgbAsset?.schema === 'UDA' &&
+      listing.rgbAsset.mode === 'rgb-node'
+  )
+
+  const handleCreateDemoUda = async () => {
+    if (isCreatingUda) return
+    setIsCreatingUda(true)
+    try {
+      const network = await getNetworkInfo().unwrap()
+      if (network.network === 'Mainnet') {
+        throw new Error(
+          'Emissione demo bloccata su Mainnet. Collega il nodo a Signet o Regtest.'
+        )
+      }
+      const issuer = await getNodeInfo().unwrap()
+      const requestId = crypto.randomUUID()
+      const issuanceInput = createIssuanceInputFromEula(
+        MOCK_EULA_ANALYSIS,
+        requestId
+      )
+      const issue = () =>
+        issueLicenseRgbAsset(
+          issuanceInput,
+          (request) => issueUda(request).unwrap(),
+          async (message) =>
+            (await signMessage({ message }).unwrap()).signed_message,
+          issuer.pubkey
+        )
+      let issuedAsset: IssuedLicenseAsset
+      try {
+        issuedAsset = await issue()
+      } catch (error) {
+        if (!isMissingUncoloredUtxo(error)) throw error
+        toast.info('Preparo un UTXO Bitcoin per l’emissione UDA…')
+        await createUtxos({
+          fee_rate: 2,
+          num: 1,
+          size: 32500,
+          up_to: false,
+        }).unwrap()
+        issuedAsset = await issue()
+      }
+
+      dispatch(
+        mintLicenseListing({
+          company: {
+            companyStatus: 'pending',
+            domain: MOCK_EULA_ANALYSIS.suggestedListing.publisherDomain,
+            name: MOCK_EULA_ANALYSIS.suggestedListing.publisherName,
+          },
+          edition: issuanceInput.edition,
+          id: `lic-${requestId}`,
+          listingDetails: {
+            category: 'Creative & Design',
+            durationDays: MOCK_EULA_ANALYSIS.suggestedListing.durationDays,
+            licenseType: MOCK_EULA_ANALYSIS.suggestedListing.licenseType,
+            platforms: [...MOCK_EULA_ANALYSIS.suggestedListing.platforms],
+            productDescription:
+              MOCK_EULA_ANALYSIS.suggestedListing.productDescription,
+            tags: [...MOCK_EULA_ANALYSIS.suggestedListing.tags],
+            version: MOCK_EULA_ANALYSIS.suggestedListing.version,
+          },
+          price: MOCK_EULA_ANALYSIS.suggestedListing.priceSats,
+          productName: issuanceInput.productName,
+          rgbAsset: issuedAsset,
+          royaltyPercent: issuanceInput.royaltyPercent,
+          transferPolicy: issuanceInput.transferPolicy,
+        })
+      )
+      toast.success(`UDA demo creata e pubblicata su ${network.network}.`)
+    } catch (error) {
+      const message = getIssuanceErrorMessage(error)
+      toast.error(message)
+    } finally {
+      setIsCreatingUda(false)
+    }
+  }
 
   const handleTestHandshake = (id: string) => {
     setTestedHandshakeId(id)
@@ -73,6 +215,15 @@ export function Component() {
 
           <div className="flex items-center gap-3">
             <button
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#9B5094]/40 bg-[#9B5094]/10 hover:bg-[#9B5094]/20 text-[#9B5094] dark:text-[#CDF7F6] font-bold text-sm transition-all"
+              disabled={isCreatingUda}
+              onClick={handleCreateDemoUda}
+              type="button"
+            >
+              <Plus className="w-4 h-4" />
+              {isCreatingUda ? 'Creazione UDA…' : 'Crea UDA demo'}
+            </button>
+            <button
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#8FB8DE] to-[#9B5094] hover:opacity-95 text-white font-bold text-sm shadow-md transition-all transform hover:scale-[1.02] active:scale-[0.98]"
               onClick={() => navigate(LICEX_MARKETPLACE_PATH)}
               type="button"
@@ -114,6 +265,74 @@ export function Component() {
       {/* Content Area */}
       {activeTab === 'licenses' ? (
         <div className="space-y-4">
+          {publishedLicenseListings.length > 0 && (
+            <section className="rounded-2xl border border-[#9B5094]/25 bg-gradient-to-br from-[#9B5094]/10 via-surface-overlay to-surface-overlay p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-lg font-bold text-content-primary">
+                    Licenze emesse da te
+                  </h2>
+                  <p className="text-xs text-content-secondary mt-0.5">
+                    Le UDA pubblicate nel Marketplace e i relativi contratti.
+                  </p>
+                </div>
+                <span className="text-xs text-content-secondary">
+                  {publishedLicenseListings.length} in vendita
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {publishedLicenseListings.map((listing) => (
+                  <article
+                    className="rounded-xl border border-border-subtle bg-surface-overlay/80 p-4 space-y-3"
+                    key={listing.id}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-content-primary truncate">
+                          {listing.productName}
+                        </h3>
+                        <p className="text-xs text-content-secondary">
+                          {listing.edition} · v{listing.version}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                        In vendita
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-content-secondary">Prezzo</span>
+                      <span className="font-bold text-content-primary">
+                        {listing.price.toLocaleString()} sats
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-mono text-content-tertiary truncate">
+                      UDA: {listing.rgbAsset?.contractId}
+                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        className="flex-1 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/20"
+                        onClick={() => setContractListing(listing)}
+                        type="button"
+                      >
+                        <FileText className="inline w-3.5 h-3.5 mr-1.5" />
+                        Vedi contratto
+                      </button>
+                      <button
+                        className="rounded-lg bg-surface-elevated px-3 py-2 text-xs font-semibold text-content-primary hover:bg-surface-elevated/70"
+                        onClick={() =>
+                          navigate(`${LICEX_MARKETPLACE_PATH}/${listing.id}`)
+                        }
+                        type="button"
+                      >
+                        Marketplace
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Search bar */}
           <div className="flex items-center justify-between gap-4">
             <div className="relative flex-1 max-w-md">
@@ -359,6 +578,93 @@ export function Component() {
               </table>
             </div>
           </div>
+        </div>
+      )}
+      {contractListing?.rgbAsset && (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={() => setContractListing(null)}
+          role="dialog"
+        >
+          <section
+            className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-border-default bg-surface-overlay shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="sticky top-0 flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-overlay p-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                  Contratto RGB UDA
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-content-primary">
+                  {contractListing.productName} · {contractListing.edition}
+                </h2>
+              </div>
+              <button
+                aria-label="Chiudi contratto"
+                className="rounded-lg p-2 text-content-secondary hover:bg-surface-elevated hover:text-content-primary"
+                onClick={() => setContractListing(null)}
+                type="button"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+            <div className="space-y-4 p-5">
+              <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-lg bg-surface-elevated p-3">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Contract / Asset ID
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.contractId}
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Schema e stato
+                  </dt>
+                  <dd className="mt-1 text-sm font-semibold text-content-primary">
+                    {contractListing.rgbAsset.schema} · In vendita
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
+                  <dt className="text-[11px] text-content-tertiary">
+                    SHA-256 dei termini EULA
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.metadataHash}
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Chiave pubblica issuer
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.issuerPubkey ?? 'Non disponibile'}
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Firma issuer
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.issuerSignature ??
+                      'Non disponibile'}
+                  </dd>
+                </div>
+              </dl>
+              <div>
+                <h3 className="mb-2 text-sm font-bold text-content-primary">
+                  Metadati inclusi nel contratto
+                </h3>
+                <pre className="max-h-80 overflow-auto rounded-xl border border-border-subtle bg-surface-elevated p-4 text-[11px] leading-relaxed text-content-secondary whitespace-pre-wrap break-words">
+                  {formatContractDetails(
+                    contractListing.rgbAsset.contractDetails
+                  )}
+                </pre>
+              </div>
+            </div>
+          </section>
         </div>
       )}
     </div>
