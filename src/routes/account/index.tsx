@@ -170,6 +170,7 @@ export const Component = () => {
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 {
+                  border: 'border-status-success/30',
                   color: 'text-status-success',
                   hover:
                     'hover:border-status-success/40 hover:bg-status-success/5',
@@ -184,6 +185,7 @@ export const Component = () => {
                     ),
                 },
                 {
+                  border: 'border-border-subtle',
                   color: 'text-amber-400',
                   hover: 'hover:border-amber-500/40 hover:bg-amber-500/5',
                   icon: <Zap className="w-4 h-4 text-amber-400" />,
@@ -191,6 +193,7 @@ export const Component = () => {
                   onClick: () => navigate(CHANNELS_PATH),
                 },
                 {
+                  border: 'border-status-danger/30',
                   color: 'text-status-danger',
                   hover:
                     'hover:border-status-danger/40 hover:bg-status-danger/5',
@@ -205,15 +208,16 @@ export const Component = () => {
                     ),
                 },
                 {
+                  border: 'border-border-subtle',
                   color: 'text-[#9A94BC]',
                   hover: 'hover:border-accent/40 hover:bg-accent/5',
                   icon: <History className="w-4 h-4" />,
                   label: 'Storico',
                   onClick: () => navigate(WALLET_HISTORY_DEPOSITS_PATH),
                 },
-              ].map(({ icon, label, color, hover, onClick }) => (
+              ].map(({ icon, label, color, border, hover, onClick }) => (
                 <button
-                  className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-surface-elevated/50 border border-border-subtle ${hover} transition-all group`}
+                  className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-surface-elevated/50 border ${border} ${hover} transition-all group`}
                   key={label}
                   onClick={onClick}
                   type="button"
@@ -223,7 +227,7 @@ export const Component = () => {
                   >
                     {icon}
                   </span>
-                  <span className="text-xs font-semibold text-content-secondary group-hover:text-content-primary">
+                  <span className={`text-xs font-semibold ${color}`}>
                     {label}
                   </span>
                 </button>

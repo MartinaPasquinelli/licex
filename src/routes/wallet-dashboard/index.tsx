@@ -584,7 +584,7 @@ export const Component = () => {
                   )
                 }
               >
-                <Download className="w-3.5 h-3.5 flex-shrink-0" />
+                <Download className="w-3.5 h-3.5 flex-shrink-0 text-status-success" />
                 <span className="truncate">{t('dashboard.deposit')}</span>
               </button>
               <button
@@ -613,7 +613,7 @@ export const Component = () => {
                   )
                 }
               >
-                <Upload className="w-3.5 h-3.5 flex-shrink-0" />
+                <Upload className="w-3.5 h-3.5 flex-shrink-0 text-status-danger" />
                 <span className="truncate">{t('dashboard.withdraw')}</span>
               </button>
             </div>

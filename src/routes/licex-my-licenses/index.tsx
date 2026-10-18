@@ -694,12 +694,12 @@ export function Component() {
               </div>
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-content-primary tracking-tight">
-              Le Mie Licenze (Asset RGB)
+              My Licenses (RGB Assets)
             </h1>
             <p className="text-content-secondary text-sm mt-1 max-w-xl">
-              Portafoglio delle tue licenze software tokenizzate come asset RGB
-              su Bitcoin. Ogni licenza è salvata persistentemente nel tuo
-              database locale e legata crittograficamente al tuo nodo.
+              Your software licenses tokenized as RGB assets on Bitcoin. Each
+              license is persisted in your local database and cryptographically
+              linked to your node.
             </p>
           </div>
 
@@ -719,7 +719,7 @@ export function Component() {
               type="button"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              Reset DB Locale
+              Reset Local DB
             </button>
             <button
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#9B5094]/40 bg-[#9B5094]/10 hover:bg-[#9B5094]/20 text-[#9B5094] dark:text-[#CDF7F6] font-bold text-sm transition-all"
@@ -727,14 +727,14 @@ export function Component() {
               type="button"
             >
               <FileSearch className="w-4 h-4" />
-              {showEulaAnalyzer ? 'Chiudi analizzatore' : 'Analizza EULA'}
+              {showEulaAnalyzer ? 'Close analyzer' : 'Analyze EULA'}
             </button>
             <button
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#8FB8DE] to-[#9B5094] hover:opacity-95 text-white font-bold text-sm shadow-md transition-all transform hover:scale-[1.02] active:scale-[0.98]"
               onClick={() => navigate(LICEX_MARKETPLACE_PATH)}
               type="button"
             >
-              Esplora Marketplace
+              Browse Marketplace
             </button>
           </div>
         </div>
@@ -751,7 +751,7 @@ export function Component() {
             type="button"
           >
             <Key className="w-4 h-4" />
-            Licenze Possedute ({ownedLicenses.length})
+            Owned Licenses ({ownedLicenses.length})
           </button>
           <button
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
@@ -763,31 +763,31 @@ export function Component() {
             type="button"
           >
             <Clock className="w-4 h-4" />
-            Storico Ordini & Transazioni ({orders.length})
+            Order & Transaction History ({orders.length})
           </button>
         </div>
       </div>
 
       {/* Content Area */}
       {isP2PSimulationAvailable() && (
-        <section className="rounded-2xl border border-violet-400/30 bg-violet-400/5 p-4 space-y-3">
+        <section className="rounded-2xl border border-violet-200 bg-violet-50 p-4 space-y-3 dark:border-violet-400/30 dark:bg-violet-400/5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-content-primary">
-                  Portafoglio P2P di test
+                  P2P Test Wallet
                 </h2>
-                <span className="rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-300">
-                  Solo sviluppo
+                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-700 dark:bg-violet-400/15 dark:text-violet-300">
+                  Development only
                 </span>
               </div>
               <p className="mt-1 text-xs text-content-secondary">
-                Simula saldo e trasferimento per verificare il flusso Nostr. Non
-                crea fondi né asset RGB reali.
+                Simulate balances and transfers to test the Nostr flow. No real
+                funds or RGB assets are created.
               </p>
               {isTestModeEnabled && (
-                <p className="mt-2 text-sm font-semibold text-violet-200">
-                  Saldo demo:{' '}
+                <p className="mt-2 text-sm font-semibold text-violet-800 dark:text-violet-200">
+                  Demo balance:{' '}
                   {testWalletBalance.toLocaleString(undefined, {
                     maximumFractionDigits: 2,
                   })}{' '}
@@ -805,19 +805,19 @@ export function Component() {
             </div>
             <div className="flex flex-wrap gap-2">
               <button
-                className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white"
+                className="rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-800"
                 onClick={activateTestWallet}
                 type="button"
               >
-                Attiva / finanzia test
+                Enable / fund test wallet
               </button>
               <button
-                className="rounded-lg border border-violet-400/30 px-3 py-2 text-xs font-semibold text-violet-200 disabled:opacity-50"
+                className="rounded-lg border border-violet-300 px-3 py-2 text-xs font-semibold text-violet-800 disabled:opacity-50 dark:border-violet-400/30 dark:text-violet-200"
                 disabled={!isTestModeEnabled}
                 onClick={() => void createTestLicense()}
                 type="button"
               >
-                Crea licenza demo
+                Create demo license
               </button>
               <button
                 className="rounded-lg border border-border-default px-3 py-2 text-xs font-semibold text-content-secondary disabled:opacity-50"
@@ -832,7 +832,7 @@ export function Component() {
                 }}
                 type="button"
               >
-                Ripristina test
+                Reset test wallet
               </button>
             </div>
           </div>
@@ -841,7 +841,7 @@ export function Component() {
       <section className="flex flex-col gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold text-content-primary">
-            Acquisti P2P completati
+            Completed P2P Purchases
           </h2>
           <p className="mt-1 text-xs text-content-secondary">
             Verifica gli esiti Nostr e aggiungi al portafoglio le licenze già
@@ -1046,7 +1046,7 @@ export function Component() {
             <div className="p-12 text-center rounded-2xl border border-dashed border-border-default bg-surface-overlay/50">
               <Key className="w-10 h-10 text-content-tertiary mx-auto mb-3 opacity-60" />
               <h3 className="text-lg font-bold text-content-primary">
-                Nessuna licenza trovata
+                No licenses found
               </h3>
               <p className="text-sm text-content-secondary mt-1">
                 Non hai ancora acquistato licenze software o nessuna corrisponde
@@ -1139,7 +1139,9 @@ export function Component() {
 
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-green-500/10 text-green-600 border border-green-500/20 text-xs font-semibold">
                           <ShieldCheck className="w-3.5 h-3.5" />
-                          {lic.licenseStatus}
+                          {lic.licenseStatus === 'active'
+                            ? 'Active'
+                            : lic.licenseStatus}
                         </div>
                       </div>
 
@@ -1213,7 +1215,7 @@ export function Component() {
                       <div className="grid grid-cols-2 gap-2 mt-4 text-xs">
                         <div className="p-2 rounded-lg bg-surface-elevated/40 border border-border-subtle">
                           <span className="text-content-tertiary block text-[10px]">
-                            Policy Trasferimento
+                            Transfer Policy
                           </span>
                           <span className="font-semibold text-content-primary">
                             {lic.listing.transferPolicy === 'transferable_free'
@@ -1223,7 +1225,7 @@ export function Component() {
                         </div>
                         <div className="p-2 rounded-lg bg-surface-elevated/40 border border-border-subtle">
                           <span className="text-content-tertiary block text-[10px]">
-                            Trasferimenti
+                            Transfers
                           </span>
                           <span className="font-semibold text-content-primary">
                             {lic.transferCount} volte
