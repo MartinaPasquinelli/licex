@@ -69,7 +69,6 @@ interface IncomingP2PPurchase {
   request: NostrMarketplacePurchaseRequest
   offer: NostrLicenseOffer
 }
-import type { LicenseListing } from '../../types/licex'
 import { EulaAnalyzerTab } from '../licex-assistant/EulaAnalyzerTab'
 
 const formatContractDetails = (details?: string): string => {
@@ -197,67 +196,6 @@ export function Component() {
       listing.rgbAsset?.schema === 'UDA' &&
       listing.rgbAsset.mode === 'rgb-node'
   )
-
-  const handleCreateDemoUda = async () => {
-    if (isCreatingUda) return
-    setIsCreatingUda(true)
-    try {
-      const network = await getNetworkInfo().unwrap()
-      if (network.network === 'Mainnet') {
-        throw new Error(
-          'Emissione demo bloccata su Mainnet. Collega il nodo a Signet o Regtest.'
-        )
-      }
-      const issuer = await getNodeInfo().unwrap()
-      const requestId = crypto.randomUUID()
-      const issuanceInput = createIssuanceInputFromEula(
-        MOCK_EULA_ANALYSIS,
-        requestId
-      )
-      const issue = () =>
-        issueLicenseRgbAsset(
-          issuanceInput,
-          (request) => issueUda(request).unwrap(),
-          async (message) =>
-            (await signMessage({ message }).unwrap()).signed_message,
-          issuer.pubkey
-        )
-      let issuedAsset: IssuedLicenseAsset
-      try {
-        issuedAsset = await issue()
-      } catch (error) {
-        if (!isMissingUncoloredUtxo(error)) throw error
-        toast.info('Preparo un UTXO Bitcoin per l’emissione UDA…')
-        await createUtxos({
-          fee_rate: 2,
-          num: 1,
-          size: 32500,
-          up_to: false,
-        }).unwrap()
-        issuedAsset = await issue()
-      }
-
-      dispatch(
-        mintLicenseListing({
-          category: 'Creative & Design',
-          edition: issuanceInput.edition,
-          id: `lic-${requestId}`,
-          platforms: [...MOCK_EULA_ANALYSIS.suggestedListing.platforms],
-          price: MOCK_EULA_ANALYSIS.suggestedListing.priceSats,
-          productName: issuanceInput.productName,
-          rgbAsset: issuedAsset,
-          royaltyPercent: issuanceInput.royaltyPercent,
-          transferPolicy: issuanceInput.transferPolicy,
-        })
-      )
-      toast.success(`UDA demo creata e pubblicata su ${network.network}.`)
-    } catch (error) {
-      const message = getIssuanceErrorMessage(error)
-      toast.error(message)
-    } finally {
-      setIsCreatingUda(false)
-    }
-  }
 
   const handleTestHandshake = (id: string) => {
     setTestedHandshakeId(id)
@@ -1360,6 +1298,167 @@ export function Component() {
               </table>
             </div>
           </div>
+        </div>
+      )}
+      {selectedLicense && (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={() => setSellingLicenseId(null)}
+          role="dialog"
+        >
+          <section
+            className="w-full max-w-md rounded-2xl border border-border-default bg-surface-overlay p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-content-primary">
+                  Metti in vendita la licenza
+                </h2>
+                <p className="mt-1 text-sm text-content-secondary">
+                  {selectedLicense.listing.productName} · usata.{' '}
+                  {selectedLicense.listing.rgbAsset?.mode === 'demo'
+                    ? 'Verrà pubblicata un’offerta di scambio simulata sui relay Nostr.'
+                    : 'Verrà creato uno swap atomico RGB-USDT dal nodo.'}
+                </p>
+              </div>
+              <Tag className="h-5 w-5 shrink-0 text-primary" />
+            </div>
+            <label className="mt-5 block text-sm font-medium text-content-primary">
+              Prezzo di rivendita (USDT)
+              <input
+                autoFocus
+                className="mt-2 w-full rounded-xl border border-border-default bg-surface-elevated px-3 py-2.5 text-content-primary outline-none focus:border-primary"
+                min="0.01"
+                onChange={(event) => setResalePrice(event.target.value)}
+                placeholder="es. 65"
+                step="0.01"
+                type="number"
+                value={resalePrice}
+              />
+            </label>
+            {sellMessage && (
+              <p
+                aria-live="polite"
+                className={`mt-3 text-sm ${
+                  sellMessage.startsWith('Offerta pubblicata')
+                    ? 'text-emerald-400'
+                    : 'text-rose-400'
+                }`}
+              >
+                {sellMessage}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                className="rounded-xl border border-border-default px-4 py-2 text-sm text-content-secondary hover:text-content-primary"
+                disabled={isPublishingOffer}
+                onClick={() => setSellingLicenseId(null)}
+                type="button"
+              >
+                Chiudi
+              </button>
+              <button
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                disabled={
+                  isPublishingOffer ||
+                  sellMessage?.startsWith('Offerta pubblicata')
+                }
+                onClick={() => void submitResaleOffer()}
+                type="button"
+              >
+                {isPublishingOffer ? 'Pubblicazione…' : 'Pubblica offerta'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {contractListing?.rgbAsset && (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={() => setContractListing(null)}
+          role="dialog"
+        >
+          <section
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border-default bg-surface-overlay shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="sticky top-0 flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-overlay p-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                  Contratto RGB UDA
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-content-primary">
+                  {contractListing.productName} · {contractListing.edition}
+                </h2>
+              </div>
+              <button
+                aria-label="Chiudi contratto"
+                className="rounded-lg p-2 text-content-secondary hover:bg-surface-elevated hover:text-content-primary"
+                onClick={() => setContractListing(null)}
+                type="button"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+            <div className="space-y-4 p-5">
+              <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-lg bg-surface-elevated p-3">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Contract / Asset ID
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.contractId}
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Schema e stato
+                  </dt>
+                  <dd className="mt-1 text-sm font-semibold text-content-primary">
+                    {contractListing.rgbAsset.schema} · In vendita
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
+                  <dt className="text-[11px] text-content-tertiary">
+                    SHA-256 dei termini EULA
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.metadataHash}
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Chiave pubblica issuer
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.issuerPubkey ?? 'Non disponibile'}
+                  </dd>
+                </div>
+                <div className="rounded-lg bg-surface-elevated p-3 sm:col-span-2">
+                  <dt className="text-[11px] text-content-tertiary">
+                    Firma issuer
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-content-primary">
+                    {contractListing.rgbAsset.issuerSignature ??
+                      'Non disponibile'}
+                  </dd>
+                </div>
+              </dl>
+              <div>
+                <h3 className="mb-2 text-sm font-bold text-content-primary">
+                  Metadati inclusi nel contratto
+                </h3>
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border-subtle bg-surface-elevated p-4 text-[11px] leading-relaxed text-content-secondary">
+                  {formatContractDetails(
+                    contractListing.rgbAsset.contractDetails
+                  )}
+                </pre>
+              </div>
+            </div>
+          </section>
         </div>
       )}
     </div>
