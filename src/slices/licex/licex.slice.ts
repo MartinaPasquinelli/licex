@@ -6,7 +6,6 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import type { NostrLicenseOffer } from '../../types/licexNostr'
 
 import type {
-  Company,
   LicenseAssetReference,
   LicenseListing,
   WatchlistItem,

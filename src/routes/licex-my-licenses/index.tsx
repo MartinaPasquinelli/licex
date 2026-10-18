@@ -163,23 +163,10 @@ export function Component() {
 
       dispatch(
         mintLicenseListing({
-          company: {
-            companyStatus: 'pending',
-            domain: MOCK_EULA_ANALYSIS.suggestedListing.publisherDomain,
-            name: MOCK_EULA_ANALYSIS.suggestedListing.publisherName,
-          },
+          category: 'Creative & Design',
           edition: issuanceInput.edition,
           id: `lic-${requestId}`,
-          listingDetails: {
-            category: 'Creative & Design',
-            durationDays: MOCK_EULA_ANALYSIS.suggestedListing.durationDays,
-            licenseType: MOCK_EULA_ANALYSIS.suggestedListing.licenseType,
-            platforms: [...MOCK_EULA_ANALYSIS.suggestedListing.platforms],
-            productDescription:
-              MOCK_EULA_ANALYSIS.suggestedListing.productDescription,
-            tags: [...MOCK_EULA_ANALYSIS.suggestedListing.tags],
-            version: MOCK_EULA_ANALYSIS.suggestedListing.version,
-          },
+          platforms: [...MOCK_EULA_ANALYSIS.suggestedListing.platforms],
           price: MOCK_EULA_ANALYSIS.suggestedListing.priceSats,
           productName: issuanceInput.productName,
           rgbAsset: issuedAsset,

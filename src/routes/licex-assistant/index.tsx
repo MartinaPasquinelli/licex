@@ -262,7 +262,7 @@ export function Component() {
               LICEX Assistant
             </h1>
             <p className="text-xs text-[rgb(var(--app-content-secondary))]">
-              Analisi EULA e ricerca assistita nel catalogo
+              EULA analysis and assisted catalog search
             </p>
           </div>
           <div className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 p-1">
@@ -276,7 +276,7 @@ export function Component() {
               type="button"
             >
               <FileSearch className="h-3.5 w-3.5" />
-              Analizzatore EULA
+              EULA Analyzer
             </button>
             <button
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${
@@ -288,7 +288,7 @@ export function Component() {
               type="button"
             >
               <MessageSquare className="h-3.5 w-3.5" />
-              Chat Assistente
+              Assistant Chat
             </button>
           </div>
         </div>
@@ -418,7 +418,7 @@ export function Component() {
                 <div className="p-4 rounded-2xl bg-[rgb(var(--app-surface-secondary))] border border-[rgb(var(--app-border-primary))]/30 text-xs text-[rgb(var(--app-content-secondary))] flex items-center gap-2">
                   <Sparkles className="w-3.5 h-3.5 text-[#CDF7F6] animate-spin" />
                   <span>
-                    Analyzing RGB protocol metadata & contract clauses...
+                    Analyzing RGB protocol metadata and contract clauses…
                   </span>
                 </div>
               </div>
@@ -463,7 +463,7 @@ export function Component() {
                   disabled={chatLoading}
                   id="licex-chat-input"
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask LICEX Assistant about transfer rules, price discovery, or license terms..."
+                  placeholder="Ask LICEX Assistant about transfer rules, price discovery, or license terms…"
                   type="text"
                   value={input}
                 />

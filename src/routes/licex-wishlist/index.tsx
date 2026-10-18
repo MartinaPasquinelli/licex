@@ -12,7 +12,6 @@ import {
   ThumbsUp,
   Coins,
   Search,
-  Building,
   X,
 } from 'lucide-react'
 
@@ -266,7 +265,7 @@ export function Component() {
             onClick={() => setShowModal(true)}
           >
             <Plus className="w-4 h-4" />
-            Request Software
+            Request software
           </button>
         </div>
 
@@ -429,47 +428,38 @@ export function Component() {
               key={item.id}
             >
               <div className="space-y-3">
-                <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-primary))]/35 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-bold text-[rgb(var(--app-content-primary))]">
-                        {item.title}
-                      </h3>
-                      {item.category && (
-                        <span className="mt-1 inline-flex rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] text-purple-200">
-                          {item.category}
-                        </span>
-                      )}
-                      <p className="text-xs text-[rgb(var(--app-content-secondary))] flex items-center gap-1.5 mt-0.5">
-                        <Building className="w-3.5 h-3.5 text-cyan-400" />
-                        Use Case:{' '}
-                        <span className="font-medium text-[rgb(var(--app-content-primary))]">
-                          {item.useCase}
-                        </span>
-                      </p>
-                    </div>
-
-                    <span
-                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                        item.status === 'matched'
-                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                          : item.status === 'fulfilled'
-                            ? 'bg-[#8FB8DE]/15 text-[#CDF7F6] border border-[#8FB8DE]/30'
-                            : 'bg-[#9B5094]/15 text-[#CDF7F6] border border-[#9B5094]/30'
-                      }`}
-                    >
-                      {item.status === 'matched'
-                        ? 'Publisher Matched'
-                        : item.status === 'fulfilled'
-                          ? 'Available in Catalog'
-                          : 'Open Request'}
-                    </span>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-[rgb(var(--app-content-primary))]">
+                      {item.title}
+                    </h3>
+                    {item.category && (
+                      <span className="mt-1 inline-flex rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] text-purple-200">
+                        {item.category}
+                      </span>
+                    )}
                   </div>
+
+                  <span
+                    className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                      item.status === 'matched'
+                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        : item.status === 'fulfilled'
+                          ? 'bg-[#8FB8DE]/15 text-[#CDF7F6] border border-[#8FB8DE]/30'
+                          : 'wishlist-open-request bg-[#9B5094]/15 text-[#CDF7F6] border border-[#9B5094]/30'
+                    }`}
+                  >
+                    {item.status === 'matched'
+                      ? 'Publisher Matched'
+                      : item.status === 'fulfilled'
+                        ? 'Available in Catalog'
+                        : 'Open Request'}
+                  </span>
                 </div>
 
-                <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-primary))]/35 p-3">
+                <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/10 bg-[rgb(var(--app-surface-primary))]/15 p-3">
                   <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
-                    Descrizione
+                    Description
                   </p>
                   <p className="text-xs leading-relaxed text-[rgb(var(--app-content-secondary))] line-clamp-3">
                     {item.description}
@@ -480,9 +470,9 @@ export function Component() {
                   item.platforms.length > 0) && (
                   <div className="grid gap-2 sm:grid-cols-2">
                     {item.requirements.length > 0 && (
-                      <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-primary))]/35 p-3">
+                      <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/10 bg-[rgb(var(--app-surface-primary))]/15 p-3">
                         <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
-                          Requisiti
+                          Requirements
                         </p>
                         <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-[rgb(var(--app-content-secondary))]">
                           {item.requirements.slice(0, 3).map((requirement) => (
@@ -493,9 +483,9 @@ export function Component() {
                     )}
 
                     {item.platforms.length > 0 && (
-                      <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-primary))]/35 p-3">
+                      <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/10 bg-[rgb(var(--app-surface-primary))]/15 p-3">
                         <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
-                          Piattaforme
+                          Platforms
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {item.platforms.map((plat) => (
@@ -526,7 +516,7 @@ export function Component() {
                   )}
                   {!item.budget && item.budgetFiat != null && (
                     <div className="text-[rgb(var(--app-content-secondary))]">
-                      Budget indicativo:{' '}
+                      Indicative budget:{' '}
                       <span className="font-semibold text-[rgb(var(--app-content-primary))]">
                         ${item.budgetFiat.toLocaleString('en-US')} USD
                       </span>
@@ -666,7 +656,7 @@ export function Component() {
                     </div>
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-[rgb(var(--app-content-secondary))]">
-                        Richiesta
+                        Request
                       </p>
                       <p className="text-sm font-semibold text-white">
                         {rfpPreview.title}
@@ -678,7 +668,7 @@ export function Component() {
                     {rfpPreview.platforms.length > 0 && (
                       <div>
                         <p className="text-[10px] uppercase tracking-wide text-[rgb(var(--app-content-secondary))]">
-                          Piattaforme
+                          Platforms
                         </p>
                         <p className="text-sm text-white">
                           {rfpPreview.platforms.join(', ')}
@@ -688,7 +678,7 @@ export function Component() {
                     {rfpPreview.requirements.length > 0 && (
                       <div>
                         <p className="text-[10px] uppercase tracking-wide text-[rgb(var(--app-content-secondary))]">
-                          Requisiti
+                          Requirements
                         </p>
                         <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-white">
                           {rfpPreview.requirements.map((requirement) => (
@@ -709,7 +699,7 @@ export function Component() {
                       rfpPreview.budgetSats != null) && (
                       <div>
                         <p className="text-[10px] uppercase tracking-wide text-[rgb(var(--app-content-secondary))]">
-                          Budget indicativo
+                          Indicative budget
                         </p>
                         <p className="text-sm text-white">
                           {rfpPreview.budgetFiat != null &&

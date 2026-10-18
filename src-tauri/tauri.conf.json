@@ -46,7 +46,7 @@
     },
     "createUpdaterArtifacts": true
   },
-  "productName": "KaleidoSwap",
+  "productName": "KaleidoSwap for LICEX",
   "mainBinaryName": "KaleidoSwap",
   "version": "0.6.0",
   "identifier": "com.kaleidoswap.dev",
@@ -71,7 +71,7 @@
         "minHeight": 600,
         "minWidth": 800,
         "resizable": true,
-        "title": "KaleidoSwap",
+        "title": "KaleidoSwap for LICEX",
         "titleBarStyle": "Visible",
         "visible": false,
         "width": 1200,

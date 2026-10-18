@@ -327,6 +327,64 @@
     background-color: rgb(var(--app-surface-overlay)) !important;
   }
 
+  /* Improve contrast for legacy accent utilities and dark LICEX panels in
+     light mode. Dark mode keeps the brighter palette unchanged. */
+  .light [class*='bg-slate-950'],
+  .light [class*='bg-slate-900'],
+  .light [class*='bg-slate-800'] {
+    background-color: rgb(var(--app-surface-base)) !important;
+    border-color: rgb(var(--app-border-default)) !important;
+  }
+
+  .light [class*='text-slate-200'],
+  .light [class*='text-slate-300'] {
+    color: rgb(var(--app-content-primary)) !important;
+  }
+
+  .light [class*='text-slate-400'],
+  .light [class*='text-slate-500'] {
+    color: rgb(var(--app-content-secondary)) !important;
+  }
+
+  .light [class*='text-cyan-200'],
+  .light [class*='text-cyan-300'],
+  .light [class*='text-cyan-400'] {
+    color: #0e7490 !important;
+  }
+
+  .light [class*='text-emerald-200'],
+  .light [class*='text-emerald-300'],
+  .light [class*='text-emerald-400'],
+  .light [class*='text-green-300'],
+  .light [class*='text-green-400'] {
+    color: #047857 !important;
+  }
+
+  .light [class*='text-amber-200'],
+  .light [class*='text-amber-300'],
+  .light [class*='text-amber-400'],
+  .light [class*='text-yellow-200'],
+  .light [class*='text-yellow-300'],
+  .light [class*='text-yellow-400'] {
+    color: #a16207 !important;
+  }
+
+  .light .wishlist-open-request {
+    color: #6b2b6d !important;
+  }
+
+  .light .wallet-deposit-action,
+  .light .wallet-deposit-action svg {
+    color: #166534 !important;
+    stroke: #166534 !important;
+  }
+
+  .light .wallet-channels-action,
+  .light .wallet-channels-action svg {
+    color: #854d0e !important;
+    stroke: #854d0e !important;
+  }
+
   /* Smooth global transition for background and colors */
   html {
     @apply antialiased;

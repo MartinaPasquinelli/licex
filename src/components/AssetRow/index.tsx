@@ -152,7 +152,8 @@ export const AssetRow: React.FC<AssetRowProps> = ({
           <div className="flex items-center gap-0.5">
             {[
               {
-                color: 'text-status-success hover:bg-status-success/15',
+                color:
+                  'wallet-deposit-action text-status-success hover:bg-status-success/15',
                 icon: <Download className="w-3.5 h-3.5" />,
                 label: 'Deposit',
                 onClick: () =>
