@@ -1,10 +1,22 @@
-import { combineReducers, configureStore } from '@reduxjs/toolkit'
+import {
+  combineReducers,
+  configureStore,
+  createListenerMiddleware,
+  isAnyOf,
+} from '@reduxjs/toolkit'
+import { toast } from 'react-toastify'
+import { logger } from '../../utils/logger'
 
 import { makerApi } from '../../slices/makerApi/makerApi.slice.ts'
 import { pairsSlice } from '../../slices/makerApi/pairs.slice.ts'
 import { dcaSlice } from '../../slices/dcaSlice'
 import { limitOrderSlice } from '../../slices/limitOrderSlice'
-import { licexSlice } from '../../slices/licex/licex.slice'
+import {
+  addListing,
+  licexSlice,
+  mintLicenseListing,
+} from '../../slices/licex/licex.slice'
+import { publishMarketplaceListing } from '../../services/licexNostrMarketplace'
 import { nodeReducer } from '../../slices/node/node.slice'
 import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { nodeSettingsSlice } from '../../slices/nodeSettings/nodeSettings.slice.ts'
@@ -26,9 +38,37 @@ const rootReducer = combineReducers({
   ui: uiSlice.reducer,
 })
 
+const marketplaceRelayListener =
+  createListenerMiddleware<ReturnType<typeof rootReducer>>()
+marketplaceRelayListener.startListening({
+  effect: async (action, listenerApi) => {
+    let listing
+    if (addListing.match(action)) {
+      listing = action.payload
+    } else if (mintLicenseListing.match(action)) {
+      listing = listenerApi
+        .getState()
+        .licex.listings.find((item) => item.id === action.payload.id)
+    }
+    if (!listing) return
+
+    try {
+      const eventId = await publishMarketplaceListing(listing)
+      if (eventId) toast.success('Inserzione pubblicata sui Nostr Relay')
+    } catch (error) {
+      logger.warn('[LICEX Marketplace] Relay publish failed:', error)
+      toast.warning(
+        'Inserzione salvata localmente; pubblicazione relay fallita'
+      )
+    }
+  },
+  matcher: isAnyOf(addListing, mintLicenseListing),
+})
+
 export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware()
+      .prepend(marketplaceRelayListener.middleware)
       .concat(nodeApi.middleware)
       .concat(makerApi.middleware)
       .concat(priceApi.middleware),

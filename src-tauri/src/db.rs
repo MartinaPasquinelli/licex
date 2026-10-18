@@ -519,6 +519,12 @@ pub fn delete_account(name: String) -> Result<usize, rusqlite::Error> {
         if let Err(e) = crate::secret_store::delete(&crate::nwc::service_secret_name(account.id)) {
             log::warn!("Failed to remove NWC service key from the OS credential store: {e}");
         }
+        if let Err(e) = crate::licex_nostr_marketplace::delete_identity(account.id) {
+            log::warn!("Failed to remove LICEX marketplace key from the OS credential store: {e}");
+        }
+        if let Err(e) = crate::licex_nostr_marketplace::delete_all_swap_secrets(account.id) {
+            log::warn!("Failed to remove LICEX P2P swap secrets from the OS credential store: {e}");
+        }
         if let Some(datapath) = account.datapath {
             if !datapath.is_empty() {
                 let full_path = PathBuf::from("../bin").join(datapath);
