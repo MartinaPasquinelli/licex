@@ -123,6 +123,8 @@ export async function fetchMarketplaceSnapshot(): Promise<{
         payload?.schema === 'licex-marketplace-listing' &&
         payload.version === 1 &&
         (payload.status === 'published' || payload.status === 'withdrawn') &&
+        (payload.listing?.rgbAsset?.mode !== 'demo' ||
+          isP2PSimulationEnabled()) &&
         typeof payload.listing?.id === 'string'
     )
   const offers = events.flatMap((event) => {

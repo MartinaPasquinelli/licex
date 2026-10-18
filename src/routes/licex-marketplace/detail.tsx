@@ -603,7 +603,10 @@ export function Component() {
                   hover:from-purple-500 hover:to-purple-400
                   shadow-lg shadow-purple-500/25
                   transition-all duration-300 hover:shadow-purple-500/40 hover:-translate-y-0.5
-                  active:translate-y-0"
+                  active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  listing.rgbAsset?.mode === 'demo' && !isTestModeEnabled
+                }
                 id="purchase-button"
                 onClick={() => {
                   if (!hasAccount) {
@@ -614,7 +617,11 @@ export function Component() {
                 }}
               >
                 <ShoppingCart className="w-4 h-4" />
-                {listing.price === 0 ? 'Get for Free' : 'Purchase License'}
+                {listing.rgbAsset?.mode === 'demo' && !isTestModeEnabled
+                  ? 'Attiva modalità demo'
+                  : listing.price === 0
+                    ? 'Get for Free'
+                    : 'Purchase License'}
               </button>
 
               {/* Watchlist button */}

@@ -403,6 +403,7 @@ export const licexSlice = createSlice({
             | 'category'
             | 'durationDays'
             | 'licenseType'
+            | 'paymentAsset'
             | 'platforms'
             | 'productDescription'
             | 'tags'
@@ -451,7 +452,8 @@ export const licexSlice = createSlice({
         maxTransfers:
           action.payload.transferPolicy === 'not_transferable' ? 0 : 5,
         minHoldingDays: 0,
-        paymentAsset: 'BTC (sats)',
+        paymentAsset:
+          action.payload.listingDetails?.paymentAsset || 'BTC (sats)',
         platforms: action.payload.listingDetails?.platforms || [
           'Windows',
           'macOS',
