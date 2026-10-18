@@ -321,14 +321,17 @@ export const licexSlice = createSlice({
       })
       saveLocalWishlist(state.wishlist)
     },
+
     clearChatMessages(state) {
       state.chatMessages = []
       saveLocalChatMessages(state.chatMessages)
     },
+
     clearFilters(state) {
       state.filters = initialFilters
       state.filteredListings = applyFilters(state.listings, state.filters)
     },
+
     completePurchase(
       state,
       action: PayloadAction<{ order: Order; licenseRecord: LicenseRecord }>
@@ -458,6 +461,7 @@ export const licexSlice = createSlice({
       state.listings = MOCK_LISTINGS
       state.filteredListings = applyFilters(MOCK_LISTINGS, state.filters)
     },
+
     selectListing(state, action: PayloadAction<string | null>) {
       state.selectedListing = action.payload
         ? (state.listings.find((listing) => listing.id === action.payload) ??
@@ -500,28 +504,32 @@ export const licexSlice = createSlice({
 })
 
 export const {
-  addChatMessage,
   addListing,
   addPriceAlert,
   addToWatchlist,
   addWishlistGroup,
   addWishlistItem,
-  clearChatMessages,
   clearFilters,
-  completePurchase,
-  mintLicenseListing,
+
   recordDemoPurchase,
   removeFromWatchlist,
   removePriceAlert,
   removeWishlistItem,
-  resetDatabase,
+
   selectListing,
-  setChatLoading,
+
   setFilters,
-  setOrders,
-  setOwnedLicenses,
-  setPriceAlerts,
+
   setViewMode,
   setWatchlist,
   setWishlist,
+  setPriceAlerts,
+  addChatMessage,
+  clearChatMessages,
+  setChatLoading,
+  completePurchase,
+  setOwnedLicenses,
+  setOrders,
+  mintLicenseListing,
+  resetDatabase,
 } = licexSlice.actions
