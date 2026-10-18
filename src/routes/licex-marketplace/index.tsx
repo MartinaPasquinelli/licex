@@ -15,6 +15,8 @@ import {
   Package,
   X,
   RefreshCw,
+  Building2,
+  UserRound,
 } from 'lucide-react'
 
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
@@ -74,6 +76,16 @@ function transferPolicyColor(policy: TransferPolicy): string {
     case 'transferable_free':
       return 'text-green-400 bg-green-400/10'
   }
+}
+
+function SellerBadge({ privateSeller = false }: { privateSeller?: boolean }) {
+  const Icon = privateSeller ? UserRound : Building2
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800/70 dark:text-slate-200">
+      <Icon className="h-3 w-3" />
+      {privateSeller ? 'Private seller' : 'Company seller'}
+    </span>
+  )
 }
 
 import {
@@ -180,6 +192,7 @@ const LicenseCard: React.FC<{
           {listing.company.companyStatus === 'verified' && (
             <Shield className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
           )}
+          <SellerBadge />
           {listing.status === 'published' &&
             listing.rgbAsset?.mode === 'rgb-node' && (
               <span className="ml-auto rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
@@ -301,6 +314,7 @@ const LicenseRow: React.FC<{
           {listing.company.companyStatus === 'verified' && (
             <Shield className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
           )}
+          <SellerBadge />
           <span className="text-xs text-[rgb(var(--app-content-secondary))]">
             by {listing.company.name}
           </span>
@@ -603,10 +617,10 @@ export function Component() {
               }`}
             >
               {relaySyncStatus === 'loading'
-                ? 'Relay: sincronizzazione…'
+                ? 'Relay: syncing…'
                 : relaySyncStatus === 'error'
-                  ? 'Relay: non raggiungibili'
-                  : `Relay: ${relayListingCount} inserzioni`}
+                  ? 'Relay: unreachable'
+                  : `Relay: ${relayListingCount} listings`}
             </div>
             <button
               aria-label="Sincronizza marketplace dai relay"
@@ -761,10 +775,10 @@ export function Component() {
                 className="text-lg font-bold text-[rgb(var(--app-content-primary))]"
                 id="resale-offers-heading"
               >
-                Licenze usate in vendita
+                Used Licenses for Sale
               </h2>
               <p className="text-xs text-[rgb(var(--app-content-secondary))] mt-1">
-                Offerte pubblicate dai proprietari tramite Nostr Relay.
+                Offers published by owners through Nostr relays.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -902,8 +916,9 @@ const ResaleOfferCard: React.FC<{ offer: NostrLicenseOffer }> = ({ offer }) => {
   return (
     <article className="rounded-2xl border border-amber-400/20 bg-gradient-to-br from-[rgb(var(--app-surface-secondary))] to-[rgb(var(--app-surface-primary))] p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
+        <SellerBadge privateSeller />
         <span className="text-[10px] uppercase tracking-wide font-semibold rounded-full px-2 py-1 bg-amber-400/10 text-amber-300 border border-amber-400/20">
-          Usata · rivendita P2P
+          Used · P2P resale
         </span>
         <span className="text-sm font-bold text-[rgb(var(--app-content-primary))]">
           {offer.resalePriceUsdt.toLocaleString(undefined, {
@@ -914,12 +929,12 @@ const ResaleOfferCard: React.FC<{ offer: NostrLicenseOffer }> = ({ offer }) => {
       </div>
       {isSimulationOffer && (
         <span className="inline-flex rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-violet-300">
-          Simulazione · nessun trasferimento RGB reale
+          Simulation · no real RGB transfer
         </span>
       )}
       {isSimulationOffer && !simulationEnabled && (
         <p className="text-xs text-violet-200">
-          Per acquistare, attiva prima il portafoglio test in “Le Mie Licenze”.
+          To purchase, first enable the test wallet in “My Licenses”.
         </p>
       )}
       <div>
@@ -931,8 +946,8 @@ const ResaleOfferCard: React.FC<{ offer: NostrLicenseOffer }> = ({ offer }) => {
         </p>
       </div>
       <div className="border-t border-[rgb(var(--app-border-primary))]/20 pt-2 flex items-center justify-between text-xs text-[rgb(var(--app-content-secondary))]">
-        <span>Venditore: {offer.sellerName}</span>
-        <span>{offer.transferCount} trasferimenti</span>
+        <span>Seller: {offer.sellerName}</span>
+        <span>{offer.transferCount} transfers</span>
       </div>
       <button
         className="w-full rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
@@ -945,12 +960,12 @@ const ResaleOfferCard: React.FC<{ offer: NostrLicenseOffer }> = ({ offer }) => {
         type="button"
       >
         {isBuying
-          ? 'Autorizzazione swap…'
+          ? 'Authorizing swap…'
           : isSimulationOffer
             ? simulationEnabled
-              ? 'Acquista in simulazione'
-              : 'Portafoglio test non attivo'
-            : 'Acquista con swap atomico'}
+              ? 'Purchase in simulation'
+              : 'Test wallet inactive'
+            : 'Purchase with atomic swap'}
       </button>
       {purchaseMessage && (
         <p className="text-xs text-[rgb(var(--app-content-secondary))]">

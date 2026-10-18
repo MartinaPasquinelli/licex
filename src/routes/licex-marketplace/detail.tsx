@@ -18,6 +18,7 @@ import {
   Lock,
   Zap,
   AlertTriangle,
+  Building2,
 } from 'lucide-react'
 
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
@@ -373,9 +374,13 @@ export function Component() {
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-cyan-400" />
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium text-[rgb(var(--app-content-primary))]">
                         {listing.company.name}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800/70 dark:text-slate-200">
+                        <Building2 className="h-3 w-3" />
+                        Company seller
                       </span>
                       {listing.company.companyStatus === 'verified' && (
                         <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20">
@@ -699,7 +704,7 @@ export function Component() {
         {/* Modale di Checkout: Lightning Network o RGB-USDT Atomic Swap */}
         {showPurchaseModal && quote && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md animate-fadeIn p-4">
-            <div className="bg-[#1a1c2c] rounded-2xl max-w-lg w-full border border-[#9a94bc]/30 shadow-2xl p-6 space-y-5 animate-scaleIn text-white">
+            <div className="bg-surface-overlay text-content-primary rounded-2xl max-w-lg w-full border border-border-default shadow-2xl p-6 space-y-5 animate-scaleIn">
               {/* Intestazione */}
               <div className="flex items-center justify-between border-b border-[#9a94bc]/20 pb-4">
                 <div className="flex items-center gap-2.5">
@@ -721,14 +726,14 @@ export function Component() {
                     )}
                   </div>
                   <div>
-                    <h2 className="text-base font-bold text-white">
+                    <h2 className="text-base font-bold text-content-primary">
                       {swapStep === 'completed'
                         ? 'Licenza Acquisita!'
                         : paymentMethod === 'lightning'
                           ? 'Checkout Pagamento Lightning'
                           : 'Checkout Atomic Swap (RGB-USDT)'}
                     </h2>
-                    <p className="text-xs text-[#9a94bc]">
+                    <p className="text-xs text-content-secondary">
                       {swapStep === 'completed'
                         ? 'Registrata nel Database SQLite Locale & Wallet'
                         : paymentMethod === 'lightning'
@@ -742,7 +747,7 @@ export function Component() {
                   swapStep !== 'broadcasting' &&
                   swapStep !== 'proof_of_holding' && (
                     <button
-                      className="text-[#9a94bc] hover:text-white text-sm"
+                      className="text-content-secondary hover:text-content-primary text-sm"
                       onClick={() => setShowPurchaseModal(false)}
                     >
                       ✕
@@ -754,12 +759,12 @@ export function Component() {
               {swapStep === 'quote' && (
                 <div className="space-y-4">
                   {/* Selettore Metodo di Pagamento */}
-                  <div className="flex rounded-xl bg-black/40 p-1 border border-[#9a94bc]/20">
+                  <div className="flex rounded-xl bg-surface-base/70 p-1 border border-border-default/40">
                     <button
                       className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all ${
                         paymentMethod === 'lightning'
                           ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                          : 'text-[#9a94bc] hover:text-white'
+                          : 'text-content-secondary hover:text-content-primary'
                       }`}
                       id="select-lightning-payment"
                       onClick={() => setPaymentMethod('lightning')}
@@ -772,7 +777,7 @@ export function Component() {
                       className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all ${
                         paymentMethod === 'usdt_swap'
                           ? 'bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/40 shadow-sm'
-                          : 'text-[#9a94bc] hover:text-white'
+                          : 'text-content-secondary hover:text-content-primary'
                       }`}
                       id="select-usdt-payment"
                       onClick={() => setPaymentMethod('usdt_swap')}
@@ -784,10 +789,10 @@ export function Component() {
 
                   {paymentMethod === 'lightning' && lnQuote ? (
                     <>
-                      <div className="p-4 rounded-xl bg-black/30 border border-amber-500/20 space-y-2.5 text-sm">
+                      <div className="p-4 rounded-xl bg-surface-base/70 border border-amber-500/20 space-y-2.5 text-sm">
                         <div className="flex justify-between">
                           <span className="text-[#9a94bc]">Software</span>
-                          <span className="font-semibold text-white">
+                          <span className="font-semibold text-content-primary">
                             {listing.productName} ({listing.edition})
                           </span>
                         </div>
@@ -801,7 +806,7 @@ export function Component() {
                           <span className="text-[#9a94bc]">
                             Protocol Fee LICEX (1%)
                           </span>
-                          <span className="text-white">
+                          <span className="text-content-primary">
                             {lnQuote.formattedFeeSats}
                           </span>
                         </div>
@@ -814,7 +819,7 @@ export function Component() {
                       </div>
 
                       {/* Stato Canali e Liquidità */}
-                      <div className="p-3 rounded-xl bg-black/20 border border-[#9a94bc]/20 flex items-center justify-between text-xs">
+                      <div className="p-3 rounded-xl bg-surface-base/50 border border-border-default/40 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="text-[#9a94bc]">
                             Liquidità Canale:
@@ -892,7 +897,7 @@ export function Component() {
 
                       <div className="flex gap-3 pt-2">
                         <button
-                          className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-black/40 text-[#9a94bc] border border-[#9a94bc]/20 hover:text-white"
+                          className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-base/70 text-content-secondary border border-border-default/40 hover:text-content-primary"
                           onClick={() => setShowPurchaseModal(false)}
                         >
                           Annulla
@@ -964,10 +969,10 @@ export function Component() {
                     </>
                   ) : (
                     <>
-                      <div className="p-4 rounded-xl bg-black/30 border border-[#9a94bc]/20 space-y-2.5 text-sm">
+                      <div className="p-4 rounded-xl bg-surface-base/70 border border-border-default/40 space-y-2.5 text-sm">
                         <div className="flex justify-between">
                           <span className="text-[#9a94bc]">Software</span>
-                          <span className="font-semibold text-white">
+                          <span className="font-semibold text-content-primary">
                             {listing.productName} ({listing.edition})
                           </span>
                         </div>
@@ -981,7 +986,7 @@ export function Component() {
                           <span className="text-[#9a94bc]">
                             Protocol Fee LICEX (1%)
                           </span>
-                          <span className="text-white">
+                          <span className="text-content-primary">
                             {quote.formattedFee}
                           </span>
                         </div>
@@ -994,7 +999,7 @@ export function Component() {
                       </div>
 
                       {/* Stato Saldo USDT */}
-                      <div className="p-3 rounded-xl bg-black/20 border border-[#9a94bc]/20 flex items-center justify-between text-xs">
+                      <div className="p-3 rounded-xl bg-surface-base/50 border border-border-default/40 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="text-[#9a94bc]">
                             {isTestModeEnabled
@@ -1127,7 +1132,7 @@ export function Component() {
 
                       <div className="flex gap-3 pt-2">
                         <button
-                          className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-black/40 text-[#9a94bc] border border-[#9a94bc]/20 hover:text-white"
+                          className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-base/70 text-content-secondary border border-border-default/40 hover:text-content-primary"
                           onClick={() => setShowPurchaseModal(false)}
                         >
                           Annulla
@@ -1198,7 +1203,7 @@ export function Component() {
                     } border-t-transparent animate-spin`}
                   />
                   <div>
-                    <h3 className="font-bold text-sm text-white">
+                    <h3 className="font-bold text-sm text-content-primary">
                       {paymentMethod === 'lightning'
                         ? 'Instradamento Pagamento Lightning'
                         : 'Transazione Atomica in Corso'}
@@ -1236,7 +1241,7 @@ export function Component() {
                             : 'Nativa RGB · Senza Codici'}
                         </span>
                       </div>
-                      <p className="text-xs text-white leading-relaxed">
+                      <p className="text-xs text-content-primary leading-relaxed">
                         {swapResult.licenseRecord.listing.rgbAsset?.mode ===
                         'demo'
                           ? 'Asset e pagamento sono simulati localmente per testare il percorso di acquisto e rivendita. Non è avvenuto alcun trasferimento RGB reale.'
@@ -1296,7 +1301,7 @@ export function Component() {
                     <AlertTriangle className="w-7 h-7" />
                   </div>
                   <div className="space-y-1.5">
-                    <h3 className="font-bold text-base text-white">
+                    <h3 className="font-bold text-base text-content-primary">
                       Pagamento Non Riuscito
                     </h3>
                     <p className="text-xs text-red-300 max-w-sm mx-auto leading-relaxed">
@@ -1306,7 +1311,7 @@ export function Component() {
                   </div>
                   <div className="flex gap-3 pt-2">
                     <button
-                      className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-black/40 text-[#9a94bc] border border-[#9a94bc]/20 hover:text-white"
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-base/70 text-content-secondary border border-border-default/40 hover:text-content-primary"
                       onClick={() => {
                         setShowPurchaseModal(false)
                         setSwapStep('quote')
