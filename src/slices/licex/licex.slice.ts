@@ -17,6 +17,8 @@ import type {
   Order,
   MarketplaceFilters,
   TransferPolicy,
+  WishlistDemandGroup,
+  WishlistGroupMatch,
 } from '../../types/licex'
 import {
   MOCK_LISTINGS,
@@ -30,6 +32,17 @@ import {
   MOCK_NOSTR_OFFERS,
 } from '../../constants/licex-mock-data'
 
+function uniqueWishlistValues(values: string[]): string[] {
+  const unique = new Map<string, string>()
+  for (const value of values) {
+    const normalized = value.trim().toLocaleLowerCase()
+    if (normalized && !unique.has(normalized)) {
+      unique.set(normalized, value.trim())
+    }
+  }
+  return [...unique.values()]
+}
+
 interface LicexState {
   listings: LicenseListing[]
   filteredListings: LicenseListing[]
@@ -37,6 +50,7 @@ interface LicexState {
   watchlist: WatchlistItem[]
   priceAlerts: PriceAlert[]
   wishlist: WantedSoftwareRequest[]
+  wishlistGroups: WishlistDemandGroup[]
   chatMessages: ChatMessage[]
   chatLoading: boolean
   companyStats: CompanyDashboardStats
@@ -73,6 +87,7 @@ const initialState: LicexState = {
   viewMode: 'grid',
   watchlist: MOCK_WATCHLIST,
   wishlist: MOCK_WISHLIST,
+  wishlistGroups: [],
 }
 
 // Helper: apply filters and sorting to listings
@@ -145,6 +160,11 @@ export const licexSlice = createSlice({
   initialState,
   name: 'licex',
   reducers: {
+    addListing(state, action: PayloadAction<LicenseListing>) {
+      state.listings.unshift(action.payload)
+      state.filteredListings = applyFilters(state.listings, state.filters)
+    },
+
     // ── Price Alerts ───────────────────────────────────────────────────
     addPriceAlert(
       state,
@@ -180,6 +200,67 @@ export const licexSlice = createSlice({
       }
     },
 
+    addWishlistGroup(
+      state,
+      action: PayloadAction<{
+        id: string
+        requestId: string
+        summary: string
+        matches: WishlistGroupMatch[]
+        source: WishlistDemandGroup['source']
+      }>
+    ) {
+      const { id, requestId, summary, matches, source } = action.payload
+      const existingIds = new Set(state.wishlist.map((request) => request.id))
+      const validMatches = matches.filter(
+        (match) =>
+          match.requestId !== requestId && existingIds.has(match.requestId)
+      )
+      if (!existingIds.has(requestId) || validMatches.length === 0) return
+
+      const requestIds = new Set([
+        requestId,
+        ...validMatches.map((match) => match.requestId),
+      ])
+      const mergedGroups = state.wishlistGroups.filter((group) =>
+        group.requestIds.some((memberId) => requestIds.has(memberId))
+      )
+      for (const group of mergedGroups) {
+        group.requestIds.forEach((memberId) => requestIds.add(memberId))
+      }
+
+      const mergedMatches = new Map<string, WishlistGroupMatch>()
+      for (const group of mergedGroups) {
+        for (const match of group.matches) {
+          mergedMatches.set(match.requestId, match)
+        }
+      }
+      for (const match of validMatches) {
+        mergedMatches.set(match.requestId, match)
+      }
+
+      const groupedRequests = state.wishlist.filter((request) =>
+        requestIds.has(request.id)
+      )
+      const createdAt = new Date().toISOString()
+      state.wishlistGroups = state.wishlistGroups.filter(
+        (group) => !mergedGroups.some((merged) => merged.id === group.id)
+      )
+      state.wishlistGroups.push({
+        combinedRequirements: uniqueWishlistValues(
+          groupedRequests.flatMap((request) => request.requirements)
+        ),
+        createdAt,
+        id,
+        matches: [...mergedMatches.values()],
+        platforms: uniqueWishlistValues(
+          groupedRequests.flatMap((request) => request.platforms)
+        ),
+        requestIds: [...requestIds],
+        source,
+        summary,
+      })
+    },
     // ── Wishlist ───────────────────────────────────────────────────────
     addWishlistItem(
       state,
@@ -192,63 +273,115 @@ export const licexSlice = createSlice({
           | 'matchCount'
           | 'pledgeTotal'
           | 'status'
-        >
+        > & { id?: string }
       >
     ) {
       state.wishlist.push({
         ...action.payload,
         createdAt: new Date().toISOString(),
-        id: `wish-${Date.now()}`,
+        id: action.payload.id ?? `wish-${Date.now()}`,
         matchCount: 0,
         pledgeTotal: 0,
         status: 'submitted',
         updatedAt: new Date().toISOString(),
       })
     },
-
     clearFilters(state) {
       state.filters = initialFilters
       state.filteredListings = applyFilters(state.listings, state.filters)
     },
-
     completePurchase(
       state,
       action: PayloadAction<{ order: Order; licenseRecord: LicenseRecord }>
     ) {
-      // Salva l'ordine in cima alla cronologia ordini
       state.orders.unshift(action.payload.order)
-      // Aggiunge la licenza tra quelle possedute dall'utente
       state.ownedLicenses.unshift(action.payload.licenseRecord)
     },
-
+    mintLicenseListing(
+      state,
+      action: PayloadAction<{
+        id: string
+        productName: string
+        edition: string
+        price: number
+        transferPolicy: TransferPolicy
+        royaltyPercent: number
+        rgbAsset: LicenseAssetReference
+      }>
+    ) {
+      const template = state.listings[0]
+      if (!template) return
+      const now = new Date().toISOString()
+      const listing: LicenseListing = {
+        ...template,
+        createdAt: now,
+        edition: action.payload.edition,
+        id: action.payload.id,
+        maxTransfers:
+          action.payload.transferPolicy === 'not_transferable' ? 0 : 5,
+        minHoldingDays: 0,
+        price: action.payload.price,
+        productName: action.payload.productName,
+        rgbAsset: action.payload.rgbAsset,
+        royaltyPercent: action.payload.royaltyPercent,
+        status: 'published',
+        transferPolicy: action.payload.transferPolicy,
+        updatedAt: now,
+      }
+      state.listings.unshift(listing)
+      state.filteredListings = applyFilters(state.listings, state.filters)
+    },
+    recordDemoPurchase(state, action: PayloadAction<Order>) {
+      state.orders.unshift(action.payload)
+    },
     removeFromWatchlist(state, action: PayloadAction<string>) {
       state.watchlist = state.watchlist.filter(
-        (w) => w.listingId !== action.payload
+        (item) => item.listingId !== action.payload
       )
     },
-
     removePriceAlert(state, action: PayloadAction<string>) {
       state.priceAlerts = state.priceAlerts.filter(
-        (a) => a.id !== action.payload
+        (alert) => alert.id !== action.payload
       )
     },
-
     removeWishlistItem(state, action: PayloadAction<string>) {
-      state.wishlist = state.wishlist.filter((w) => w.id !== action.payload)
+      state.wishlist = state.wishlist.filter(
+        (request) => request.id !== action.payload
+      )
+      state.wishlistGroups = state.wishlistGroups.flatMap((group) => {
+        const requestIds = group.requestIds.filter(
+          (requestId) => requestId !== action.payload
+        )
+        if (requestIds.length <= 1) return []
+        const groupedRequests = state.wishlist.filter((request) =>
+          requestIds.includes(request.id)
+        )
+        return [
+          {
+            ...group,
+            combinedRequirements: uniqueWishlistValues(
+              groupedRequests.flatMap((request) => request.requirements)
+            ),
+            matches: group.matches.filter(
+              (match) => match.requestId !== action.payload
+            ),
+            platforms: uniqueWishlistValues(
+              groupedRequests.flatMap((request) => request.platforms)
+            ),
+            requestIds,
+          },
+        ]
+      })
     },
-
     selectListing(state, action: PayloadAction<string | null>) {
       state.selectedListing = action.payload
-        ? state.listings.find((l) => l.id === action.payload) || null
+        ? (state.listings.find((listing) => listing.id === action.payload) ??
+          null)
         : null
     },
-
     setChatLoading(state, action: PayloadAction<boolean>) {
       state.chatLoading = action.payload
     },
-
-    // ── Filters ────────────────────────────────────────────────────────
-
     setFilters(state, action: PayloadAction<Partial<MarketplaceFilters>>) {
       state.filters = { ...state.filters, ...action.payload }
       state.filteredListings = applyFilters(state.listings, state.filters)
@@ -260,16 +393,20 @@ export const licexSlice = createSlice({
 })
 
 export const {
-  setFilters,
-  clearFilters,
-  setViewMode,
-  selectListing,
-  addToWatchlist,
-  removeFromWatchlist,
+  addListing,
   addPriceAlert,
-  removePriceAlert,
+  addToWatchlist,
+  addWishlistGroup,
   addWishlistItem,
-  removeWishlistItem,
-  setChatLoading,
+  clearFilters,
   completePurchase,
+  mintLicenseListing,
+  recordDemoPurchase,
+  removeFromWatchlist,
+  removePriceAlert,
+  removeWishlistItem,
+  selectListing,
+  setChatLoading,
+  setFilters,
+  setViewMode,
 } = licexSlice.actions

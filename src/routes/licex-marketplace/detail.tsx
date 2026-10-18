@@ -3,7 +3,6 @@
 
 import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { toast } from 'react-toastify'
 import {
   ArrowLeft,
   Shield,
@@ -24,9 +23,9 @@ import {
   addToWatchlist,
   removeFromWatchlist,
   addPriceAlert,
-  recordDemoPurchase,
 } from '../../slices/licex/licex.slice'
 import type { TransferPolicy } from '../../types/licex'
+import { LicexMarkdown } from '../../components/LicexMarkdown'
 import {
   LICEX_MARKETPLACE_PATH,
   ACCOUNT_PATH,
@@ -40,11 +39,6 @@ import {
   type SwapExecutionResult,
 } from '../../services/licexPaymentService'
 import { completePurchase } from '../../slices/licex/licex.slice'
-
-function formatSats(sats: number): string {
-  if (sats === 0) return 'Free'
-  return `${sats.toLocaleString()} sats`
-}
 
 function transferPolicyLabel(policy: TransferPolicy): string {
   switch (policy) {
@@ -228,9 +222,9 @@ export function Component() {
                 </div>
 
                 {/* Description */}
-                <p className="text-sm text-[rgb(var(--app-content-secondary))] leading-relaxed">
-                  {listing.productDescription}
-                </p>
+                <div className="text-sm text-[rgb(var(--app-content-secondary))] leading-relaxed">
+                  <LicexMarkdown content={listing.productDescription} />
+                </div>
 
                 {/* Tags */}
                 <div className="flex flex-wrap gap-1.5">
