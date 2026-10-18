@@ -62,3 +62,54 @@ export function generateProofOfHolding(licenseId: string, buyerPubkey: string) {
     nonce,
   }
 }
+
+export interface LightningPaymentQuote {
+  basePriceSats: number
+  licexFeeSats: number
+  royaltyFeeSats: number
+  sellerReceivesSats: number
+  totalPriceSats: number
+  formattedPriceSats: string
+  formattedFeeSats: string
+  formattedTotalSats: string
+  isResale: boolean
+  royaltyRecipient: string
+  royaltyPercent: number
+  simulatedInvoice: string
+}
+
+export function calculateLightningQuote(
+  listing: LicenseListing,
+  orderType: OrderType = 'primary'
+): LightningPaymentQuote {
+  const basePriceSats =
+    listing.price >= 500
+      ? Math.round(listing.price)
+      : Math.round(listing.price * 1500)
+  const licexFeeSats = Math.max(50, Math.round(basePriceSats * 0.01))
+  const isResale = orderType === 'resale'
+  const royaltyPercent = isResale ? listing.royaltyPercent : 0
+  const royaltyFeeSats = Math.round(basePriceSats * (royaltyPercent / 100))
+  const sellerReceivesSats = basePriceSats - royaltyFeeSats
+  const totalPriceSats = basePriceSats + licexFeeSats
+
+  const hash32 = Array.from({ length: 32 }, () =>
+    Math.floor(Math.random() * 16).toString(16)
+  ).join('')
+  const simulatedInvoice = `lnbc${totalPriceSats}0n1p${hash32.slice(0, 20)}pp5licex`
+
+  return {
+    basePriceSats,
+    formattedFeeSats: `${licexFeeSats.toLocaleString()} sats`,
+    formattedPriceSats: `${basePriceSats.toLocaleString()} sats`,
+    formattedTotalSats: `${totalPriceSats.toLocaleString()} sats`,
+    isResale,
+    licexFeeSats,
+    royaltyFeeSats,
+    royaltyPercent,
+    royaltyRecipient: listing.companyId,
+    sellerReceivesSats,
+    simulatedInvoice,
+    totalPriceSats,
+  }
+}

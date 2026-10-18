@@ -1,0 +1,6 @@
+[target.aarch64-apple-darwin]
+linker = "/opt/homebrew/opt/llvm/bin/clang"
+
+[env]
+CC = { value = "/opt/homebrew/opt/llvm/bin/clang", force = true }
+CXX = { value = "/opt/homebrew/opt/llvm/bin/clang++", force = true }

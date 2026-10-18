@@ -2,7 +2,7 @@
 // Allows users to request software licenses that aren't yet on LICEX,
 // pledge interest or sats, and for companies to discover demand.
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Sparkles,
   Plus,
@@ -14,7 +14,8 @@ import {
 } from 'lucide-react'
 
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
-import { addWishlistItem } from '../../slices/licex/licex.slice'
+import { addWishlistItem, setWishlist } from '../../slices/licex/licex.slice'
+import { loadWishlistFromSqlite } from '../../services/licex/licexStorage'
 
 function formatSats(sats: number): string {
   if (sats === 0) return '0 sats'
@@ -26,6 +27,12 @@ function formatSats(sats: number): string {
 export function Component() {
   const dispatch = useAppDispatch()
   const { wishlist } = useAppSelector((s) => s.licex)
+
+  useEffect(() => {
+    loadWishlistFromSqlite().then((items) => {
+      if (items && items.length > 0) dispatch(setWishlist(items))
+    })
+  }, [dispatch])
 
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)

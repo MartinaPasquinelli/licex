@@ -504,8 +504,62 @@ export const Component = () => {
               </div>
             </div>
 
-            {/* Actions — compact 3-button row */}
-            <div className="relative z-10 grid grid-cols-3 gap-2">
+            {/* Breakdown On-Chain vs Canali Lightning */}
+            <div className="relative z-10 grid grid-cols-2 gap-2 mb-4 p-3 rounded-xl bg-surface-elevated/40 border border-border-default/40">
+              <div className="flex flex-col">
+                <span className="text-[11px] font-medium text-content-tertiary">
+                  ⛓️ Saldo On-Chain
+                </span>
+                <span className="text-sm font-bold text-content-primary mt-0.5">
+                  {isLoading
+                    ? '...'
+                    : `${formatBitcoinAmount(onChainSpendableBalance, bitcoinUnit)} ${bitcoinUnit === 'SAT' ? 'sats' : bitcoinUnit}`}
+                </span>
+              </div>
+              <button
+                className="flex flex-col text-left group/ln hover:opacity-90 transition-opacity"
+                id="wallet-channels-breakdown-btn"
+                onClick={() => navigate(CHANNELS_PATH)}
+                title="Gestisci Canali Lightning"
+                type="button"
+              >
+                <div className="flex items-center justify-between text-[11px] font-medium text-amber-400">
+                  <span className="flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-amber-400" />
+                    <span>⚡ Canali Lightning</span>
+                  </span>
+                  <ArrowRight className="w-3 h-3 text-amber-400/70 group-hover/ln:translate-x-0.5 transition-transform" />
+                </div>
+                <span className="text-sm font-bold text-amber-300 mt-0.5">
+                  {isLoading
+                    ? '...'
+                    : `${formatBitcoinAmount(offChainBalance, bitcoinUnit)} ${bitcoinUnit === 'SAT' ? 'sats' : bitcoinUnit}`}
+                </span>
+              </button>
+            </div>
+
+            {/* Warning shortcut se saldo canali è a zero */}
+            {!isLoading && offChainBalance === 0 && (
+              <div className="relative z-10 mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-amber-300">
+                  <Zap className="w-4 h-4 flex-shrink-0 text-amber-400" />
+                  <span className="text-[11px]">
+                    Nessun canale attivo per pagamenti istantanei
+                  </span>
+                </div>
+                <button
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold text-[11px] transition-colors border border-amber-500/30 flex items-center gap-1"
+                  onClick={() => navigate(CHANNELS_PATH)}
+                  type="button"
+                >
+                  <span>Apri Canale</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {/* Actions — 4-button row */}
+            <div className="relative z-10 grid grid-cols-4 gap-2">
               <button
                 className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 hover:border-status-success/50 text-status-success text-xs font-semibold transition-all overflow-hidden"
                 onClick={() =>
@@ -519,6 +573,14 @@ export const Component = () => {
               >
                 <Download className="w-3.5 h-3.5 flex-shrink-0" />
                 <span className="truncate">{t('dashboard.deposit')}</span>
+              </button>
+              <button
+                className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 text-xs font-semibold transition-all overflow-hidden"
+                id="wallet-channels-btn"
+                onClick={() => navigate(CHANNELS_PATH)}
+              >
+                <Zap className="w-3.5 h-3.5 flex-shrink-0 text-amber-400" />
+                <span className="truncate">Canali</span>
               </button>
               <button
                 className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/30 text-white text-xs font-semibold transition-all overflow-hidden"

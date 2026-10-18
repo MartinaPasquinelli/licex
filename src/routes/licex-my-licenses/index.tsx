@@ -2,7 +2,7 @@
 // Portfolio of purchased software licenses, cryptographic RGB ownership proofs,
 // license keys, transfer policies and complete order history.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Key,
   ShieldCheck,
@@ -13,14 +13,26 @@ import {
   Search,
   Sparkles,
   Zap,
+  Database,
+  RefreshCw,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-import { useAppSelector } from '../../app/store/hooks'
+import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
+import {
+  resetDatabase,
+  setOwnedLicenses,
+  setOrders,
+} from '../../slices/licex/licex.slice'
+import {
+  loadLicensesFromSqlite,
+  loadOrdersFromSqlite,
+} from '../../services/licex/licexStorage'
 import { LICEX_MARKETPLACE_PATH } from '../../app/router/paths'
 
 export function Component() {
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
   const { ownedLicenses, orders } = useAppSelector((state) => state.licex)
   const [activeTab, setActiveTab] = useState<'licenses' | 'orders'>('licenses')
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
@@ -28,6 +40,20 @@ export function Component() {
   const [testedHandshakeId, setTestedHandshakeId] = useState<string | null>(
     null
   )
+
+  // Interroga direttamente le tabelle SQLite native al montaggio della pagina
+  useEffect(() => {
+    loadLicensesFromSqlite().then((sqliteLicenses) => {
+      if (sqliteLicenses && sqliteLicenses.length > 0) {
+        dispatch(setOwnedLicenses(sqliteLicenses))
+      }
+    })
+    loadOrdersFromSqlite().then((sqliteOrders) => {
+      if (sqliteOrders && sqliteOrders.length > 0) {
+        dispatch(setOrders(sqliteOrders))
+      }
+    })
+  }, [dispatch])
 
   const handleTestHandshake = (id: string) => {
     setTestedHandshakeId(id)
@@ -57,21 +83,44 @@ export function Component() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-[#9B5094]/10 via-[#8FB8DE]/10 to-transparent rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#9B5094]/15 border border-[#9B5094]/30 text-[#9B5094] dark:text-[#CDF7F6] text-xs font-semibold mb-3">
-              <Sparkles className="w-3.5 h-3.5 text-[#9B5094] dark:text-[#CDF7F6]" />
-              Asset RGB25 · Bitcoin Single-Use Seals
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#9B5094]/15 border border-[#9B5094]/30 text-[#9B5094] dark:text-[#CDF7F6] text-xs font-semibold">
+                <Sparkles className="w-3.5 h-3.5 text-[#9B5094] dark:text-[#CDF7F6]" />
+                Asset RGB25 · Bitcoin Single-Use Seals
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
+                <Database className="w-3 h-3 text-emerald-400" />
+                DB Locale Persistente
+              </div>
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-content-primary tracking-tight">
               Le Mie Licenze (Asset RGB)
             </h1>
             <p className="text-content-secondary text-sm mt-1 max-w-xl">
               Portafoglio delle tue licenze software tokenizzate come asset RGB
-              su Bitcoin. Ogni licenza è legata crittograficamente al tuo nodo
-              ed account.
+              su Bitcoin. Ogni licenza è salvata persistentemente nel tuo
+              database locale e legata crittograficamente al tuo nodo.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              className="px-3 py-2.5 rounded-xl bg-surface-elevated hover:bg-surface-elevated/80 border border-border-default text-content-secondary hover:text-content-primary text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Vuoi ripristinare il database locale alle licenze e ordini demo di fabbrica?'
+                  )
+                ) {
+                  dispatch(resetDatabase())
+                }
+              }}
+              title="Ripristina dati demo nel database locale"
+              type="button"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Reset DB Locale
+            </button>
             <button
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#8FB8DE] to-[#9B5094] hover:opacity-95 text-white font-bold text-sm shadow-md transition-all transform hover:scale-[1.02] active:scale-[0.98]"
               onClick={() => navigate(LICEX_MARKETPLACE_PATH)}

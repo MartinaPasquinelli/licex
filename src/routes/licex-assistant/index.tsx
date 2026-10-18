@@ -3,10 +3,13 @@
 // Analyzes license terms, transferability, vendor reputation, and drafts terms.
 
 import { useState, useRef, useEffect } from 'react'
-import { Bot, Send, Sparkles, Cpu, Lightbulb } from 'lucide-react'
+import { Bot, Send, Sparkles, Lightbulb } from 'lucide-react'
 
 import { useAppSelector } from '../../app/store/hooks'
-import { MOCK_CHAT_MESSAGES } from '../../constants/licex-mock-data'
+import {
+  loadLocalChatMessages,
+  saveLocalChatMessages,
+} from '../../services/licex/licexStorage'
 import type { ChatMessage } from '../../types/licex'
 
 const SUGGESTED_PROMPTS = [
@@ -18,8 +21,9 @@ const SUGGESTED_PROMPTS = [
 
 export function Component() {
   const listings = useAppSelector((s) => s.licex.listings)
-  const [chatMessages, setChatMessages] =
-    useState<ChatMessage[]>(MOCK_CHAT_MESSAGES)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() =>
+    loadLocalChatMessages()
+  )
   const [chatLoading, setChatLoading] = useState(false)
 
   const [input, setInput] = useState('')
@@ -44,7 +48,9 @@ export function Component() {
       timestamp: new Date().toISOString(),
     }
 
-    setChatMessages((prev) => [...prev, userMsg])
+    const updatedWithUser = [...chatMessages, userMsg]
+    setChatMessages(updatedWithUser)
+    saveLocalChatMessages(updatedWithUser)
     if (!textToSend) setInput('')
     setChatLoading(true)
 
@@ -100,7 +106,11 @@ export function Component() {
         timestamp: new Date().toISOString(),
       }
 
-      setChatMessages((prev) => [...prev, botMsg])
+      setChatMessages((prev) => {
+        const finalMessages = [...prev, botMsg]
+        saveLocalChatMessages(finalMessages)
+        return finalMessages
+      })
       setChatLoading(false)
     }, 1200)
   }

@@ -112,6 +112,9 @@ export interface Order {
   royalty: number
   paymentStatus: PaymentStatus
   orderStatus: OrderStatus
+  paymentMethod?: 'lightning' | 'usdt_swap'
+  lightningPreimage?: string
+  totalPrice?: number
   createdAt: string
 }
 

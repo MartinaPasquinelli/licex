@@ -15,6 +15,7 @@ import {
   Key,
   ChevronRight,
   Settings,
+  Zap,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -23,6 +24,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   WALLET_HISTORY_DEPOSITS_PATH,
   SETTINGS_PATH,
+  CHANNELS_PATH,
 } from '../../app/router/paths'
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
 import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
@@ -43,6 +45,8 @@ export const Component = () => {
   const nodeReachability = useAppSelector((state) => state.node.reachability)
   const nodeInfo = nodeApi.endpoints.nodeInfo.useQueryState()
   const btcBalance = nodeApi.endpoints.btcBalance.useQueryState(undefined)
+  const { data: channelsData } =
+    nodeApi.endpoints.listChannels.useQuery(undefined)
 
   const isNodeReachable =
     nodeReachability === 'reachable' ||
@@ -54,6 +58,11 @@ export const Component = () => {
   const onChainBalance =
     (btcBalance.data?.vanilla?.spendable ?? 0) +
     (btcBalance.data?.colored?.spendable ?? 0)
+
+  const offChainBalance = (channelsData?.channels ?? []).reduce(
+    (sum: number, ch: any) => sum + (ch.local_balance_sat || 0),
+    0
+  )
 
   const networkLabel =
     nodeSettingsData?.network === 'SignetCustom'
@@ -157,7 +166,7 @@ export const Component = () => {
             </div>
 
             {/* Quick wallet actions */}
-            <div className="mt-4 grid grid-cols-3 gap-3">
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 {
                   color: 'text-[#8FB8DE]',
@@ -171,6 +180,13 @@ export const Component = () => {
                         type: 'deposit',
                       })
                     ),
+                },
+                {
+                  color: 'text-amber-400',
+                  hover: 'hover:border-amber-500/40 hover:bg-amber-500/5',
+                  icon: <Zap className="w-4 h-4 text-amber-400" />,
+                  label: 'Canali',
+                  onClick: () => navigate(CHANNELS_PATH),
                 },
                 {
                   color: 'text-[#9B5094]',
@@ -254,6 +270,24 @@ export const Component = () => {
                   label: 'Saldo on-chain',
                   value: `${onChainBalance.toLocaleString()} SAT`,
                 },
+                {
+                  icon: <Zap className="w-4 h-4 text-amber-400" />,
+                  label: 'Saldo Lightning (Canali)',
+                  value: (
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-300 font-semibold">
+                        {offChainBalance.toLocaleString()} SAT
+                      </span>
+                      <button
+                        className="text-xs text-amber-400 hover:text-amber-300 underline font-medium ml-1"
+                        onClick={() => navigate(CHANNELS_PATH)}
+                        type="button"
+                      >
+                        Gestisci Canali →
+                      </button>
+                    </div>
+                  ),
+                },
               ].map(({ icon, label, value }) => (
                 <div
                   className="flex items-center justify-between py-3 border-b border-border-subtle last:border-none"
@@ -263,9 +297,9 @@ export const Component = () => {
                     <span className="text-primary">{icon}</span>
                     <span className="text-sm font-medium">{label}</span>
                   </div>
-                  <span className="text-sm font-semibold text-content-primary">
+                  <div className="text-sm font-semibold text-content-primary">
                     {value}
-                  </span>
+                  </div>
                 </div>
               ))}
               {pubkey && (
