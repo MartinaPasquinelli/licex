@@ -1,10 +1,7 @@
-[target.aarch64-apple-darwin]
-linker = "/opt/homebrew/opt/llvm/bin/clang"
+# Keep compiler selection platform-native. In particular, do not set CC/CXX
+# globally here: Cargo applies [env] to every target, which made Windows use
+# the Homebrew compiler path from macOS and broke crates such as ring.
 
-[env]
-CC = { value = "/opt/homebrew/opt/llvm/bin/clang", force = true }
-CXX = { value = "/opt/homebrew/opt/llvm/bin/clang++", force = true }
-
-# Configurazione per sviluppatori Windows (evita l'errore di percorso lungo MAX_PATH)
-[target.'cfg(windows)']
-# Nota per Windows: se compili su Windows, puoi usare CARGO_TARGET_DIR="C:/Users/Public/cargo_target/licex-tauri"
+# Configurazione opzionale per sviluppatori Windows (evita l'errore di percorso lungo MAX_PATH).
+# Esempio PowerShell:
+#   $env:CARGO_TARGET_DIR = 'C:/Users/Public/cargo_target/licex-tauri'

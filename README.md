@@ -191,28 +191,24 @@ Make sure pnpm is version 10 (`pnpm --version`). If Homebrew installed
 a newer major, use `npm install -g pnpm@10` or `corepack enable` and
 `corepack prepare pnpm@10 --activate`.
 
-#### 2. Environment variables and Intel paths fix
+#### 2. Environment variables (optional)
 
-Add the following exports to your shell profile (`~/.zshrc` or
+The project does not force a compiler path in Cargo, so macOS can use its
+native Clang and Windows can use MSVC. If Homebrew LLVM/OpenSSL are needed,
+use Homebrew's resolved prefixes instead of hardcoding Intel or Apple Silicon
+paths. Add the following exports to your shell profile (`~/.zshrc` or
 `~/.bash_profile`):
 
 ```bash
-export PATH="/usr/local/opt/llvm/bin:$PATH"
-export LDFLAGS="-L/usr/local/opt/llvm/lib"
-export CPPFLAGS="-I/usr/local/opt/llvm/include"
-export CC="/usr/local/opt/llvm/bin/clang"
-export CXX="/usr/local/opt/llvm/bin/clang++"
-export OPENSSL_DIR="/usr/local/opt/openssl@3"
-export OPENSSL_INCLUDE_DIR="/usr/local/opt/openssl@3/include"
-export OPENSSL_LIB_DIR="/usr/local/opt/openssl@3/lib"
-source $HOME/.cargo/env
-```
-
-Create a symbolic link if needed:
-
-```bash
-sudo mkdir -p /opt/homebrew/opt
-sudo ln -s /usr/local/opt/openssl@3 /opt/homebrew/opt/openssl@3
+export PATH="$(brew --prefix llvm)/bin:$PATH"
+export LDFLAGS="-L$(brew --prefix openssl@3)/lib"
+export CPPFLAGS="-I$(brew --prefix openssl@3)/include"
+export CC="$(brew --prefix llvm)/bin/clang"
+export CXX="$(brew --prefix llvm)/bin/clang++"
+export OPENSSL_DIR="$(brew --prefix openssl@3)"
+export OPENSSL_INCLUDE_DIR="$(brew --prefix openssl@3)/include"
+export OPENSSL_LIB_DIR="$(brew --prefix openssl@3)/lib"
+source "$HOME/.cargo/env"
 ```
 
 #### 3. Compilation & execution
@@ -232,6 +228,7 @@ pnpm run tauri:dev
 | `EPERM ... pnpx.CMD` on `corepack enable` | No write access to `Program Files`       | Use `npm install -g pnpm@10` or an administrator shell |
 | `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`       | pnpm 12 ignores `pnpm.overrides`         | Use pnpm 10                                            |
 | `ERESOLVE` on `npm install`               | eslint 9 / `@eslint/js` 10 peer conflict | Use pnpm, not npm                                      |
+| `failed to find tool /opt/homebrew/...`   | A macOS compiler path is forced on another OS | Remove global `CC`/`CXX` overrides and use the native compiler |
 | Build fails on OpenSSL / libclang         | Missing environment variables            | Set the variables in the Environment Variables step    |
 
 These commands validate parts of the existing application. They do
