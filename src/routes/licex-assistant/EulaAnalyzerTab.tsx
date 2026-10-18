@@ -223,7 +223,11 @@ export function EulaAnalyzerTab({
       const requestId = crypto.randomUUID()
       const { extracted, suggestedListing } = analysisResult
       const issuanceInput = createIssuanceInputFromEula(
-        analysisResult,
+        {
+          ...analysisResult,
+          aiReviewStatus: aiReview ? 'completed' : 'unavailable',
+          confidenceScore: 0,
+        },
         requestId
       )
       let issuedAsset: IssuedLicenseAsset
@@ -529,9 +533,8 @@ export function EulaAnalyzerTab({
                 claim with the terms detected in the contract.
               </p>
               <select
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500"
                 onChange={(e) => {
-                  className =
-                    'mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500'
                   setClaimedPolicy(e.target.value as TransferPolicy | '')
                   setAnalysisResult(null)
                   setAiReview(null)
