@@ -48,21 +48,17 @@ export class QvacEulaAnalyzer {
       executiveSummary
     )
 
-    // 6. Calculate confidence score based on completeness of signals
-    const confidenceScore = this.calculateConfidence(extracted, clauses)
-
     const processingTimeMs = Math.round(performance.now() - startTime)
 
     return {
-      aiReviewStatus: complianceAudit.aiReviewStatus,
       analysisTimestamp: new Date().toISOString(),
       clauses,
       complianceAudit,
-      confidenceScore,
       executiveSummary,
       extracted,
       id: `eula-${Date.now()}`,
       processingTimeMs,
+      reviewStatus: complianceAudit.reviewStatus,
       suggestedListing,
     }
   }
@@ -453,9 +449,9 @@ export class QvacEulaAnalyzer {
   ): EulaComplianceAudit {
     if (!claimedPolicy) {
       return {
-        aiReviewStatus: 'analyzed',
         detectedTransferPolicy: detectedPolicy,
         matchesClaim: true,
+        reviewStatus: 'analyzed',
       }
     }
 
@@ -483,19 +479,19 @@ export class QvacEulaAnalyzer {
       }
 
       return {
-        aiReviewStatus: 'flagged',
         claimedTransferPolicy: claimedPolicy,
         detectedTransferPolicy: detectedPolicy,
         flagReason,
         matchesClaim: false,
+        reviewStatus: 'flagged',
       }
     }
 
     return {
-      aiReviewStatus: 'analyzed',
       claimedTransferPolicy: claimedPolicy,
       detectedTransferPolicy: detectedPolicy,
       matchesClaim: true,
+      reviewStatus: 'analyzed',
     }
   }
 
@@ -545,16 +541,5 @@ export class QvacEulaAnalyzer {
       transferPolicy: extracted.transferPolicy,
       version: extracted.version,
     }
-  }
-
-  private static calculateConfidence(
-    extracted: EulaExtractedMetadata,
-    clauses: EulaClause[]
-  ): number {
-    let score = 70
-    if (extracted.productName !== 'Software License') score += 10
-    if (clauses.length >= 2) score += 10
-    if (clauses.some((c) => c.category === 'transferability')) score += 10
-    return Math.min(score, 98)
   }
 }

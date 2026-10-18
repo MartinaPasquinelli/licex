@@ -3,6 +3,7 @@
 // Implements US-05 (Structured extraction) and US-06 (Compliance audit).
 
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   FileText,
   ShieldCheck,
@@ -22,13 +23,26 @@ import {
 import { useAppDispatch } from '../../app/store/hooks'
 import { addListing } from '../../slices/licex/licex.slice'
 import { QvacEulaAnalyzer } from '../../services/qvac/eula-analyzer'
+import {
+  buildEulaAnalysisPrompt,
+  createEulaSourcePassages,
+  EULA_TOPIC_LABELS,
+  parseEulaAiReview,
+  type EulaAiReview,
+} from '../../services/qvac/eula-ai-review'
 import { EULA_SAMPLES } from '../../services/qvac/eula-samples'
 import type { EulaAnalysisResult } from '../../services/qvac/eula-types'
 import type { TransferPolicy, LicenseListing } from '../../types/licex'
 import { LicexMarkdown } from '../../components/LicexMarkdown'
+import { useMind } from '../../hooks/useMind'
+import { KALEIDO_MIND_MODELS_PATH } from '../../app/router/paths'
+import { isUsableQvacStatus } from '../../services/qvac/licex-assistant'
+import { getRecommendedModelId } from '../kaleido-mind/modelCatalog'
 
 export function EulaAnalyzerTab() {
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
+  const mind = useMind()
 
   const [contractText, setContractText] = useState(EULA_SAMPLES[0].text)
   const [selectedSampleId, setSelectedSampleId] = useState<string>(
@@ -38,6 +52,10 @@ export function EulaAnalyzerTab() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] =
     useState<EulaAnalysisResult | null>(null)
+  const [aiReview, setAiReview] = useState<EulaAiReview | null>(null)
+  const [analysisError, setAnalysisError] = useState('')
+  const [modelError, setModelError] = useState('')
+  const [isStartingModel, setIsStartingModel] = useState(false)
   const [copiedJson, setCopiedJson] = useState(false)
   const [publishedSuccess, setPublishedSuccess] = useState(false)
 
@@ -47,35 +65,100 @@ export function EulaAnalyzerTab() {
       setSelectedSampleId(sample.id)
       setContractText(sample.text)
       setAnalysisResult(null)
+      setAiReview(null)
+      setAnalysisError('')
       setPublishedSuccess(false)
     }
   }
 
-  const handleAnalyze = () => {
+  const handleStartModel = async () => {
+    const recommendedId = getRecommendedModelId(mind.catalog, mind.hardware)
+    const model =
+      mind.installed.find((installed) => installed.id === recommendedId) ??
+      mind.installed.find((installed) => installed.active) ??
+      mind.installed[0]
+    if (!model) {
+      setModelError(
+        'Non ci sono modelli installati. Installa un modello nella sezione KaleidoMind > Models.'
+      )
+      return
+    }
+
+    setModelError('')
+    setIsStartingModel(true)
+    try {
+      await mind.startProvider(model.id)
+    } catch (error) {
+      setModelError(
+        `Avvio del modello non riuscito: ${error instanceof Error ? error.message : String(error)}`
+      )
+    } finally {
+      setIsStartingModel(false)
+    }
+  }
+
+  const handleAnalyze = async () => {
     if (!contractText.trim()) return
+    if (!isUsableQvacStatus(mind.status)) {
+      setAnalysisError(
+        'Avvia un modello QVAC locale prima di analizzare il contratto. Il testo non è stato inviato a un servizio AI cloud.'
+      )
+      return
+    }
 
     setIsAnalyzing(true)
+    setAnalysisError('')
+    setAiReview(null)
     setPublishedSuccess(false)
 
-    // Simulate snappy local SLM inference cycle (400ms)
-    setTimeout(() => {
-      const result = QvacEulaAnalyzer.analyze(
+    let heuristicResult: EulaAnalysisResult | null = null
+    try {
+      heuristicResult = QvacEulaAnalyzer.analyze(
         contractText,
         claimedPolicy ? claimedPolicy : undefined
       )
-      setAnalysisResult(result)
+      const passages = createEulaSourcePassages(contractText.trim())
+      const response = await mind.chat(
+        buildEulaAnalysisPrompt(passages),
+        undefined,
+        `eula-review-${crypto.randomUUID()}`
+      )
+      const review = parseEulaAiReview(response.text, passages)
+      setAiReview(review)
+      setAnalysisResult({
+        ...heuristicResult,
+        processingTimeMs: response.latencyMs,
+      })
+    } catch (error) {
+      setAiReview(null)
+      if (heuristicResult) setAnalysisResult(heuristicResult)
+      setAnalysisError(
+        heuristicResult
+          ? `Risposta AI non utilizzabile: ${error instanceof Error ? error.message : String(error)} È mostrata solo l’analisi euristica, basata su regole e non sull’AI.`
+          : `Analisi non riuscita: ${error instanceof Error ? error.message : String(error)}`
+      )
+    } finally {
       setIsAnalyzing(false)
-    }, 450)
+    }
   }
 
   const handleCopyJson = () => {
     if (!analysisResult) return
-    navigator.clipboard.writeText(JSON.stringify(analysisResult, null, 2))
+    navigator.clipboard.writeText(
+      JSON.stringify(
+        {
+          aiReview,
+          heuristicAnalysis: analysisResult,
+        },
+        null,
+        2
+      )
+    )
     setCopiedJson(true)
     setTimeout(() => setCopiedJson(false), 2000)
   }
 
-  const handlePublishToMarketplace = () => {
+  const handleSaveDraft = () => {
     if (!analysisResult) return
 
     const { extracted, executiveSummary } = analysisResult
@@ -83,45 +166,40 @@ export function EulaAnalyzerTab() {
     const newListing: LicenseListing = {
       category: 'Software & Tools',
       company: {
-        companyStatus: 'verified',
-        defaultTransferPolicy: extracted.transferPolicy,
-        description:
-          'Vendor verificato tramite analisi crittografica e conformità QVAC.',
-        defaultRoyaltyPercent: extracted.royaltyEstimatePercent ?? 5,
-        domain: `${extracted.productName.toLowerCase().replace(/[^a-z]/g, '')}.io`,
-        id: 'comp-qvac-verified',
-        logoUrl:
-          'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&h=100&fit=crop',
-        name: extracted.productName.split(' ')[0] + ' Labs',
-        refundPolicy:
-          'Rimborso garantito entro 14 giorni prima dell’attivazione.',
-        verifiedAt: new Date().toISOString(),
+        companyStatus: 'pending',
+        defaultRoyaltyPercent: 0,
+        defaultTransferPolicy: 'not_transferable',
+        description: 'Bozza demo: dati aziendali e licenza non verificati.',
+        domain: 'non-verificato.invalid',
+        id: 'comp-qvac-draft',
+        logoUrl: '',
+        name: 'Azienda da verificare',
+        refundPolicy: 'Da definire',
       },
-      companyId: 'comp-qvac-verified',
+      companyId: 'comp-qvac-draft',
+      createdAt: new Date().toISOString(),
       durationDays: extracted.durationDays,
       edition: extracted.edition || 'Standard',
       id: `lic-${Date.now()}`,
+      imageUrl: '',
       licenseType: extracted.licenseType,
-      paymentAsset: 'USDT on RGB',
-      maxTransfers: extracted.transferPolicy === 'not_transferable' ? 0 : 5,
+      maxTransfers: 0,
+      minHoldingDays: null,
+      paymentAsset: 'Da configurare',
       platforms: extracted.platforms,
-      imageUrl:
-        'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&h=400&fit=crop',
-      productDescription: executiveSummary,
-      createdAt: new Date().toISOString(),
+      price: 0,
+      productDescription: `${executiveSummary}\n\nBozza demo non verificata. Non pubblicare senza revisione umana e verifica del venditore e dei termini.`,
       productName: extracted.productName,
-      minHoldingDays: 7,
-      price: extracted.licenseType === 'perpetual' ? 45000 : 15000,
-      version: extracted.version || '1.0',
-      royaltyPercent: extracted.royaltyEstimatePercent ?? 5,
-      status: 'published',
+      royaltyPercent: 0,
+      status: 'draft',
       tags: [
         extracted.edition || 'Pro',
         extracted.licenseType,
         ...extracted.platforms,
       ],
-      transferPolicy: extracted.transferPolicy,
+      transferPolicy: 'not_transferable',
       updatedAt: new Date().toISOString(),
+      version: extracted.version || '1.0',
     }
 
     dispatch(addListing(newListing))
@@ -139,24 +217,72 @@ export function EulaAnalyzerTab() {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-white">
-                QVAC Legal Engine v1.0
+                Analisi EULA QVAC
               </span>
-              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                100% Locale
+              <span
+                className={`px-2 py-0.5 text-xs font-medium rounded-full border ${
+                  isUsableQvacStatus(mind.status)
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                }`}
+              >
+                {isUsableQvacStatus(mind.status)
+                  ? `Modello locale attivo${mind.status?.activeModelName ? ` · ${mind.status.activeModelName}` : ''}`
+                  : 'Modello locale non attivo'}
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Inferenza edge deterministica & semantica sul dispositivo. Nessun
-              dato contrattuale o confidenziale lascia la macchina.
+              L’AI locale individua e riassume clausole con citazioni
+              controllate sul testo. È un supporto informativo, non una verifica
+              legale.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-xs font-mono text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
           <Lock className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Zero Cloud Telemetry</span>
+          <span>Inferenza QVAC sul dispositivo</span>
         </div>
       </div>
+      {!isUsableQvacStatus(mind.status) && mind.installed.length > 0 && (
+        <button
+          className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs font-medium text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50"
+          disabled={isStartingModel || mind.starting || !!mind.loading}
+          onClick={() => void handleStartModel()}
+          type="button"
+        >
+          {isStartingModel || mind.starting || mind.loading
+            ? 'Avvio del modello locale…'
+            : 'Avvia modello locale'}
+        </button>
+      )}
+      <button
+        className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800"
+        onClick={() => navigate(KALEIDO_MIND_MODELS_PATH)}
+        type="button"
+      >
+        Scegli o installa un altro modello
+      </button>
+      {modelError && (
+        <p
+          className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200"
+          role="alert"
+        >
+          {modelError}
+        </p>
+      )}
+      {analysisError && (
+        <p
+          className={`rounded-lg border p-3 text-xs ${
+            analysisResult
+              ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+              : 'border-rose-500/30 bg-rose-500/10 text-rose-200'
+          }`}
+          role="alert"
+        >
+          {analysisError}
+        </p>
+      )}
 
       {/* Main Analysis Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -225,6 +351,9 @@ export function EulaAnalyzerTab() {
                 onChange={(e) => {
                   setContractText(e.target.value)
                   setSelectedSampleId('')
+                  setAnalysisResult(null)
+                  setAiReview(null)
+                  setAnalysisError('')
                 }}
                 placeholder="Incolla qui il testo del contratto di licenza o EULA..."
                 rows={10}
@@ -242,14 +371,16 @@ export function EulaAnalyzerTab() {
                 <span className="text-[10px] text-slate-500">Opzionale</span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Seleziona cosa dichiara il venditore per testare se QVAC rileva
-                incongruenze o tentativi di frode:
+                Confronto euristico con la dichiarazione del venditore. Non
+                verifica la conformità legale:
               </p>
               <select
                 className="w-full text-xs p-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                onChange={(e) =>
+                onChange={(e) => {
                   setClaimedPolicy(e.target.value as TransferPolicy | '')
-                }
+                  setAnalysisResult(null)
+                  setAiReview(null)
+                }}
                 value={claimedPolicy}
               >
                 <option value="">Nessuna dichiarazione (Analisi cieca)</option>
@@ -275,12 +406,12 @@ export function EulaAnalyzerTab() {
               {isAnalyzing ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  Elaborazione Locale QVAC...
+                  Analisi del modello locale…
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  Analizza Licenza con QVAC
+                  Analizza con QVAC locale
                 </>
               )}
             </button>
@@ -305,6 +436,61 @@ export function EulaAnalyzerTab() {
             </div>
           ) : (
             <div className="space-y-5 animate-in fade-in duration-300">
+              {aiReview && (
+                <section className="space-y-3 rounded-2xl border border-cyan-500/30 bg-slate-900 p-5">
+                  <div>
+                    <h2 className="flex items-center gap-2 text-sm font-bold text-cyan-200">
+                      <Sparkles className="h-4 w-4" />
+                      Lettura assistita dal modello locale
+                    </h2>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Il modello seleziona passaggi numerati; il testo mostrato
+                      è recuperato direttamente dal contratto originale.
+                      L’interpretazione resta da controllare e non è una
+                      conclusione legale.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {aiReview.findings.map((finding) => (
+                      <article
+                        className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"
+                        key={finding.topic}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h3 className="text-xs font-semibold text-white">
+                            {EULA_TOPIC_LABELS[finding.topic]}
+                          </h3>
+                          <span className="text-[10px] text-slate-400">
+                            {finding.status === 'explicit'
+                              ? 'Passaggio esplicito'
+                              : finding.status === 'ambiguous'
+                                ? 'Ambiguo / da verificare'
+                                : 'Non individuato'}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-300">
+                          {finding.interpretation}
+                        </p>
+                        {finding.evidence && (
+                          <blockquote className="mt-2 border-l-2 border-cyan-500/50 pl-3 font-mono text-[11px] italic text-slate-400">
+                            “{finding.evidence}”
+                          </blockquote>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-amber-200/90">
+                    {aiReview.caveat}
+                  </p>
+                </section>
+              )}
+
+              <p className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-[11px] text-amber-200">
+                Il riepilogo e gli attributi seguenti sono prodotti da regole
+                euristiche, non dal modello AI. Possono essere errati e non
+                verificano la validità legale del contratto.
+              </p>
+
               {/* Result Overview Header Card */}
               <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -333,14 +519,14 @@ export function EulaAnalyzerTab() {
                       'transferable_free' && (
                       <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-xs">
                         <CheckCircle2 className="w-4 h-4" />
-                        Trasferimento Libero (RGB secondary market)
+                        Ipotesi euristica: trasferimento libero
                       </div>
                     )}
                     {analysisResult.extracted.transferPolicy ===
                       'transferable_with_approval' && (
                       <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold text-xs">
                         <AlertTriangle className="w-4 h-4" />
-                        Rivendita con Approvazione & Royalty (
+                        Ipotesi euristica: possibile approvazione (
                         {analysisResult.extracted.royaltyEstimatePercent ?? 5}%)
                       </div>
                     )}
@@ -348,20 +534,19 @@ export function EulaAnalyzerTab() {
                       'not_transferable' && (
                       <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 font-semibold text-xs">
                         <XCircle className="w-4 h-4" />
-                        Non Trasferibile (Vincolo Personale)
+                        Nessun segnale di trasferibilità nelle regole
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Audit Warning Banner if Flagged (US-06) */}
-                {analysisResult.complianceAudit.aiReviewStatus ===
-                  'flagged' && (
+                {analysisResult.complianceAudit.reviewStatus === 'flagged' && (
                   <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 flex items-start gap-3">
                     <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
                     <div className="text-xs space-y-1">
                       <div className="font-semibold text-rose-300">
-                        Incongruenza di Conformità Rilevata (US-06)
+                        Disaccordo rilevato dalle regole (non verifica legale)
                       </div>
                       <p className="text-rose-200/90 leading-relaxed">
                         {analysisResult.complianceAudit.flagReason}
@@ -420,10 +605,10 @@ export function EulaAnalyzerTab() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                     <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                    Sintesi Esecutiva QVAC
+                    Sintesi euristica (regole, non AI)
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                    Formattata per Descrizione Marketplace
+                    Riepilogo non verificato
                   </span>
                 </div>
                 <div className="p-3.5 rounded-lg bg-slate-950/70 border border-slate-800/80">
@@ -490,7 +675,7 @@ export function EulaAnalyzerTab() {
                 </div>
               </div>
 
-              {/* Action Bar (Export JSON and Create Marketplace Listing) */}
+              {/* Action Bar (Export JSON and save a non-published draft) */}
               <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
                 <button
                   className="px-3.5 py-2 rounded-lg text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 transition flex items-center gap-1.5 cursor-pointer"
@@ -517,17 +702,17 @@ export function EulaAnalyzerTab() {
                       : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/20'
                   }`}
                   disabled={publishedSuccess}
-                  onClick={handlePublishToMarketplace}
+                  onClick={handleSaveDraft}
                   type="button"
                 >
                   {publishedSuccess ? (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
-                      Licenza Pubblicata nel Marketplace!
+                      Bozza demo salvata (non pubblicata)
                     </>
                   ) : (
                     <>
-                      Pre-compila & Pubblica Inserzione
+                      Salva bozza demo non pubblicata
                       <ArrowRight className="w-3.5 h-3.5" />
                     </>
                   )}

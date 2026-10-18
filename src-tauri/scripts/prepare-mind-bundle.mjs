@@ -275,6 +275,31 @@ function writeSlimWorker(name) {
   console.log('  wrote slim LLM-only worker (dist/src/worker/index.js)')
 }
 
+function extendProviderChatTimeout() {
+  const providerPath = join(
+    out,
+    'provider',
+    'node_modules',
+    '@kaleidorg',
+    'mind-provider',
+    'dist',
+    'index.js'
+  )
+  const provider = readFileSync(providerPath, 'utf8')
+  const defaultTimeout =
+    'get timeoutMs() { return thinkingEnabled ? 60_000 : 30_000; },'
+  const extendedTimeout =
+    'get timeoutMs() { return thinkingEnabled ? 600_000 : 300_000; },'
+  const occurrences = provider.split(defaultTimeout).length - 1
+  if (occurrences !== 1) {
+    throw new Error(
+      `Unexpected @kaleidorg/mind-provider chat timeout configuration (${occurrences} matches); update prepare-mind-bundle.mjs for this provider version`
+    )
+  }
+  writeFileSync(providerPath, provider.replace(defaultTimeout, extendedTimeout))
+  console.log('  extended provider chat timeout (300s default / 600s thinking)')
+}
+
 // Node runtime for the target platform (host by default).
 function fetchNode() {
   const platMap = { darwin: 'darwin', linux: 'linux', win32: 'win' }
@@ -313,6 +338,7 @@ installFromNpm('provider', {
   '@kaleidorg/mind': process.env.MIND_VERSION ?? pinnedPackage('@kaleidorg/mind'),
   '@qvac/sdk': QVAC_VERSION,
 })
+extendProviderChatTimeout()
 assertPlatformRuntimes('provider')
 pruneEngines('provider')
 // After pruning engines, the default worker would crash importing them — swap in

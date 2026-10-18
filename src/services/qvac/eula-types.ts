@@ -6,7 +6,6 @@ import type {
   TransferPolicy,
   LicenseType,
   LicenseListing,
-  AiReviewStatus,
 } from '../../types/licex'
 
 export type EulaClauseCategory =
@@ -50,7 +49,7 @@ export interface EulaComplianceAudit {
   detectedTransferPolicy: TransferPolicy
   matchesClaim: boolean
   flagReason?: string
-  aiReviewStatus: AiReviewStatus
+  reviewStatus: 'analyzed' | 'flagged'
 }
 
 export interface EulaAnalysisResult {
@@ -58,9 +57,8 @@ export interface EulaAnalysisResult {
   extracted: EulaExtractedMetadata
   clauses: EulaClause[]
   executiveSummary: string
-  aiReviewStatus: AiReviewStatus
+  reviewStatus: 'analyzed' | 'flagged'
   complianceAudit: EulaComplianceAudit
-  confidenceScore: number // 0-100%
   suggestedListing: Partial<LicenseListing>
   analysisTimestamp: string
   processingTimeMs: number

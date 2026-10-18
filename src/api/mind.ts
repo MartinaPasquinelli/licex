@@ -560,7 +560,7 @@ class MindClient {
     })
     return this.request<ChatResult>(
       { chatId, cmd: 'chat', prompt },
-      300_000
+      600_000
     ).finally(off)
   }
   listCapabilities() {

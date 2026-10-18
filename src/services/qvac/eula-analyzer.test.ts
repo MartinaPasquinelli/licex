@@ -14,7 +14,8 @@ describe('QvacEulaAnalyzer compliance audit', () => {
 
     expect(result.extracted.transferPolicy).toBe('transferable_with_approval')
     expect(result.complianceAudit.matchesClaim).toBe(false)
-    expect(result.complianceAudit.aiReviewStatus).toBe('flagged')
+    expect(result.complianceAudit.reviewStatus).toBe('flagged')
+    expect(result.reviewStatus).toBe('flagged')
   })
 
   it('accepts an approval-required claim that matches the EULA', () => {
@@ -24,14 +25,14 @@ describe('QvacEulaAnalyzer compliance audit', () => {
     )
 
     expect(result.complianceAudit.matchesClaim).toBe(true)
-    expect(result.complianceAudit.aiReviewStatus).toBe('analyzed')
+    expect(result.complianceAudit.reviewStatus).toBe('analyzed')
   })
 
   it('flags a non-transferable claim when the EULA allows transfer with approval', () => {
     const result = QvacEulaAnalyzer.analyze(soundmasterEula, 'not_transferable')
 
     expect(result.complianceAudit.matchesClaim).toBe(false)
-    expect(result.complianceAudit.aiReviewStatus).toBe('flagged')
+    expect(result.complianceAudit.reviewStatus).toBe('flagged')
     expect(result.complianceAudit.flagReason).toContain('previa autorizzazione')
   })
 })

@@ -8,7 +8,10 @@ import { Cpu, Play, Rocket } from 'lucide-react'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { KALEIDO_MIND_BRAIN_PATH } from '../../app/router/paths'
+import {
+  KALEIDO_MIND_BRAIN_PATH,
+  KALEIDO_MIND_MODELS_PATH,
+} from '../../app/router/paths'
 import { Modal } from '../../components/ui/Modal'
 import { Select } from '../../components/ui/Select'
 import type { UseMindResult } from '../../hooks/useMind'
@@ -17,7 +20,7 @@ import { getRecommendedModelId } from './modelCatalog'
 /**
  * Remembers the last model you started, so "the latest" is the one you used.
  */
-export const LAST_MODEL_KEY = 'kaleido-mind.last-model.v1'
+export const LAST_MODEL_KEY = 'kaleido-mind.last-model.v3'
 
 export const StartBrainModal: React.FC<{
   mind: UseMindResult
@@ -121,6 +124,16 @@ export const StartBrainModal: React.FC<{
                 Start {activeModel?.displayName ?? 'brain'}
               </button>
             </div>
+            <button
+              className="w-full rounded-md px-3 py-1.5 text-xs font-medium text-content-tertiary hover:text-content-primary"
+              onClick={() => {
+                setDismissed(true)
+                navigate(KALEIDO_MIND_MODELS_PATH)
+              }}
+              type="button"
+            >
+              Choose or install another model
+            </button>
           </>
         ) : (
           <>

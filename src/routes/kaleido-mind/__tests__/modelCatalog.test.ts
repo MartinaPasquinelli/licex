@@ -15,6 +15,39 @@ const model = (id: string, recommended?: boolean): CatalogModel => ({
 })
 
 describe('Mind model recommendation', () => {
+  it('prefers the next stronger Qwen model over the provider default', () => {
+    expect(
+      getRecommendedModelId(
+        [
+          {
+            ...model('qwen3.5-2b-q4_k_m', true),
+            ramHintGb: 3,
+          },
+          {
+            ...model('qwen3.5-4b-q4_k_m'),
+            ramHintGb: 5,
+          },
+        ],
+        hardware(8)
+      )
+    ).toBe('qwen3.5-4b-q4_k_m')
+  })
+
+  it('keeps the provider default when hardware capacity is unknown', () => {
+    expect(
+      getRecommendedModelId([
+        {
+          ...model('qwen3.5-2b-q4_k_m', true),
+          ramHintGb: 3,
+        },
+        {
+          ...model('qwen3.5-4b-q4_k_m'),
+          ramHintGb: 5,
+        },
+      ])
+    ).toBe('qwen3.5-2b-q4_k_m')
+  })
+
   it('uses the provider recommendation even when a smaller model is listed first', () => {
     expect(
       getRecommendedModelId([model('qwen3.5-0.8b'), model('qwen3.5-2b', true)])
@@ -43,6 +76,23 @@ it('suggests the smaller model on a 4 GB device', () => {
       hardware(4)
     )
   ).toBe('small')
+})
+it('falls back to the provider default when the stronger model exceeds the memory budget', () => {
+  expect(
+    getRecommendedModelId(
+      [
+        {
+          ...model('qwen3.5-2b-q4_k_m', true),
+          ramHintGb: 3,
+        },
+        {
+          ...model('qwen3.5-4b-q4_k_m'),
+          ramHintGb: 5,
+        },
+      ],
+      hardware(6)
+    )
+  ).toBe('qwen3.5-2b-q4_k_m')
 })
 it('keeps the balanced recommendation on a large machine instead of choosing the largest download', () => {
   expect(
