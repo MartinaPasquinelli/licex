@@ -17,6 +17,8 @@ import {
   Cpu,
   Layers,
   Lock,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 import { useAppDispatch } from '../../app/store/hooks'
@@ -40,6 +42,10 @@ export function EulaAnalyzerTab() {
     useState<EulaAnalysisResult | null>(null)
   const [copiedJson, setCopiedJson] = useState(false)
   const [publishedSuccess, setPublishedSuccess] = useState(false)
+  const [showContract, setShowContract] = useState(false)
+  const [expandedSampleIds, setExpandedSampleIds] = useState<Set<string>>(
+    new Set()
+  )
 
   const handleSelectSample = (sampleId: string) => {
     const sample = EULA_SAMPLES.find((s) => s.id === sampleId)
@@ -84,10 +90,10 @@ export function EulaAnalyzerTab() {
       category: 'Software & Tools',
       company: {
         companyStatus: 'verified',
+        defaultRoyaltyPercent: extracted.royaltyEstimatePercent ?? 5,
         defaultTransferPolicy: extracted.transferPolicy,
         description:
           'Vendor verificato tramite analisi crittografica e conformità QVAC.',
-        defaultRoyaltyPercent: extracted.royaltyEstimatePercent ?? 5,
         domain: `${extracted.productName.toLowerCase().replace(/[^a-z]/g, '')}.io`,
         id: 'comp-qvac-verified',
         logoUrl:
@@ -98,21 +104,20 @@ export function EulaAnalyzerTab() {
         verifiedAt: new Date().toISOString(),
       },
       companyId: 'comp-qvac-verified',
+      createdAt: new Date().toISOString(),
       durationDays: extracted.durationDays,
       edition: extracted.edition || 'Standard',
       id: `lic-${Date.now()}`,
-      licenseType: extracted.licenseType,
-      paymentAsset: 'USDT on RGB',
-      maxTransfers: extracted.transferPolicy === 'not_transferable' ? 0 : 5,
-      platforms: extracted.platforms,
       imageUrl:
         'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&h=400&fit=crop',
-      productDescription: executiveSummary,
-      createdAt: new Date().toISOString(),
-      productName: extracted.productName,
+      licenseType: extracted.licenseType,
+      maxTransfers: extracted.transferPolicy === 'not_transferable' ? 0 : 5,
       minHoldingDays: 7,
+      paymentAsset: 'USDT on RGB',
+      platforms: extracted.platforms,
       price: extracted.licenseType === 'perpetual' ? 45000 : 15000,
-      version: extracted.version || '1.0',
+      productDescription: executiveSummary,
+      productName: extracted.productName,
       royaltyPercent: extracted.royaltyEstimatePercent ?? 5,
       status: 'published',
       tags: [
@@ -122,6 +127,7 @@ export function EulaAnalyzerTab() {
       ],
       transferPolicy: extracted.transferPolicy,
       updatedAt: new Date().toISOString(),
+      version: extracted.version || '1.0',
     }
 
     dispatch(addListing(newListing))
@@ -145,10 +151,6 @@ export function EulaAnalyzerTab() {
                 100% Locale
               </span>
             </div>
-            <p className="text-xs text-slate-400">
-              Inferenza edge deterministica & semantica sul dispositivo. Nessun
-              dato contrattuale o confidenziale lascia la macchina.
-            </p>
           </div>
         </div>
 
@@ -175,12 +177,10 @@ export function EulaAnalyzerTab() {
 
             {/* Quick Sample Selector */}
             <div className="space-y-2">
-              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Esempi Reali Precaricati (1-Click Demo):
-              </span>
               <div className="grid grid-cols-1 gap-1.5">
                 {EULA_SAMPLES.map((sample) => {
                   const isSelected = selectedSampleId === sample.id
+                  const isExpanded = expandedSampleIds.has(sample.id)
                   return (
                     <button
                       className={`text-left p-2.5 rounded-lg text-xs transition border flex items-start justify-between gap-2 ${
@@ -189,28 +189,45 @@ export function EulaAnalyzerTab() {
                           : 'bg-slate-800/60 hover:bg-slate-800 border-slate-700/60 text-slate-300'
                       }`}
                       key={sample.id}
-                      onClick={() => handleSelectSample(sample.id)}
+                      onClick={() => {
+                        handleSelectSample(sample.id)
+                        setExpandedSampleIds((current) => {
+                          const next = new Set(current)
+                          if (next.has(sample.id)) next.delete(sample.id)
+                          else next.add(sample.id)
+                          return next
+                        })
+                      }}
                       type="button"
                     >
-                      <div>
+                      <div className="min-w-0">
                         <div className="font-semibold text-white">
                           {sample.title}
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
-                          {sample.subtitle}
-                        </div>
+                        {isExpanded && (
+                          <div className="mt-0.5 text-left text-[11px] text-slate-400">
+                            {sample.subtitle}
+                          </div>
+                        )}
                       </div>
-                      <span
-                        className={`px-2 py-0.5 text-[10px] rounded font-mono ${
-                          sample.expectedPolicy === 'transferable_free'
-                            ? 'bg-emerald-500/15 text-emerald-300'
-                            : sample.expectedPolicy ===
-                                'transferable_with_approval'
-                              ? 'bg-amber-500/15 text-amber-300'
-                              : 'bg-rose-500/15 text-rose-300'
-                        }`}
-                      >
-                        {sample.expectedPolicy}
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span
+                          className={`px-2 py-0.5 text-[10px] rounded font-mono ${
+                            sample.expectedPolicy === 'transferable_free'
+                              ? 'bg-emerald-500/15 text-emerald-300'
+                              : sample.expectedPolicy ===
+                                  'transferable_with_approval'
+                                ? 'bg-amber-500/15 text-amber-300'
+                                : 'bg-rose-500/15 text-rose-300'
+                          }`}
+                        >
+                          {sample.expectedPolicy}
+                        </span>
+                        {isExpanded ? (
+                          <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                        )}
                       </span>
                     </button>
                   )
@@ -218,19 +235,36 @@ export function EulaAnalyzerTab() {
               </div>
             </div>
 
-            {/* EULA Text Area */}
-            <div>
-              <textarea
-                className="w-full font-mono text-xs p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none leading-relaxed"
-                onChange={(e) => {
-                  setContractText(e.target.value)
-                  setSelectedSampleId('')
-                }}
-                placeholder="Incolla qui il testo del contratto di licenza o EULA..."
-                rows={10}
-                value={contractText}
-              />
-            </div>
+            <button
+              className="flex w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-950/70 px-3.5 py-3 text-left text-xs font-medium text-slate-200 hover:border-cyan-500/50"
+              onClick={() => setShowContract((visible) => !visible)}
+              type="button"
+            >
+              <span>
+                {showContract
+                  ? 'Nascondi contratto'
+                  : 'Visualizza contratto EULA'}
+              </span>
+              {showContract ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </button>
+            {showContract && (
+              <div>
+                <textarea
+                  className="w-full resize-none rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs leading-relaxed text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  onChange={(e) => {
+                    setContractText(e.target.value)
+                    setSelectedSampleId('')
+                  }}
+                  placeholder="Incolla qui il testo del contratto di licenza o EULA..."
+                  rows={10}
+                  value={contractText}
+                />
+              </div>
+            )}
 
             {/* Optional Vendor Claim Cross-Check (US-06 Audit) */}
             <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2">
@@ -432,18 +466,19 @@ export function EulaAnalyzerTab() {
               </div>
 
               {/* Grounded Legal Clauses (With Exact Text Quotes) */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                    <Layers className="w-3.5 h-3.5 text-cyan-400" />
-                    Clausole Rilevate con Citazione del Testo Originale
-                  </h3>
-                  <span className="text-xs text-slate-400">
-                    {analysisResult.clauses.length} clausole analizzate
+              <details className="group space-y-3 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wider text-slate-300">
+                  <span className="flex items-center gap-2">
+                    <Layers className="h-3.5 w-3.5 text-cyan-400" />
+                    Clausole rilevate e testo originale
                   </span>
-                </div>
+                  <span className="flex shrink-0 items-center gap-2 text-xs font-normal normal-case tracking-normal text-slate-400">
+                    {analysisResult.clauses.length} clausole
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                  </span>
+                </summary>
 
-                <div className="space-y-2.5">
+                <div className="space-y-2.5 pt-1">
                   {analysisResult.clauses.map((clause) => (
                     <div
                       className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2"
@@ -488,7 +523,7 @@ export function EulaAnalyzerTab() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </details>
 
               {/* Action Bar (Export JSON and Create Marketplace Listing) */}
               <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
