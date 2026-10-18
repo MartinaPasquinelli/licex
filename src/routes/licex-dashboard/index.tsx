@@ -18,11 +18,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
 import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { mintLicenseListing } from '../../slices/licex/licex.slice'
-import { MOCK_EULA_ANALYSIS } from '../../constants/licex-mock-data'
-import {
-  createIssuanceInputFromEula,
-  issueLicenseRgbAsset,
-} from '../../services/licex/licenseAssetIssuer'
+import { issueLicenseRgbAsset } from '../../services/licex/licenseAssetIssuer'
 
 function formatSats(sats: number): string {
   if (sats >= 1000000) return `${(sats / 1000000).toFixed(2)}M sats`
@@ -38,7 +34,7 @@ export function Component() {
     searchParams.get('tab') === 'mint' ? 'mint' : 'listings'
   )
 
-  // Form for simulated mint
+  // Manual issuer form; EULA-driven UDA publication lives in My Licenses.
   const [mintName, setMintName] = useState('')
   const [mintEdition, setMintEdition] = useState('')
   const [mintPrice, setMintPrice] = useState('')
@@ -47,7 +43,6 @@ export function Component() {
   const [mintRoyalty, setMintRoyalty] = useState('5')
   const [mintNotice, setMintNotice] = useState<string | null>(null)
   const [isIssuing, setIsIssuing] = useState(false)
-  const [mockEulaSelected, setMockEulaSelected] = useState(false)
   const [issueUda] = nodeApi.endpoints.issueUdaAsset.useMutation()
   const [signMessage] = nodeApi.endpoints.signMessage.useMutation()
   const [getNetworkInfo] = nodeApi.endpoints.networkInfo.useLazyQuery()
@@ -68,23 +63,21 @@ export function Component() {
       const network = await getNetworkInfo().unwrap()
       if (network.network === 'Mainnet') {
         throw new Error(
-          'Emissione bloccata: i termini mock non possono essere emessi su mainnet. Configura signet o regtest.'
+          'Emissione di prova bloccata su Mainnet. Collega il nodo a Mutinynet o Regtest.'
         )
       }
       const issuer = await getNodeInfo().unwrap()
-      const issuanceInput = mockEulaSelected
-        ? createIssuanceInputFromEula(MOCK_EULA_ANALYSIS, requestId)
-        : {
-            edition: mintEdition,
-            productName: mintName,
-            requestId,
-            royaltyPercent: royalty,
-            transferPolicy: mintTransferPolicy as
-              | 'transferable_free'
-              | 'transferable_with_approval'
-              | 'not_transferable',
-            version: '2026.1',
-          }
+      const issuanceInput = {
+        edition: mintEdition,
+        productName: mintName,
+        requestId,
+        royaltyPercent: royalty,
+        transferPolicy: mintTransferPolicy as
+          | 'transferable_free'
+          | 'transferable_with_approval'
+          | 'not_transferable',
+        version: '2026.1',
+      }
       const issuedAsset = await issueLicenseRgbAsset(
         issuanceInput,
         (request) => issueUda(request).unwrap(),
@@ -102,26 +95,6 @@ export function Component() {
           rgbAsset: issuedAsset,
           royaltyPercent: royalty,
           transferPolicy: issuanceInput.transferPolicy,
-          ...(mockEulaSelected
-            ? {
-                company: {
-                  companyStatus: 'pending' as const,
-                  domain: MOCK_EULA_ANALYSIS.suggestedListing.publisherDomain,
-                  name: MOCK_EULA_ANALYSIS.suggestedListing.publisherName,
-                },
-                listingDetails: {
-                  category: 'Creative & Design',
-                  durationDays:
-                    MOCK_EULA_ANALYSIS.suggestedListing.durationDays,
-                  licenseType: MOCK_EULA_ANALYSIS.suggestedListing.licenseType,
-                  platforms: [...MOCK_EULA_ANALYSIS.suggestedListing.platforms],
-                  productDescription:
-                    MOCK_EULA_ANALYSIS.suggestedListing.productDescription,
-                  tags: [...MOCK_EULA_ANALYSIS.suggestedListing.tags],
-                  version: MOCK_EULA_ANALYSIS.suggestedListing.version,
-                },
-              }
-            : {}),
         })
       )
 
@@ -383,33 +356,9 @@ export function Component() {
 
             <form className="space-y-4" onSubmit={handleMintSubmit}>
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-                I dati demo sono inventati. Il pulsante di prova crea un UDA
-                reale sulla rete non-mainnet selezionata e firma i termini con
-                il wallet collegato. Royalty e policy di trasferimento sono
-                metadati dichiarativi, non regole di consenso RGB.
-                <button
-                  className="ml-2 underline font-semibold"
-                  disabled={isIssuing}
-                  onClick={() => {
-                    setMintName(MOCK_EULA_ANALYSIS.extracted.productName)
-                    setMintEdition(MOCK_EULA_ANALYSIS.extracted.edition)
-                    setMintPrice(
-                      String(MOCK_EULA_ANALYSIS.suggestedListing.priceSats)
-                    )
-                    setMintRoyalty(
-                      String(
-                        MOCK_EULA_ANALYSIS.extracted.royaltyEstimatePercent
-                      )
-                    )
-                    setMintTransferPolicy(
-                      MOCK_EULA_ANALYSIS.extracted.transferPolicy
-                    )
-                    setMockEulaSelected(true)
-                  }}
-                  type="button"
-                >
-                  Carica EULA demo
-                </button>
+                Per pubblicare una licenza analizzata, usa l’Analizzatore EULA
+                in “Le Mie Licenze”. Questa schermata resta disponibile per
+                emissioni manuali.
               </div>
               <div>
                 <label className="text-xs text-[rgb(var(--app-content-secondary))] block mb-1">
@@ -417,10 +366,7 @@ export function Component() {
                 </label>
                 <input
                   className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-[rgb(var(--app-surface-primary))] border border-[rgb(var(--app-border-primary))]/30 text-white focus:outline-none focus:border-purple-500"
-                  onChange={(e) => {
-                    setMockEulaSelected(false)
-                    setMintName(e.target.value)
-                  }}
+                  onChange={(e) => setMintName(e.target.value)}
                   placeholder="e.g. CLion C++ IDE Enterprise"
                   required
                   type="text"
@@ -435,10 +381,7 @@ export function Component() {
                   </label>
                   <input
                     className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-[rgb(var(--app-surface-primary))] border border-[rgb(var(--app-border-primary))]/30 text-white focus:outline-none focus:border-purple-500"
-                    onChange={(e) => {
-                      setMockEulaSelected(false)
-                      setMintEdition(e.target.value)
-                    }}
+                    onChange={(e) => setMintEdition(e.target.value)}
                     placeholder="e.g. Commercial 2026"
                     required
                     type="text"
@@ -452,10 +395,7 @@ export function Component() {
                   </label>
                   <input
                     className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-[rgb(var(--app-surface-primary))] border border-[rgb(var(--app-border-primary))]/30 text-white focus:outline-none focus:border-purple-500"
-                    onChange={(e) => {
-                      setMockEulaSelected(false)
-                      setMintPrice(e.target.value)
-                    }}
+                    onChange={(e) => setMintPrice(e.target.value)}
                     placeholder="e.g. 250000"
                     required
                     type="number"
@@ -471,10 +411,7 @@ export function Component() {
                   </label>
                   <select
                     className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-[rgb(var(--app-surface-primary))] border border-[rgb(var(--app-border-primary))]/30 text-white focus:outline-none focus:border-purple-500"
-                    onChange={(e) => {
-                      setMockEulaSelected(false)
-                      setMintTransferPolicy(e.target.value)
-                    }}
+                    onChange={(e) => setMintTransferPolicy(e.target.value)}
                     value={mintTransferPolicy}
                   >
                     <option value="transferable_free">
@@ -493,10 +430,7 @@ export function Component() {
                   </label>
                   <input
                     className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-[rgb(var(--app-surface-primary))] border border-[rgb(var(--app-border-primary))]/30 text-white focus:outline-none focus:border-purple-500"
-                    onChange={(e) => {
-                      setMockEulaSelected(false)
-                      setMintRoyalty(e.target.value)
-                    }}
+                    onChange={(e) => setMintRoyalty(e.target.value)}
                     placeholder="e.g. 5"
                     type="number"
                     value={mintRoyalty}

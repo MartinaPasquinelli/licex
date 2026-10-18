@@ -17,10 +17,9 @@ import {
   RefreshCw,
   FileText,
   X,
-  Plus,
+  FileSearch,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { toast } from 'react-toastify'
 
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
 import {
@@ -33,15 +32,8 @@ import {
   loadOrdersFromSqlite,
 } from '../../services/licex/licexStorage'
 import { LICEX_MARKETPLACE_PATH } from '../../app/router/paths'
-import { MOCK_EULA_ANALYSIS } from '../../constants/licex-mock-data'
-import { mintLicenseListing } from '../../slices/licex/licex.slice'
-import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
-import {
-  createIssuanceInputFromEula,
-  issueLicenseRgbAsset,
-} from '../../services/licex/licenseAssetIssuer'
-import type { IssuedLicenseAsset } from '../../services/licex/licenseAssetIssuer'
 import type { LicenseListing } from '../../types/licex'
+import { EulaAnalyzerTab } from '../licex-assistant/EulaAnalyzerTab'
 
 const formatContractDetails = (details?: string): string => {
   if (!details) return 'Il nodo non ha restituito i dettagli del contratto.'
@@ -51,34 +43,6 @@ const formatContractDetails = (details?: string): string => {
     return details
   }
 }
-
-const getIssuanceErrorMessage = (error: unknown): string => {
-  if (error instanceof Error) return error.message
-  if (error && typeof error === 'object') {
-    const value = error as Record<string, unknown>
-    const data = value.data
-    if (data && typeof data === 'object') {
-      const details = data as Record<string, unknown>
-      for (const key of ['error', 'message', 'detail']) {
-        if (typeof details[key] === 'string' && details[key]) {
-          return details[key] as string
-        }
-      }
-    }
-    for (const key of ['error', 'message', 'detail']) {
-      if (typeof value[key] === 'string' && value[key]) {
-        return value[key] as string
-      }
-    }
-    if (typeof value.status === 'number') {
-      return `Il nodo RGB ha rifiutato la richiesta (errore ${value.status}).`
-    }
-  }
-  return 'Errore sconosciuto durante la comunicazione con il nodo RGB.'
-}
-
-const isMissingUncoloredUtxo = (error: unknown): boolean =>
-  getIssuanceErrorMessage(error).toLowerCase().includes('no uncolored utxos')
 
 export function Component() {
   const navigate = useNavigate()
@@ -109,92 +73,13 @@ export function Component() {
   const [contractListing, setContractListing] = useState<LicenseListing | null>(
     null
   )
-  const [isCreatingUda, setIsCreatingUda] = useState(false)
-  const [issueUda] = nodeApi.endpoints.issueUdaAsset.useMutation()
-  const [createUtxos] = nodeApi.endpoints.createUtxos.useMutation()
-  const [signMessage] = nodeApi.endpoints.signMessage.useMutation()
-  const [getNetworkInfo] = nodeApi.endpoints.networkInfo.useLazyQuery()
-  const [getNodeInfo] = nodeApi.endpoints.nodeInfo.useLazyQuery()
+  const [showEulaAnalyzer, setShowEulaAnalyzer] = useState(false)
   const publishedLicenseListings = listings.filter(
     (listing) =>
       listing.status === 'published' &&
       listing.rgbAsset?.schema === 'UDA' &&
       listing.rgbAsset.mode === 'rgb-node'
   )
-
-  const handleCreateDemoUda = async () => {
-    if (isCreatingUda) return
-    setIsCreatingUda(true)
-    try {
-      const network = await getNetworkInfo().unwrap()
-      if (network.network === 'Mainnet') {
-        throw new Error(
-          'Emissione demo bloccata su Mainnet. Collega il nodo a Signet o Regtest.'
-        )
-      }
-      const issuer = await getNodeInfo().unwrap()
-      const requestId = crypto.randomUUID()
-      const issuanceInput = createIssuanceInputFromEula(
-        MOCK_EULA_ANALYSIS,
-        requestId
-      )
-      const issue = () =>
-        issueLicenseRgbAsset(
-          issuanceInput,
-          (request) => issueUda(request).unwrap(),
-          async (message) =>
-            (await signMessage({ message }).unwrap()).signed_message,
-          issuer.pubkey
-        )
-      let issuedAsset: IssuedLicenseAsset
-      try {
-        issuedAsset = await issue()
-      } catch (error) {
-        if (!isMissingUncoloredUtxo(error)) throw error
-        toast.info('Preparo un UTXO Bitcoin per l’emissione UDA…')
-        await createUtxos({
-          fee_rate: 2,
-          num: 1,
-          size: 32500,
-          up_to: false,
-        }).unwrap()
-        issuedAsset = await issue()
-      }
-
-      dispatch(
-        mintLicenseListing({
-          company: {
-            companyStatus: 'pending',
-            domain: MOCK_EULA_ANALYSIS.suggestedListing.publisherDomain,
-            name: MOCK_EULA_ANALYSIS.suggestedListing.publisherName,
-          },
-          edition: issuanceInput.edition,
-          id: `lic-${requestId}`,
-          listingDetails: {
-            category: 'Creative & Design',
-            durationDays: MOCK_EULA_ANALYSIS.suggestedListing.durationDays,
-            licenseType: MOCK_EULA_ANALYSIS.suggestedListing.licenseType,
-            platforms: [...MOCK_EULA_ANALYSIS.suggestedListing.platforms],
-            productDescription:
-              MOCK_EULA_ANALYSIS.suggestedListing.productDescription,
-            tags: [...MOCK_EULA_ANALYSIS.suggestedListing.tags],
-            version: MOCK_EULA_ANALYSIS.suggestedListing.version,
-          },
-          price: MOCK_EULA_ANALYSIS.suggestedListing.priceSats,
-          productName: issuanceInput.productName,
-          rgbAsset: issuedAsset,
-          royaltyPercent: issuanceInput.royaltyPercent,
-          transferPolicy: issuanceInput.transferPolicy,
-        })
-      )
-      toast.success(`UDA demo creata e pubblicata su ${network.network}.`)
-    } catch (error) {
-      const message = getIssuanceErrorMessage(error)
-      toast.error(message)
-    } finally {
-      setIsCreatingUda(false)
-    }
-  }
 
   const handleTestHandshake = (id: string) => {
     setTestedHandshakeId(id)
@@ -264,12 +149,11 @@ export function Component() {
             </button>
             <button
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#9B5094]/40 bg-[#9B5094]/10 hover:bg-[#9B5094]/20 text-[#9B5094] dark:text-[#CDF7F6] font-bold text-sm transition-all"
-              disabled={isCreatingUda}
-              onClick={handleCreateDemoUda}
+              onClick={() => setShowEulaAnalyzer((visible) => !visible)}
               type="button"
             >
-              <Plus className="w-4 h-4" />
-              {isCreatingUda ? 'Creazione UDA…' : 'Crea UDA demo'}
+              <FileSearch className="w-4 h-4" />
+              {showEulaAnalyzer ? 'Chiudi analizzatore' : 'Analizza EULA'}
             </button>
             <button
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#8FB8DE] to-[#9B5094] hover:opacity-95 text-white font-bold text-sm shadow-md transition-all transform hover:scale-[1.02] active:scale-[0.98]"
@@ -311,7 +195,29 @@ export function Component() {
       </div>
 
       {/* Content Area */}
-      {activeTab === 'licenses' ? (
+      {showEulaAnalyzer ? (
+        <section className="space-y-4 rounded-2xl border border-border-default bg-surface-overlay p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-content-primary">
+                Analizzatore EULA
+              </h2>
+              <p className="text-xs text-content-secondary">
+                Analizza i termini e pubblica la licenza come RGB UDA.
+              </p>
+            </div>
+            <button
+              aria-label="Chiudi analizzatore EULA"
+              className="rounded-lg p-2 text-content-secondary hover:bg-surface-elevated hover:text-content-primary"
+              onClick={() => setShowEulaAnalyzer(false)}
+              type="button"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <EulaAnalyzerTab onPublished={() => setShowEulaAnalyzer(false)} />
+        </section>
+      ) : activeTab === 'licenses' ? (
         <div className="space-y-4">
           {publishedLicenseListings.length > 0 && (
             <section className="rounded-2xl border border-[#9B5094]/25 bg-gradient-to-br from-[#9B5094]/10 via-surface-overlay to-surface-overlay p-5 space-y-4">

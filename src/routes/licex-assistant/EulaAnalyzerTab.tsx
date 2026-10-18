@@ -22,14 +22,50 @@ import {
 } from 'lucide-react'
 
 import { useAppDispatch } from '../../app/store/hooks'
-import { addListing } from '../../slices/licex/licex.slice'
+import { mintLicenseListing } from '../../slices/licex/licex.slice'
+import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { QvacEulaAnalyzer } from '../../services/qvac/eula-analyzer'
 import { EULA_SAMPLES } from '../../services/qvac/eula-samples'
 import type { EulaAnalysisResult } from '../../services/qvac/eula-types'
-import type { TransferPolicy, LicenseListing } from '../../types/licex'
+import type { TransferPolicy } from '../../types/licex'
 import { LicexMarkdown } from '../../components/LicexMarkdown'
+import {
+  createIssuanceInputFromEula,
+  issueLicenseRgbAsset,
+} from '../../services/licex/licenseAssetIssuer'
+import type { IssuedLicenseAsset } from '../../services/licex/licenseAssetIssuer'
+import { toast } from 'react-toastify'
 
-export function EulaAnalyzerTab() {
+interface EulaAnalyzerTabProps {
+  onPublished?: () => void
+}
+
+const getNodeErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object') {
+    const value = error as Record<string, unknown>
+    const data = value.data
+    if (data && typeof data === 'object') {
+      const details = data as Record<string, unknown>
+      for (const key of ['error', 'message', 'detail']) {
+        if (typeof details[key] === 'string' && details[key]) {
+          return details[key] as string
+        }
+      }
+    }
+    for (const key of ['error', 'message', 'detail']) {
+      if (typeof value[key] === 'string' && value[key]) {
+        return value[key] as string
+      }
+    }
+  }
+  return 'Errore sconosciuto durante la pubblicazione RGB UDA.'
+}
+
+const isMissingUncoloredUtxo = (error: unknown): boolean =>
+  getNodeErrorMessage(error).toLowerCase().includes('no uncolored utxos')
+
+export function EulaAnalyzerTab({ onPublished }: EulaAnalyzerTabProps) {
   const dispatch = useAppDispatch()
 
   const [contractText, setContractText] = useState(EULA_SAMPLES[0].text)
@@ -42,10 +78,17 @@ export function EulaAnalyzerTab() {
     useState<EulaAnalysisResult | null>(null)
   const [copiedJson, setCopiedJson] = useState(false)
   const [publishedSuccess, setPublishedSuccess] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [publishError, setPublishError] = useState<string | null>(null)
   const [showContract, setShowContract] = useState(false)
   const [expandedSampleIds, setExpandedSampleIds] = useState<Set<string>>(
     new Set()
   )
+  const [issueUda] = nodeApi.endpoints.issueUdaAsset.useMutation()
+  const [createUtxos] = nodeApi.endpoints.createUtxos.useMutation()
+  const [signMessage] = nodeApi.endpoints.signMessage.useMutation()
+  const [getNetworkInfo] = nodeApi.endpoints.networkInfo.useLazyQuery()
+  const [getNodeInfo] = nodeApi.endpoints.nodeInfo.useLazyQuery()
 
   const handleSelectSample = (sampleId: string) => {
     const sample = EULA_SAMPLES.find((s) => s.id === sampleId)
@@ -81,57 +124,101 @@ export function EulaAnalyzerTab() {
     setTimeout(() => setCopiedJson(false), 2000)
   }
 
-  const handlePublishToMarketplace = () => {
-    if (!analysisResult) return
+  const handlePublishToMarketplace = async () => {
+    if (!analysisResult || isPublishing || publishedSuccess) return
 
-    const { extracted, executiveSummary } = analysisResult
+    setIsPublishing(true)
+    setPublishError(null)
+    try {
+      const network = await getNetworkInfo().unwrap()
+      if (network.network === 'Mainnet') {
+        throw new Error(
+          'Pubblicazione dei termini EULA bloccata su Mainnet. Collega il nodo a Mutinynet o Regtest.'
+        )
+      }
 
-    const newListing: LicenseListing = {
-      category: 'Software & Tools',
-      company: {
-        companyStatus: 'verified',
-        defaultRoyaltyPercent: extracted.royaltyEstimatePercent ?? 5,
-        defaultTransferPolicy: extracted.transferPolicy,
-        description:
-          'Vendor verificato tramite analisi crittografica e conformità QVAC.',
-        domain: `${extracted.productName.toLowerCase().replace(/[^a-z]/g, '')}.io`,
-        id: 'comp-qvac-verified',
-        logoUrl:
-          'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&h=100&fit=crop',
-        name: extracted.productName.split(' ')[0] + ' Labs',
-        refundPolicy:
-          'Rimborso garantito entro 14 giorni prima dell’attivazione.',
-        verifiedAt: new Date().toISOString(),
-      },
-      companyId: 'comp-qvac-verified',
-      createdAt: new Date().toISOString(),
-      durationDays: extracted.durationDays,
-      edition: extracted.edition || 'Standard',
-      id: `lic-${Date.now()}`,
-      imageUrl:
-        'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&h=400&fit=crop',
-      licenseType: extracted.licenseType,
-      maxTransfers: extracted.transferPolicy === 'not_transferable' ? 0 : 5,
-      minHoldingDays: 7,
-      paymentAsset: 'USDT on RGB',
-      platforms: extracted.platforms,
-      price: extracted.licenseType === 'perpetual' ? 45000 : 15000,
-      productDescription: executiveSummary,
-      productName: extracted.productName,
-      royaltyPercent: extracted.royaltyEstimatePercent ?? 5,
-      status: 'published',
-      tags: [
-        extracted.edition || 'Pro',
-        extracted.licenseType,
-        ...extracted.platforms,
-      ],
-      transferPolicy: extracted.transferPolicy,
-      updatedAt: new Date().toISOString(),
-      version: extracted.version || '1.0',
+      const issuer = await getNodeInfo().unwrap()
+      const requestId = crypto.randomUUID()
+      const { extracted, suggestedListing } = analysisResult
+      const issuanceInput = createIssuanceInputFromEula(
+        analysisResult,
+        requestId
+      )
+      const issue = () =>
+        issueLicenseRgbAsset(
+          issuanceInput,
+          (request) => issueUda(request).unwrap(),
+          async (message) =>
+            (await signMessage({ message }).unwrap()).signed_message,
+          issuer.pubkey
+        )
+
+      let issuedAsset: IssuedLicenseAsset
+      try {
+        issuedAsset = await issue()
+      } catch (error) {
+        if (!isMissingUncoloredUtxo(error)) throw error
+        toast.info('Preparo un UTXO Bitcoin per l’emissione UDA…')
+        await createUtxos({
+          fee_rate: 2,
+          num: 1,
+          size: 32500,
+          up_to: false,
+        }).unwrap()
+        issuedAsset = await issue()
+      }
+
+      const suggestedPrice = Number(suggestedListing.price)
+      const price =
+        suggestedPrice > 0
+          ? suggestedPrice
+          : extracted.licenseType === 'perpetual'
+            ? 45000
+            : 15000
+      const productSlug =
+        extracted.productName.toLowerCase().replace(/[^a-z0-9]/g, '') ||
+        'unverified-publisher'
+
+      dispatch(
+        mintLicenseListing({
+          company: {
+            companyStatus: 'pending',
+            domain: `${productSlug}.invalid`,
+            name: `${extracted.productName} publisher (non verificato)`,
+          },
+          edition: issuanceInput.edition,
+          id: `lic-${requestId}`,
+          listingDetails: {
+            category: suggestedListing.category || 'Software & Tools',
+            durationDays: extracted.durationDays,
+            licenseType: extracted.licenseType,
+            platforms: [...extracted.platforms],
+            productDescription: analysisResult.executiveSummary,
+            tags: suggestedListing.tags || [
+              issuanceInput.edition,
+              extracted.licenseType,
+              ...extracted.platforms,
+            ],
+            version: issuanceInput.version,
+          },
+          price,
+          productName: issuanceInput.productName,
+          rgbAsset: issuedAsset,
+          royaltyPercent: issuanceInput.royaltyPercent,
+          transferPolicy: issuanceInput.transferPolicy,
+        })
+      )
+
+      toast.success(`UDA emessa e inserzione pubblicata su ${network.network}.`)
+      setPublishedSuccess(true)
+      onPublished?.()
+    } catch (error) {
+      const message = getNodeErrorMessage(error)
+      setPublishError(message)
+      toast.error(message)
+    } finally {
+      setIsPublishing(false)
     }
-
-    dispatch(addListing(newListing))
-    setPublishedSuccess(true)
   }
 
   return (
@@ -527,6 +614,14 @@ export function EulaAnalyzerTab() {
 
               {/* Action Bar (Export JSON and Create Marketplace Listing) */}
               <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                {publishError && (
+                  <div
+                    className="w-full rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200"
+                    role="alert"
+                  >
+                    {publishError}
+                  </div>
+                )}
                 <button
                   className="px-3.5 py-2 rounded-lg text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 transition flex items-center gap-1.5 cursor-pointer"
                   onClick={handleCopyJson}
@@ -551,11 +646,16 @@ export function EulaAnalyzerTab() {
                       ? 'bg-emerald-600 text-white cursor-default'
                       : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/20'
                   }`}
-                  disabled={publishedSuccess}
-                  onClick={handlePublishToMarketplace}
+                  disabled={publishedSuccess || isPublishing}
+                  onClick={() => void handlePublishToMarketplace()}
                   type="button"
                 >
-                  {publishedSuccess ? (
+                  {isPublishing ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Firma, crea UDA e pubblica…
+                    </>
+                  ) : publishedSuccess ? (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
                       Licenza Pubblicata nel Marketplace!

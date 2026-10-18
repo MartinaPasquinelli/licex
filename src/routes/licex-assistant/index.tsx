@@ -4,16 +4,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  ArrowRight,
-  Bot,
-  FileSearch,
-  Lightbulb,
-  MessageSquare,
-  Play,
-  Send,
-  Sparkles,
-} from 'lucide-react'
+import { ArrowRight, Bot, Lightbulb, Play, Send, Sparkles } from 'lucide-react'
 
 import { useAppSelector } from '../../app/store/hooks'
 import {
@@ -21,7 +12,6 @@ import {
   saveLocalChatMessages,
 } from '../../services/licex/licexStorage'
 import type { ChatMessage } from '../../types/licex'
-import { EulaAnalyzerTab } from './EulaAnalyzerTab'
 import { LicexMarkdown } from '../../components/LicexMarkdown'
 import { useMind } from '../../hooks/useMind'
 import {
@@ -81,7 +71,6 @@ export function Component() {
   )
   const [chatLoading, setChatLoading] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'eula' | 'chat'>('eula')
   const [input, setInput] = useState('')
   const [startError, setStartError] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -262,34 +251,8 @@ export function Component() {
               LICEX Assistant
             </h1>
             <p className="text-xs text-[rgb(var(--app-content-secondary))]">
-              Analisi EULA e ricerca assistita nel catalogo
+              Ricerca assistita nel catalogo
             </p>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 p-1">
-            <button
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                activeTab === 'eula'
-                  ? 'bg-cyan-500/20 text-cyan-300'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-              onClick={() => setActiveTab('eula')}
-              type="button"
-            >
-              <FileSearch className="h-3.5 w-3.5" />
-              Analizzatore EULA
-            </button>
-            <button
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                activeTab === 'chat'
-                  ? 'bg-purple-500/20 text-purple-300'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-              onClick={() => setActiveTab('chat')}
-              type="button"
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              Chat Assistente
-            </button>
           </div>
         </div>
       </div>
@@ -333,154 +296,148 @@ export function Component() {
         </div>
       )}
 
-      {activeTab === 'eula' ? (
-        <div className="flex-1 overflow-y-auto px-6 py-6">
-          <EulaAnalyzerTab />
-        </div>
-      ) : (
-        <>
-          {/* Messages list */}
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
-            {chatMessages.map((msg) => (
+      <>
+        {/* Messages list */}
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+          {chatMessages.map((msg) => (
+            <div
+              className={`flex gap-3 max-w-3xl ${
+                msg.role === 'user' ? 'ml-auto flex-row-reverse' : ''
+              }`}
+              key={msg.id}
+            >
               <div
-                className={`flex gap-3 max-w-3xl ${
-                  msg.role === 'user' ? 'ml-auto flex-row-reverse' : ''
+                className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                  msg.role === 'user'
+                    ? 'bg-[#9B5094] text-white'
+                    : 'bg-[rgb(var(--app-surface-secondary))] border border-[#8FB8DE]/30 text-[#CDF7F6]'
                 }`}
-                key={msg.id}
               >
-                <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${
-                    msg.role === 'user'
-                      ? 'bg-[#9B5094] text-white'
-                      : 'bg-[rgb(var(--app-surface-secondary))] border border-[#8FB8DE]/30 text-[#CDF7F6]'
-                  }`}
-                >
-                  {msg.role === 'user' ? 'ME' : <Bot className="w-4 h-4" />}
-                </div>
+                {msg.role === 'user' ? 'ME' : <Bot className="w-4 h-4" />}
+              </div>
 
-                <div
-                  className={`p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                    msg.role === 'user'
-                      ? 'bg-gradient-to-r from-[#9B5094] to-[#8FB8DE] text-white shadow-md'
-                      : 'bg-[rgb(var(--app-surface-secondary))] border border-[rgb(var(--app-border-primary))]/30 text-[rgb(var(--app-content-primary))]'
-                  }`}
-                >
-                  <LicexMarkdown content={msg.content} />
-                  {msg.listingIds && msg.listingIds.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {msg.listingIds.map((listingId) => {
-                        const listing = listings.find(
-                          (candidate) => candidate.id === listingId
-                        )
-                        if (!listing) return null
-                        return (
-                          <Link
-                            className="flex items-center justify-between rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-xs hover:bg-purple-500/10"
-                            key={listing.id}
-                            to={`${LICEX_MARKETPLACE_PATH}/${listing.id}`}
-                          >
-                            <span>
-                              <span className="block font-semibold text-white">
-                                {listing.productName}
-                              </span>
-                              <span className="text-[rgb(var(--app-content-secondary))]">
-                                {listing.price.toLocaleString()} sats ·{' '}
-                                {getTransferPolicyLabel(listing.transferPolicy)}
-                              </span>
+              <div
+                className={`p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                  msg.role === 'user'
+                    ? 'bg-gradient-to-r from-[#9B5094] to-[#8FB8DE] text-white shadow-md'
+                    : 'bg-[rgb(var(--app-surface-secondary))] border border-[rgb(var(--app-border-primary))]/30 text-[rgb(var(--app-content-primary))]'
+                }`}
+              >
+                <LicexMarkdown content={msg.content} />
+                {msg.listingIds && msg.listingIds.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {msg.listingIds.map((listingId) => {
+                      const listing = listings.find(
+                        (candidate) => candidate.id === listingId
+                      )
+                      if (!listing) return null
+                      return (
+                        <Link
+                          className="flex items-center justify-between rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-xs hover:bg-purple-500/10"
+                          key={listing.id}
+                          to={`${LICEX_MARKETPLACE_PATH}/${listing.id}`}
+                        >
+                          <span>
+                            <span className="block font-semibold text-white">
+                              {listing.productName}
                             </span>
-                            <ArrowRight className="h-4 w-4 text-purple-300" />
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                  <div
-                    className={`text-[10px] mt-2 opacity-60 text-right ${
-                      msg.role === 'user'
-                        ? 'text-[#CDF7F6]'
-                        : 'text-[rgb(var(--app-content-secondary))]'
-                    }`}
-                  >
-                    {new Date(msg.timestamp).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
+                            <span className="text-[rgb(var(--app-content-secondary))]">
+                              {listing.price.toLocaleString()} sats ·{' '}
+                              {getTransferPolicyLabel(listing.transferPolicy)}
+                            </span>
+                          </span>
+                          <ArrowRight className="h-4 w-4 text-purple-300" />
+                        </Link>
+                      )
                     })}
                   </div>
-                </div>
-              </div>
-            ))}
-
-            {chatLoading && (
-              <div className="flex gap-3 max-w-xl animate-pulse">
-                <div className="w-8 h-8 rounded-xl bg-[rgb(var(--app-surface-secondary))] border border-[#8FB8DE]/30 flex items-center justify-center text-[#CDF7F6]">
-                  <Bot className="w-4 h-4" />
-                </div>
-                <div className="p-4 rounded-2xl bg-[rgb(var(--app-surface-secondary))] border border-[rgb(var(--app-border-primary))]/30 text-xs text-[rgb(var(--app-content-secondary))] flex items-center gap-2">
-                  <Sparkles className="w-3.5 h-3.5 text-[#CDF7F6] animate-spin" />
-                  <span>
-                    Analyzing RGB protocol metadata & contract clauses...
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Prompt Suggestions */}
-          {chatMessages.length <= 3 && (
-            <div className="px-6 py-2 flex flex-wrap gap-2">
-              {SUGGESTED_PROMPTS.map((prompt) => (
-                <button
-                  className="text-xs px-3 py-1.5 rounded-full bg-[rgb(var(--app-surface-secondary))] text-[rgb(var(--app-content-secondary))] border border-[rgb(var(--app-border-primary))]/30 hover:border-[#8FB8DE]/40 hover:text-[#CDF7F6] transition-colors flex items-center gap-1.5"
-                  key={prompt}
-                  onClick={() => handleSend(prompt)}
+                )}
+                <div
+                  className={`text-[10px] mt-2 opacity-60 text-right ${
+                    msg.role === 'user'
+                      ? 'text-[#CDF7F6]'
+                      : 'text-[rgb(var(--app-content-secondary))]'
+                  }`}
                 >
-                  <Lightbulb className="w-3 h-3 text-[#8FB8DE]" />
-                  {prompt}
-                </button>
-              ))}
+                  {new Date(msg.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {chatLoading && (
+            <div className="flex gap-3 max-w-xl animate-pulse">
+              <div className="w-8 h-8 rounded-xl bg-[rgb(var(--app-surface-secondary))] border border-[#8FB8DE]/30 flex items-center justify-center text-[#CDF7F6]">
+                <Bot className="w-4 h-4" />
+              </div>
+              <div className="p-4 rounded-2xl bg-[rgb(var(--app-surface-secondary))] border border-[rgb(var(--app-border-primary))]/30 text-xs text-[rgb(var(--app-content-secondary))] flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-[#CDF7F6] animate-spin" />
+                <span>
+                  Analyzing RGB protocol metadata & contract clauses...
+                </span>
+              </div>
             </div>
           )}
 
-          {/* Input bar */}
-          <div className="flex-shrink-0 p-4 border-t border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-secondary))]/30">
-            <form
-              className="max-w-4xl mx-auto flex items-center gap-3"
-              onSubmit={(e) => {
-                e.preventDefault()
-                handleSend()
-              }}
-            >
-              <div className="flex-1 relative">
-                <input
-                  className="w-full px-4 py-3 rounded-xl text-sm
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Prompt Suggestions */}
+        {chatMessages.length <= 3 && (
+          <div className="px-6 py-2 flex flex-wrap gap-2">
+            {SUGGESTED_PROMPTS.map((prompt) => (
+              <button
+                className="text-xs px-3 py-1.5 rounded-full bg-[rgb(var(--app-surface-secondary))] text-[rgb(var(--app-content-secondary))] border border-[rgb(var(--app-border-primary))]/30 hover:border-[#8FB8DE]/40 hover:text-[#CDF7F6] transition-colors flex items-center gap-1.5"
+                key={prompt}
+                onClick={() => handleSend(prompt)}
+              >
+                <Lightbulb className="w-3 h-3 text-[#8FB8DE]" />
+                {prompt}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Input bar */}
+        <div className="flex-shrink-0 p-4 border-t border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-secondary))]/30">
+          <form
+            className="max-w-4xl mx-auto flex items-center gap-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleSend()
+            }}
+          >
+            <div className="flex-1 relative">
+              <input
+                className="w-full px-4 py-3 rounded-xl text-sm
                 bg-[rgb(var(--app-surface-secondary))]
                 border border-[rgb(var(--app-border-primary))]/30
                 text-[rgb(var(--app-content-primary))]
                 placeholder-[rgb(var(--app-content-secondary))]/50
                 focus:border-[#8FB8DE]/50 focus:outline-none"
-                  disabled={chatLoading}
-                  id="licex-chat-input"
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask LICEX Assistant about transfer rules, price discovery, or license terms..."
-                  type="text"
-                  value={input}
-                />
-              </div>
+                disabled={chatLoading}
+                id="licex-chat-input"
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask LICEX Assistant about transfer rules, price discovery, or license terms..."
+                type="text"
+                value={input}
+              />
+            </div>
 
-              <button
-                className="p-3 rounded-xl bg-gradient-to-r from-[#9B5094] to-[#8FB8DE] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 shadow-md shadow-[#9B5094]/20 transition-all"
-                disabled={!input.trim() || chatLoading}
-                id="licex-chat-send-btn"
-                type="submit"
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </form>
-          </div>
-        </>
-      )}
+            <button
+              className="p-3 rounded-xl bg-gradient-to-r from-[#9B5094] to-[#8FB8DE] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 shadow-md shadow-[#9B5094]/20 transition-all"
+              disabled={!input.trim() || chatLoading}
+              id="licex-chat-send-btn"
+              type="submit"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </form>
+        </div>
+      </>
     </div>
   )
 }

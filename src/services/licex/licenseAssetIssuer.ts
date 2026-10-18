@@ -35,26 +35,26 @@ export interface EulaAnalysisForIssuance {
   id: string
   extracted: {
     productName: string
-    edition: string
-    version: string
+    edition?: string
+    version?: string
     licenseType: string
     durationDays: number | null
     platforms: readonly string[]
-    seatsAllowed: number
+    seatsAllowed: number | 'unlimited' | 'unknown'
     commercialUseAllowed: boolean
     transferPolicy: TransferPolicy
     transferFeeMentioned: boolean
-    royaltyEstimatePercent: number
+    royaltyEstimatePercent?: number
     onlineVerificationRequired: boolean
   }
-  clauses: readonly Record<string, unknown>[]
+  clauses: readonly unknown[]
   executiveSummary: string
   aiReviewStatus: string
-  complianceAudit: Record<string, unknown>
+  complianceAudit: object
   confidenceScore: number
   analysisTimestamp: string
   processingTimeMs: number
-  suggestedListing: Record<string, unknown>
+  suggestedListing: object
 }
 
 type IssuanceRecord = IssuedLicenseAsset
@@ -107,6 +107,22 @@ const createPublicTerms = (input: LicenseAssetIssuanceInput): string =>
       : {}),
   })
 
+// The RGB node validates UDA names as short strings. EULA product names and
+// editions can be much longer (or contain multibyte characters), so use a
+// conservative 32-byte limit while retaining full values in the signed terms.
+const createUdaName = (input: LicenseAssetIssuanceInput): string => {
+  const fullName = `${input.productName.trim()} (${input.edition.trim()})`
+  const encoder = new TextEncoder()
+  let name = ''
+  for (const character of fullName) {
+    if (encoder.encode(name + character).length > 32) break
+    name += character
+  }
+  const boundedName = name.trim()
+  if (!boundedName) throw new Error('Il nome UDA RGB è vuoto o troppo lungo.')
+  return boundedName
+}
+
 /**
  * Issue a real, unique RGB asset through the connected node.
  * The returned asset id is the RGB contract identifier; no local/demo id is
@@ -150,7 +166,7 @@ export const issueLicenseRgbAsset = async (
   const response = await issueUda({
     attachments_file_digests: [],
     details: onChainDetails,
-    name: `${input.productName} (${input.edition})`,
+    name: createUdaName(input),
     precision: 0,
     ticker,
   })
@@ -177,7 +193,7 @@ export const createIssuanceInputFromEula = (
   analysis: EulaAnalysisForIssuance,
   requestId: string
 ): LicenseAssetIssuanceInput => ({
-  edition: analysis.extracted.edition,
+  edition: analysis.extracted.edition || 'Standard',
   licenseMetadata: {
     aiReviewStatus: analysis.aiReviewStatus,
     analysisId: analysis.id,
@@ -198,9 +214,9 @@ export const createIssuanceInputFromEula = (
   },
   productName: analysis.extracted.productName,
   requestId,
-  royaltyPercent: analysis.extracted.royaltyEstimatePercent,
+  royaltyPercent: analysis.extracted.royaltyEstimatePercent ?? 5,
   transferPolicy: analysis.extracted.transferPolicy,
-  version: analysis.extracted.version,
+  version: analysis.extracted.version || '1.0',
 })
 
 /**

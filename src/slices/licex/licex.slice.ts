@@ -355,45 +355,78 @@ export const licexSlice = createSlice({
         price: number
         transferPolicy: TransferPolicy
         royaltyPercent: number
-        category?: string
-        platforms?: string[]
+        listingDetails?: Partial<
+          Pick<
+            LicenseListing,
+            | 'category'
+            | 'durationDays'
+            | 'licenseType'
+            | 'platforms'
+            | 'productDescription'
+            | 'tags'
+            | 'version'
+          >
+        >
+        company?: Pick<Company, 'companyStatus' | 'domain' | 'name'>
       }>
     ) {
+      const template = state.listings[0]
       const newListing: LicenseListing = {
-        category: action.payload.category || 'Development',
-        company: state.listings[0]?.company || {
-          companyStatus: 'verified',
-          defaultRoyaltyPercent: action.payload.royaltyPercent,
-          defaultTransferPolicy: action.payload.transferPolicy,
-          description: 'Verified Issuer Node',
-          domain: 'jetbrains.com',
-          id: 'comp-1',
-          logoUrl: '',
-          name: 'JetBrains s.r.o.',
-          refundPolicy: 'Standard 14-day policy',
-        },
-        companyId: 'comp-1',
+        category: action.payload.listingDetails?.category || 'Development',
+        company: action.payload.company
+          ? {
+              companyStatus: action.payload.company.companyStatus,
+              defaultRoyaltyPercent: action.payload.royaltyPercent,
+              defaultTransferPolicy: action.payload.transferPolicy,
+              description:
+                'Editore non verificato; termini derivati dall’EULA.',
+              domain: action.payload.company.domain,
+              id: `company-${action.payload.id}`,
+              logoUrl: '',
+              name: action.payload.company.name,
+              refundPolicy: 'Definita dai termini della licenza.',
+            }
+          : template?.company || {
+              companyStatus: 'verified',
+              defaultRoyaltyPercent: action.payload.royaltyPercent,
+              defaultTransferPolicy: action.payload.transferPolicy,
+              description: 'Verified Issuer Node',
+              domain: 'jetbrains.com',
+              id: 'comp-1',
+              logoUrl: '',
+              name: 'JetBrains s.r.o.',
+              refundPolicy: 'Standard 14-day policy',
+            },
+        companyId: action.payload.company
+          ? `company-${action.payload.id}`
+          : template?.companyId || 'comp-1',
         createdAt: new Date().toISOString(),
-        durationDays: null,
+        durationDays: action.payload.listingDetails?.durationDays ?? null,
         edition: action.payload.edition,
         id: action.payload.id,
         imageUrl: '',
-        licenseType: 'perpetual',
+        licenseType: action.payload.listingDetails?.licenseType || 'perpetual',
         maxTransfers:
           action.payload.transferPolicy === 'not_transferable' ? 0 : 5,
         minHoldingDays: 0,
-        paymentAsset: 'RGB-USDT (demo stablecoin)',
-        platforms: action.payload.platforms || ['Windows', 'macOS', 'Linux'],
+        paymentAsset: 'BTC (sats)',
+        platforms: action.payload.listingDetails?.platforms || [
+          'Windows',
+          'macOS',
+          'Linux',
+        ],
         price: action.payload.price,
-        productDescription: `${action.payload.productName} (${action.payload.edition}) - Licenza software ufficiale emessa come asset RGB su Bitcoin.`,
+        productDescription:
+          action.payload.listingDetails?.productDescription ||
+          `${action.payload.productName} (${action.payload.edition}) - Licenza software emessa come asset RGB su Bitcoin.`,
         productName: action.payload.productName,
         rgbAsset: action.payload.rgbAsset,
         royaltyPercent: action.payload.royaltyPercent,
         status: 'published',
-        tags: ['RGB Asset', 'Verified Issuer', 'Demo Mint'],
+        tags: action.payload.listingDetails?.tags || ['RGB Asset', 'UDA'],
         transferPolicy: action.payload.transferPolicy,
         updatedAt: new Date().toISOString(),
-        version: '2026.1',
+        version: action.payload.listingDetails?.version || '1.0',
       }
 
       state.listings.unshift(newListing)
