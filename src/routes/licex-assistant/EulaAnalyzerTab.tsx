@@ -23,6 +23,7 @@ import {
 
 import { useAppDispatch } from '../../app/store/hooks'
 import { mintLicenseListing } from '../../slices/licex/licex.slice'
+import { getMarketplaceIdentity } from '../../services/licexNostrMarketplace'
 import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { QvacEulaAnalyzer } from '../../services/qvac/eula-analyzer'
 import { EULA_SAMPLES } from '../../services/qvac/eula-samples'
@@ -194,6 +195,7 @@ export function EulaAnalyzerTab({
       const productSlug =
         extracted.productName.toLowerCase().replace(/[^a-z0-9]/g, '') ||
         'unverified-publisher'
+      const publisherNpub = await getMarketplaceIdentity().catch(() => null)
 
       dispatch(
         mintLicenseListing({
@@ -204,6 +206,7 @@ export function EulaAnalyzerTab({
           },
           edition: issuanceInput.edition,
           id: `lic-${requestId}`,
+          ...(publisherNpub ? { publisherNpub } : {}),
           listingDetails: {
             category: suggestedListing.category || 'Software & Tools',
             durationDays: extracted.durationDays,

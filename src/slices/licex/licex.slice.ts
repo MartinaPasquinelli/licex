@@ -391,6 +391,7 @@ export const licexSlice = createSlice({
       state,
       action: PayloadAction<{
         id: string
+        publisherNpub?: string
         rgbAsset: LicenseAssetReference
         productName: string
         edition: string
@@ -464,6 +465,7 @@ export const licexSlice = createSlice({
           action.payload.listingDetails?.productDescription ||
           `${action.payload.productName} (${action.payload.edition}) - Licenza software emessa come asset RGB su Bitcoin.`,
         productName: action.payload.productName,
+        publisherNpub: action.payload.publisherNpub,
         rgbAsset: action.payload.rgbAsset,
         royaltyPercent: action.payload.royaltyPercent,
         status: 'published',
