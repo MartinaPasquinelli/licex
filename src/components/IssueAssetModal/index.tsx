@@ -24,7 +24,7 @@ export const IssueAssetModal: React.FC<IssueAssetModalProps> = ({
   const [amount, setAmount] = useState('')
   const [precision, setPrecision] = useState('0')
   const [isLoading, setIsLoading] = useState(false)
-  const [isDemoMode, setIsDemoMode] = useState(true)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   const { showUtxoModal, setShowUtxoModal, utxoModalProps } =
     useUtxoErrorHandler()
@@ -61,6 +61,12 @@ export const IssueAssetModal: React.FC<IssueAssetModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (Number(actualAmount) <= 0) {
+      toast.error(
+        t('issueAssetModal.amountError', 'The amount must be greater than zero')
+      )
+      return
+    }
     setIsLoading(true)
     try {
       if (isDemoMode) {
@@ -85,22 +91,18 @@ export const IssueAssetModal: React.FC<IssueAssetModalProps> = ({
       toast.success(t('issueAssetModal.success'))
       onSuccess()
       onClose()
-    } catch (error: any) {
-      // Fallback graceful to demo issuance if node fails or UTXOs are missing
-      saveDemoRgbAsset({
-        amount: Number(actualAmount),
-        name,
-        precision: Number(precision),
-        ticker: (ticker || '').toUpperCase(),
-      })
-      toast.info(
-        t(
-          'issueAssetModal.demoFallbackNotice',
-          'Nodo o UTXO non rilevati: asset emesso con successo in Modalità Demo per consentire il test!'
-        )
+    } catch (error: unknown) {
+      const message =
+        typeof error === 'object' && error !== null && 'data' in error
+          ? String((error as { data?: unknown }).data)
+          : error instanceof Error
+            ? error.message
+            : String(error)
+      toast.error(
+        t('issueAssetModal.failure', 'Emissione RGB fallita: {{message}}', {
+          message,
+        })
       )
-      onSuccess()
-      onClose()
     } finally {
       setIsLoading(false)
     }

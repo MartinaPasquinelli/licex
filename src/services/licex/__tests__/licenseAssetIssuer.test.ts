@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   getDemoLicenseIssuance,
+  issueLicenseRgbAsset,
   issueDemoLicenseAsset,
 } from '../licenseAssetIssuer'
 
@@ -48,5 +49,38 @@ describe('demo license asset issuer', () => {
 
     expect(retry).toEqual(first)
     expect(getDemoLicenseIssuance(input.requestId)).toEqual(first)
+  })
+
+  it('uses the RGB node response for real license issuance', async () => {
+    const issueUda = vi.fn().mockResolvedValue({
+      asset: { asset_id: 'rgb:real-contract-id' },
+    })
+
+    const result = await issueLicenseRgbAsset(
+      {
+        edition: 'Pro',
+        productName: 'Node IDE',
+        requestId: 'node-1',
+        royaltyPercent: 5,
+        transferPolicy: 'transferable_free',
+        version: '2026.1',
+      },
+      issueUda,
+      vi.fn().mockResolvedValue('mock-schnorr-signature'),
+      '02mock-issuer-public-key'
+    )
+
+    expect(issueUda).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments_file_digests: [],
+        details: expect.stringContaining('mock-schnorr-signature'),
+        precision: 0,
+      })
+    )
+    expect(result.assetId).toBe('rgb:real-contract-id')
+    expect(result.contractId).toBe('rgb:real-contract-id')
+    expect(result.mode).toBe('rgb-node')
+    expect(result.schema).toBe('UDA')
+    expect(getDemoLicenseIssuance('node-1')).toBeUndefined()
   })
 })

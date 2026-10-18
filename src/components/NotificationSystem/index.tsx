@@ -136,7 +136,7 @@ const NotificationItem: React.FC<{
 
   return (
     <div
-      className={`${inPanel ? 'border-b border-divider/10' : 'rounded-xl shadow-lg'} ${
+      className={`${inPanel ? 'border-b border-divider/10' : 'w-[min(28rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] rounded-xl shadow-lg'} ${
         isUpdateNotification
           ? 'bg-gradient-to-r from-amber-900/90 to-orange-900/90 border border-amber-500/30 cursor-pointer hover:from-amber-800/90 hover:to-orange-800/90 transform hover:scale-[1.02] transition-all duration-200'
           : containerClass
@@ -148,7 +148,7 @@ const NotificationItem: React.FC<{
       }
       role="alert"
     >
-      <div className="p-4">
+      <div className="min-w-0 overflow-hidden p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             {isUpdateNotification ? (
@@ -202,7 +202,7 @@ const NotificationItem: React.FC<{
         )}
 
         <div
-          className={`text-sm ${isUpdateNotification ? 'text-amber-100/90' : 'text-gray-600 dark:text-content-secondary'}`}
+          className={`min-w-0 max-w-full overflow-hidden text-sm [overflow-wrap:anywhere] ${isUpdateNotification ? 'text-amber-100/90' : 'text-gray-600 dark:text-content-secondary'}`}
         >
           {notification.message}
           {isUpdateNotification && (

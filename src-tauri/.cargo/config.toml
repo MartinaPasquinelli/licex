@@ -1,2 +1,7 @@
-[build]
-target-dir = "C:/Users/Public/cargo_target/licex-tauri"
+# Keep compiler selection platform-native. In particular, do not set CC/CXX
+# globally here: Cargo applies [env] to every target, which made Windows use
+# the Homebrew compiler path from macOS and broke crates such as ring.
+
+# Configurazione opzionale per sviluppatori Windows (evita l'errore di percorso lungo MAX_PATH).
+# Esempio PowerShell:
+#   $env:CARGO_TARGET_DIR = 'C:/Users/Public/cargo_target/licex-tauri'

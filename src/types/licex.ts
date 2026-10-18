@@ -27,7 +27,10 @@ export interface LicenseAssetReference {
   assetId: string
   contractId: string
   metadataHash: string
-  schema: 'UDA'
+  contractDetails?: string
+  issuerSignature?: string
+  issuerPubkey?: string
+  schema: 'UDA' | 'NIA'
   status: RgbAssetStatus
   mode: LicenseAssetMode
   issuedAt: string
@@ -112,6 +115,9 @@ export interface Order {
   royalty: number
   paymentStatus: PaymentStatus
   orderStatus: OrderStatus
+  paymentMethod?: 'lightning' | 'usdt_swap'
+  lightningPreimage?: string
+  totalPrice?: number
   createdAt: string
 }
 

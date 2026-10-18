@@ -37,6 +37,8 @@ import type {
   InvoiceStatusRequest,
   IssueAssetNIAResponse,
   IssueAssetNIARequest,
+  IssueAssetUDAResponse,
+  IssueAssetUDARequest,
   ListAssetsResponse,
   ListChannelsResponse,
   ListPaymentsResponse,
@@ -210,6 +212,13 @@ export const nodeApi = createApi({
       IssueAssetNIARequest
     >({
       queryFn: queryFn((w, args) => w.issueAssetNIA(args)),
+    }),
+
+    issueUdaAsset: builder.mutation<
+      IssueAssetUDAResponse,
+      IssueAssetUDARequest
+    >({
+      queryFn: queryFn((w, args) => w.issueAssetUDA(args)),
     }),
 
     keysend: builder.mutation<KeysendResponse, KeysendRequest>({

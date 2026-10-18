@@ -63,6 +63,27 @@ pub struct NwcConnection {
     pub last_used_at: Option<i64>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct LicexOwnedLicenseDb {
+    pub id: String,
+    pub order_id: String,
+    pub license_status: String,
+    pub activation_status: String,
+    pub payload: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct LicexOrderDb {
+    pub id: String,
+    pub listing_id: String,
+    pub order_status: String,
+    pub payment_status: String,
+    pub price: i64,
+    pub payload: String,
+    pub created_at: String,
+}
+
 // Check if a database file exists, and create one if it does not.
 pub fn init() -> Result<(), String> {
     // Create database file if it doesn't exist
@@ -199,6 +220,46 @@ pub fn init() -> Result<(), String> {
         (),
     )
     .map_err(|e| format!("failed to run database migration: {}", e))?;
+
+    // Add LicexOwnedLicenses table for local software license persistence
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS 'LicexOwnedLicenses' (
+            'id' TEXT PRIMARY KEY NOT NULL,
+            'order_id' TEXT NOT NULL,
+            'license_status' TEXT NOT NULL,
+            'activation_status' TEXT NOT NULL,
+            'payload' TEXT NOT NULL,
+            'created_at' TEXT NOT NULL
+        );",
+        (),
+    )
+    .map_err(|e| format!("failed to run database migration for LicexOwnedLicenses: {}", e))?;
+
+    // Add LicexOrders table for local purchase history persistence
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS 'LicexOrders' (
+            'id' TEXT PRIMARY KEY NOT NULL,
+            'listing_id' TEXT NOT NULL,
+            'order_status' TEXT NOT NULL,
+            'payment_status' TEXT NOT NULL,
+            'price' INTEGER NOT NULL,
+            'payload' TEXT NOT NULL,
+            'created_at' TEXT NOT NULL
+        );",
+        (),
+    )
+    .map_err(|e| format!("failed to run database migration for LicexOrders: {}", e))?;
+
+    // Add LicexUserData table for watchlist, wishlist, price alerts, company stats, and chat history
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS 'LicexUserData' (
+            'key' TEXT PRIMARY KEY NOT NULL,
+            'payload' TEXT NOT NULL,
+            'updated_at' TEXT NOT NULL
+        );",
+        (),
+    )
+    .map_err(|e| format!("failed to run database migration for LicexUserData: {}", e))?;
 
     Ok(())
 }
@@ -457,6 +518,12 @@ pub fn delete_account(name: String) -> Result<usize, rusqlite::Error> {
     if let Some(account) = account {
         if let Err(e) = crate::secret_store::delete(&crate::nwc::service_secret_name(account.id)) {
             log::warn!("Failed to remove NWC service key from the OS credential store: {e}");
+        }
+        if let Err(e) = crate::licex_nostr_marketplace::delete_identity(account.id) {
+            log::warn!("Failed to remove LICEX marketplace key from the OS credential store: {e}");
+        }
+        if let Err(e) = crate::licex_nostr_marketplace::delete_all_swap_secrets(account.id) {
+            log::warn!("Failed to remove LICEX P2P swap secrets from the OS credential store: {e}");
         }
         if let Some(datapath) = account.datapath {
             if !datapath.is_empty() {
@@ -816,3 +883,130 @@ pub fn reset_expired_nwc_budgets(now: i64) -> Result<usize, rusqlite::Error> {
         rusqlite::params![now],
     )
 }
+
+// ─── LicEX SQLite Persistence Functions ────────────────────────────────────────
+
+pub fn insert_or_update_licex_license(
+    id: String,
+    order_id: String,
+    license_status: String,
+    activation_status: String,
+    payload: String,
+    created_at: String,
+) -> Result<(), rusqlite::Error> {
+    let conn = Connection::open(get_db_path())?;
+    conn.execute(
+        "INSERT INTO LicexOwnedLicenses (id, order_id, license_status, activation_status, payload, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(id) DO UPDATE SET
+            order_id = excluded.order_id,
+            license_status = excluded.license_status,
+            activation_status = excluded.activation_status,
+            payload = excluded.payload,
+            created_at = excluded.created_at",
+        rusqlite::params![id, order_id, license_status, activation_status, payload, created_at],
+    )?;
+    Ok(())
+}
+
+pub fn get_licex_licenses() -> Result<Vec<LicexOwnedLicenseDb>, rusqlite::Error> {
+    let conn = Connection::open(get_db_path())?;
+    let mut stmt = conn.prepare(
+        "SELECT id, order_id, license_status, activation_status, payload, created_at FROM LicexOwnedLicenses ORDER BY created_at DESC"
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(LicexOwnedLicenseDb {
+            id: row.get(0)?,
+            order_id: row.get(1)?,
+            license_status: row.get(2)?,
+            activation_status: row.get(3)?,
+            payload: row.get(4)?,
+            created_at: row.get(5)?,
+        })
+    })?;
+    let mut list = Vec::new();
+    for r in rows {
+        list.push(r?);
+    }
+    Ok(list)
+}
+
+pub fn insert_or_update_licex_order(
+    id: String,
+    listing_id: String,
+    order_status: String,
+    payment_status: String,
+    price: i64,
+    payload: String,
+    created_at: String,
+) -> Result<(), rusqlite::Error> {
+    let conn = Connection::open(get_db_path())?;
+    conn.execute(
+        "INSERT INTO LicexOrders (id, listing_id, order_status, payment_status, price, payload, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+         ON CONFLICT(id) DO UPDATE SET
+            listing_id = excluded.listing_id,
+            order_status = excluded.order_status,
+            payment_status = excluded.payment_status,
+            price = excluded.price,
+            payload = excluded.payload,
+            created_at = excluded.created_at",
+        rusqlite::params![id, listing_id, order_status, payment_status, price, payload, created_at],
+    )?;
+    Ok(())
+}
+
+pub fn get_licex_orders() -> Result<Vec<LicexOrderDb>, rusqlite::Error> {
+    let conn = Connection::open(get_db_path())?;
+    let mut stmt = conn.prepare(
+        "SELECT id, listing_id, order_status, payment_status, price, payload, created_at FROM LicexOrders ORDER BY created_at DESC"
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(LicexOrderDb {
+            id: row.get(0)?,
+            listing_id: row.get(1)?,
+            order_status: row.get(2)?,
+            payment_status: row.get(3)?,
+            price: row.get(4)?,
+            payload: row.get(5)?,
+            created_at: row.get(6)?,
+        })
+    })?;
+    let mut list = Vec::new();
+    for r in rows {
+        list.push(r?);
+    }
+    Ok(list)
+}
+
+pub fn set_licex_user_data(key: String, payload: String, updated_at: String) -> Result<(), rusqlite::Error> {
+    let conn = Connection::open(get_db_path())?;
+    conn.execute(
+        "INSERT INTO LicexUserData (key, payload, updated_at) VALUES (?1, ?2, ?3)
+         ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at",
+        rusqlite::params![key, payload, updated_at],
+    )?;
+    Ok(())
+}
+
+pub fn get_licex_user_data(key: &str) -> Result<Option<String>, rusqlite::Error> {
+    let conn = Connection::open(get_db_path())?;
+    let mut stmt = conn.prepare("SELECT payload FROM LicexUserData WHERE key = ?1")?;
+    let mut rows = stmt.query([key])?;
+    if let Some(row) = rows.next()? {
+        let payload: String = row.get(0)?;
+        Ok(Some(payload))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn clear_licex_tables() -> Result<(), rusqlite::Error> {
+    let conn = Connection::open(get_db_path())?;
+    conn.execute("DELETE FROM LicexOwnedLicenses", [])?;
+    conn.execute("DELETE FROM LicexOrders", [])?;
+    conn.execute("DELETE FROM LicexUserData", [])?;
+    Ok(())
+}
+
+

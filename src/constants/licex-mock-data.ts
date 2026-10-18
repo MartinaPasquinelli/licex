@@ -16,6 +16,86 @@ import type {
   Order,
 } from '../types/licex'
 
+/**
+ * Synthetic EULA analysis used to exercise the RGB UDA issuer flow.
+ * Product, issuer, license terms, clauses and price are fictional; this must
+ * only be issued against a test network.
+ */
+export const MOCK_EULA_ANALYSIS = {
+  aiReviewStatus: 'mock_reviewed',
+  analysisTimestamp: '2026-10-18T10:00:00.000Z',
+  clauses: [
+    {
+      category: 'transfer',
+      id: 'clause-mock-transfer-001',
+      isAmbiguous: false,
+      originalQuote:
+        'The license may be transferred once to another individual with prior written approval from Northstar Software Ltd.',
+      riskLevel: 'medium',
+      riskReason:
+        'L’approvazione dell’editore può ritardare o impedire una rivendita.',
+      summary:
+        'La licenza può essere trasferita una volta previa approvazione scritta dell’editore.',
+      title: 'Trasferimento con approvazione',
+    },
+    {
+      category: 'activation',
+      id: 'clause-mock-verification-001',
+      isAmbiguous: false,
+      originalQuote:
+        'The application must connect to the licensing service at least once every 30 days.',
+      riskLevel: 'low',
+      riskReason:
+        'L’attivazione può essere temporaneamente limitata senza connessione.',
+      summary:
+        'L’applicazione richiede una connessione online almeno ogni 30 giorni.',
+      title: 'Verifica online periodica',
+    },
+  ],
+  complianceAudit: {
+    aiReviewStatus: 'mock_pass',
+    claimedTransferPolicy: 'transferable_with_approval',
+    detectedTransferPolicy: 'transferable_with_approval',
+    flagReason: '',
+    matchesClaim: true,
+  },
+  confidenceScore: 91,
+  executiveSummary:
+    'Licenza perpetua individuale per uso commerciale, con trasferimento soggetto ad approvazione e verifica online periodica. Dati e clausole sono fittizi e servono solo a provare il flusso.',
+  extracted: {
+    edition: 'Professional',
+    licenseType: 'perpetual',
+    durationDays: null,
+    productName: 'Northstar Studio',
+    commercialUseAllowed: true,
+    version: '2026.1',
+    platforms: ['Windows 11', 'macOS 15', 'Ubuntu 24.04'],
+    seatsAllowed: 1,
+    onlineVerificationRequired: true,
+    transferFeeMentioned: false,
+    royaltyEstimatePercent: 10,
+    transferPolicy: 'transferable_with_approval',
+  },
+  id: 'eula-mock-northstar-2026-001',
+  processingTimeMs: 1240,
+  suggestedListing: {
+    durationDays: null,
+    edition: 'Professional',
+    licenseType: 'perpetual',
+    platforms: ['Windows 11', 'macOS 15', 'Ubuntu 24.04'],
+    priceSats: 125000,
+    productDescription:
+      'Licenza individuale perpetua fittizia di Northstar Studio Professional 2026.1. Uso commerciale consentito; trasferimento soggetto ad approvazione; verifica online ogni 30 giorni.',
+    productName: 'Northstar Studio',
+    publisherDomain: 'northstar.example',
+    publisherName: 'Northstar Software Ltd. (demo)',
+    royaltyPercent: 10,
+    tags: ['design', 'professional', 'perpetual', 'mock-eula'],
+    transferPolicy: 'transferable_with_approval',
+    version: '2026.1',
+  },
+} as const
+
 // ── Companies ────────────────────────────────────────────────────────────────
 export const MOCK_COMPANIES: Company[] = [
   {

@@ -2,7 +2,7 @@
 // Allows users to request software licenses that aren't yet on LICEX,
 // pledge interest or sats, and for companies to discover demand.
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   ArrowLeft,
   Check,
@@ -12,7 +12,6 @@ import {
   ThumbsUp,
   Coins,
   Search,
-  Building,
   X,
 } from 'lucide-react'
 
@@ -20,7 +19,9 @@ import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
 import {
   addWishlistGroup,
   addWishlistItem,
+  setWishlist,
 } from '../../slices/licex/licex.slice'
+import { loadWishlistFromSqlite } from '../../services/licex/licexStorage'
 import { useGetBitcoinPriceQuery } from '../../slices/priceApi/priceApi.slice'
 import { useMind } from '../../hooks/useMind'
 import { isUsableQvacStatus } from '../../services/qvac/licex-assistant'
@@ -51,6 +52,12 @@ export function Component() {
   const mind = useMind()
   const { data: bitcoinPriceData } = useGetBitcoinPriceQuery('usd')
   const btcUsdPrice = bitcoinPriceData?.bitcoin.usd
+
+  useEffect(() => {
+    loadWishlistFromSqlite().then((items) => {
+      if (items && items.length > 0) dispatch(setWishlist(items))
+    })
+  }, [dispatch])
 
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -258,7 +265,7 @@ export function Component() {
             onClick={() => setShowModal(true)}
           >
             <Plus className="w-4 h-4" />
-            Request Software
+            Request software
           </button>
         </div>
 
@@ -431,13 +438,6 @@ export function Component() {
                         {item.category}
                       </span>
                     )}
-                    <p className="text-xs text-[rgb(var(--app-content-secondary))] flex items-center gap-1.5 mt-0.5">
-                      <Building className="w-3.5 h-3.5 text-cyan-400" />
-                      Use Case:{' '}
-                      <span className="font-medium text-[rgb(var(--app-content-primary))]">
-                        {item.useCase}
-                      </span>
-                    </p>
                   </div>
 
                   <span
@@ -446,7 +446,7 @@ export function Component() {
                         ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                         : item.status === 'fulfilled'
                           ? 'bg-[#8FB8DE]/15 text-[#CDF7F6] border border-[#8FB8DE]/30'
-                          : 'bg-[#9B5094]/15 text-[#CDF7F6] border border-[#9B5094]/30'
+                          : 'wishlist-open-request bg-[#9B5094]/15 text-[#CDF7F6] border border-[#9B5094]/30'
                     }`}
                   >
                     {item.status === 'matched'
@@ -457,28 +457,50 @@ export function Component() {
                   </span>
                 </div>
 
-                <p className="text-xs text-[rgb(var(--app-content-secondary))] leading-relaxed line-clamp-3">
-                  {item.description}
-                </p>
-
-                {item.requirements.length > 0 && (
-                  <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-[rgb(var(--app-content-secondary))]">
-                    {item.requirements.slice(0, 3).map((requirement) => (
-                      <li key={requirement}>{requirement}</li>
-                    ))}
-                  </ul>
-                )}
-
-                <div className="flex flex-wrap gap-1">
-                  {item.platforms.map((plat) => (
-                    <span
-                      className="text-[10px] px-2 py-0.5 rounded bg-[rgb(var(--app-surface-primary))] text-[rgb(var(--app-content-secondary))]"
-                      key={plat}
-                    >
-                      {plat}
-                    </span>
-                  ))}
+                <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/10 bg-[rgb(var(--app-surface-primary))]/15 p-3">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
+                    Description
+                  </p>
+                  <p className="text-xs leading-relaxed text-[rgb(var(--app-content-secondary))] line-clamp-3">
+                    {item.description}
+                  </p>
                 </div>
+
+                {(item.requirements.length > 0 ||
+                  item.platforms.length > 0) && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {item.requirements.length > 0 && (
+                      <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/10 bg-[rgb(var(--app-surface-primary))]/15 p-3">
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
+                          Requirements
+                        </p>
+                        <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-[rgb(var(--app-content-secondary))]">
+                          {item.requirements.slice(0, 3).map((requirement) => (
+                            <li key={requirement}>{requirement}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {item.platforms.length > 0 && (
+                      <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/10 bg-[rgb(var(--app-surface-primary))]/15 p-3">
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
+                          Platforms
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {item.platforms.map((plat) => (
+                            <span
+                              className="rounded bg-[rgb(var(--app-surface-primary))] px-2 py-0.5 text-[10px] text-[rgb(var(--app-content-secondary))]"
+                              key={plat}
+                            >
+                              {plat}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Footer info & pledges */}
@@ -494,7 +516,7 @@ export function Component() {
                   )}
                   {!item.budget && item.budgetFiat != null && (
                     <div className="text-[rgb(var(--app-content-secondary))]">
-                      Budget indicativo:{' '}
+                      Indicative budget:{' '}
                       <span className="font-semibold text-[rgb(var(--app-content-primary))]">
                         ${item.budgetFiat.toLocaleString('en-US')} USD
                       </span>
@@ -634,7 +656,7 @@ export function Component() {
                     </div>
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-[rgb(var(--app-content-secondary))]">
-                        Richiesta
+                        Request
                       </p>
                       <p className="text-sm font-semibold text-white">
                         {rfpPreview.title}
@@ -646,7 +668,7 @@ export function Component() {
                     {rfpPreview.platforms.length > 0 && (
                       <div>
                         <p className="text-[10px] uppercase tracking-wide text-[rgb(var(--app-content-secondary))]">
-                          Piattaforme
+                          Platforms
                         </p>
                         <p className="text-sm text-white">
                           {rfpPreview.platforms.join(', ')}
@@ -656,7 +678,7 @@ export function Component() {
                     {rfpPreview.requirements.length > 0 && (
                       <div>
                         <p className="text-[10px] uppercase tracking-wide text-[rgb(var(--app-content-secondary))]">
-                          Requisiti
+                          Requirements
                         </p>
                         <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-white">
                           {rfpPreview.requirements.map((requirement) => (
@@ -677,7 +699,7 @@ export function Component() {
                       rfpPreview.budgetSats != null) && (
                       <div>
                         <p className="text-[10px] uppercase tracking-wide text-[rgb(var(--app-content-secondary))]">
-                          Budget indicativo
+                          Indicative budget
                         </p>
                         <p className="text-sm text-white">
                           {rfpPreview.budgetFiat != null &&

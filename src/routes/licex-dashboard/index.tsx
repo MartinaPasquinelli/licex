@@ -8,16 +8,17 @@ import {
   TrendingUp,
   Coins,
   ArrowRightLeft,
-  Plus,
   Clock,
   AlertTriangle,
   KeyRound,
 } from 'lucide-react'
 import { toast } from 'react-toastify'
+import { useSearchParams } from 'react-router-dom'
 
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
+import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
 import { mintLicenseListing } from '../../slices/licex/licex.slice'
-import { issueDemoLicenseAsset } from '../../services/licex/licenseAssetIssuer'
+import { issueLicenseRgbAsset } from '../../services/licex/licenseAssetIssuer'
 
 function formatSats(sats: number): string {
   if (sats >= 1000000) return `${(sats / 1000000).toFixed(2)}M sats`
@@ -27,12 +28,13 @@ function formatSats(sats: number): string {
 
 export function Component() {
   const dispatch = useAppDispatch()
+  const [searchParams] = useSearchParams()
   const { companyStats, listings } = useAppSelector((s) => s.licex)
   const [activeTab, setActiveTab] = useState<'listings' | 'transfers' | 'mint'>(
-    'listings'
+    searchParams.get('tab') === 'mint' ? 'mint' : 'listings'
   )
 
-  // Form for simulated mint
+  // Manual issuer form; EULA-driven UDA publication lives in My Licenses.
   const [mintName, setMintName] = useState('')
   const [mintEdition, setMintEdition] = useState('')
   const [mintPrice, setMintPrice] = useState('')
@@ -41,6 +43,10 @@ export function Component() {
   const [mintRoyalty, setMintRoyalty] = useState('5')
   const [mintNotice, setMintNotice] = useState<string | null>(null)
   const [isIssuing, setIsIssuing] = useState(false)
+  const [issueUda] = nodeApi.endpoints.issueUdaAsset.useMutation()
+  const [signMessage] = nodeApi.endpoints.signMessage.useMutation()
+  const [getNetworkInfo] = nodeApi.endpoints.networkInfo.useLazyQuery()
+  const [getNodeInfo] = nodeApi.endpoints.nodeInfo.useLazyQuery()
 
   const companyListings = listings.filter(
     (l) => l.companyId === 'comp-1' || l.companyId === 'comp-2'
@@ -54,30 +60,49 @@ export function Component() {
     const requestId = crypto.randomUUID()
     setIsIssuing(true)
     try {
-      const issuedAsset = await issueDemoLicenseAsset({
+      const network = await getNetworkInfo().unwrap()
+      if (network.network === 'Mainnet') {
+        throw new Error(
+          'Emissione di prova bloccata su Mainnet. Collega il nodo a Mutinynet o Regtest.'
+        )
+      }
+      const issuer = await getNodeInfo().unwrap()
+      const issuanceInput = {
         edition: mintEdition,
         productName: mintName,
         requestId,
         royaltyPercent: royalty,
-        transferPolicy: mintTransferPolicy as any,
+        transferPolicy: mintTransferPolicy as
+          | 'transferable_free'
+          | 'transferable_with_approval'
+          | 'not_transferable',
         version: '2026.1',
-      })
+      }
+      const issuedAsset = await issueLicenseRgbAsset(
+        issuanceInput,
+        (request) => issueUda(request).unwrap(),
+        async (message) =>
+          (await signMessage({ message }).unwrap()).signed_message,
+        issuer.pubkey
+      )
 
       dispatch(
         mintLicenseListing({
-          edition: mintEdition,
+          edition: issuanceInput.edition,
           id: `lic-${requestId}`,
           price: priceSats,
-          productName: mintName,
+          productName: issuanceInput.productName,
           rgbAsset: issuedAsset,
           royaltyPercent: royalty,
-          transferPolicy: mintTransferPolicy as any,
+          transferPolicy: issuanceInput.transferPolicy,
         })
       )
 
-      toast.success('Licenza RGB UDA demo emessa e pubblicata!')
+      toast.success(
+        `Licenza RGB UDA emessa su ${network.network} e pubblicata!`
+      )
       setMintNotice(
-        `✓ Licenza pubblicata solo dopo emissione asset. Asset ID: ${issuedAsset.assetId}; contratto UDA: ${issuedAsset.contractId}; hash metadati: ${issuedAsset.metadataHash.slice(0, 16)}…`
+        `✓ Licenza pubblicata dopo conferma del nodo RGB. Asset/contratto: ${issuedAsset.contractId}; hash metadati: ${issuedAsset.metadataHash.slice(0, 16)}…`
       )
       setMintName('')
       setMintEdition('')
@@ -113,17 +138,6 @@ export function Component() {
               Connected
             </p>
           </div>
-
-          <button
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
-              bg-gradient-to-r from-purple-600 to-indigo-600 text-white
-              hover:from-purple-500 hover:to-indigo-500 shadow-md shadow-purple-500/20 transition-all self-start sm:self-auto"
-            id="mint-new-license-btn"
-            onClick={() => setActiveTab('mint')}
-          >
-            <Plus className="w-4 h-4" />
-            Issue / Mint RGB License
-          </button>
         </div>
 
         {/* Analytics Cards */}
@@ -341,6 +355,11 @@ export function Component() {
             )}
 
             <form className="space-y-4" onSubmit={handleMintSubmit}>
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                Per pubblicare una licenza analizzata, usa l’Analizzatore EULA
+                in “Le Mie Licenze”. Questa schermata resta disponibile per
+                emissioni manuali.
+              </div>
               <div>
                 <label className="text-xs text-[rgb(var(--app-content-secondary))] block mb-1">
                   Product Title *
@@ -424,7 +443,7 @@ export function Component() {
                 disabled={isIssuing}
                 type="submit"
               >
-                {isIssuing ? 'Issuing UDA…' : 'Mint & Deploy RGB UDA (Demo)'}
+                {isIssuing ? 'Issuing UDA…' : 'Mint & Deploy RGB UDA'}
               </button>
             </form>
           </div>

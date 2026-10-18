@@ -3,7 +3,10 @@
 // AI chat, and company dashboard. Uses mock data as initial state.
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import type { NostrLicenseOffer } from '../../types/licexNostr'
+import type {
+  NostrLicenseOffer,
+  NostrMarketplaceListingPayload,
+} from '../../types/licexNostr'
 
 import type {
   LicenseAssetReference,
@@ -15,6 +18,7 @@ import type {
   CompanyDashboardStats,
   LicenseRecord,
   Order,
+  Company,
   MarketplaceFilters,
   TransferPolicy,
   WishlistDemandGroup,
@@ -29,8 +33,26 @@ import {
   MOCK_COMPANY_STATS,
   MOCK_OWNED_LICENSES,
   MOCK_ORDERS,
-  MOCK_NOSTR_OFFERS,
 } from '../../constants/licex-mock-data'
+import {
+  loadLocalOwnedLicenses,
+  saveLocalOwnedLicenses,
+  loadLocalOrders,
+  saveLocalOrders,
+  loadLocalWatchlist,
+  saveLocalWatchlist,
+  loadLocalPriceAlerts,
+  saveLocalPriceAlerts,
+  loadLocalWishlist,
+  saveLocalWishlist,
+  loadLocalCompanyStats,
+  saveLocalCompanyStats,
+  loadLocalChatMessages,
+  saveLocalChatMessages,
+  loadLocalListings,
+  saveLocalListings,
+  resetLocalLicexDatabase,
+} from '../../services/licex/licexStorage'
 
 function uniqueWishlistValues(values: string[]): string[] {
   const unique = new Map<string, string>()
@@ -72,21 +94,30 @@ const initialFilters: MarketplaceFilters = {
   transferPolicy: '',
 }
 
+const initialListings = loadLocalListings()
+const initialWatchlist = loadLocalWatchlist()
+const initialPriceAlerts = loadLocalPriceAlerts()
+const initialWishlist = loadLocalWishlist()
+const initialOwnedLicenses = loadLocalOwnedLicenses()
+const initialOrders = loadLocalOrders()
+const initialCompanyStats = loadLocalCompanyStats()
+const initialChatMessages = loadLocalChatMessages()
+
 const initialState: LicexState = {
   chatLoading: false,
-  chatMessages: MOCK_CHAT_MESSAGES,
-  companyStats: MOCK_COMPANY_STATS,
-  filteredListings: MOCK_LISTINGS.filter((l) => l.status === 'published'),
+  chatMessages: initialChatMessages,
+  companyStats: initialCompanyStats,
+  filteredListings: initialListings.filter((l) => l.status === 'published'),
   filters: initialFilters,
-  listings: MOCK_LISTINGS,
-  orders: MOCK_ORDERS,
-  ownedLicenses: MOCK_OWNED_LICENSES,
-  p2pOffers: MOCK_NOSTR_OFFERS,
-  priceAlerts: MOCK_PRICE_ALERTS,
+  listings: initialListings,
+  orders: initialOrders,
+  ownedLicenses: initialOwnedLicenses,
+  p2pOffers: [],
+  priceAlerts: initialPriceAlerts,
   selectedListing: null,
   viewMode: 'grid',
-  watchlist: MOCK_WATCHLIST,
-  wishlist: MOCK_WISHLIST,
+  watchlist: initialWatchlist,
+  wishlist: initialWishlist,
   wishlistGroups: [],
 }
 
@@ -160,11 +191,21 @@ export const licexSlice = createSlice({
   initialState,
   name: 'licex',
   reducers: {
+    addChatMessage(state, action: PayloadAction<ChatMessage>) {
+      state.chatMessages.push(action.payload)
+      saveLocalChatMessages(state.chatMessages)
+    },
     addListing(state, action: PayloadAction<LicenseListing>) {
       state.listings.unshift(action.payload)
       state.filteredListings = applyFilters(state.listings, state.filters)
+      saveLocalListings(state.listings)
     },
-
+    addP2pOffer(state, action: PayloadAction<NostrLicenseOffer>) {
+      state.p2pOffers = [
+        action.payload,
+        ...state.p2pOffers.filter((offer) => offer.id !== action.payload.id),
+      ]
+    },
     // ── Price Alerts ───────────────────────────────────────────────────
     addPriceAlert(
       state,
@@ -182,6 +223,7 @@ export const licexSlice = createSlice({
           thresholdSats: action.payload.thresholdSats,
           triggered: false,
         })
+        saveLocalPriceAlerts(state.priceAlerts)
       }
     },
 
@@ -197,6 +239,7 @@ export const licexSlice = createSlice({
           listing,
           listingId: action.payload,
         })
+        saveLocalWatchlist(state.watchlist)
       }
     },
 
@@ -261,6 +304,7 @@ export const licexSlice = createSlice({
         summary,
       })
     },
+
     // ── Wishlist ───────────────────────────────────────────────────────
     addWishlistItem(
       state,
@@ -285,51 +329,153 @@ export const licexSlice = createSlice({
         status: 'submitted',
         updatedAt: new Date().toISOString(),
       })
+      saveLocalWishlist(state.wishlist)
     },
+
+    clearChatMessages(state) {
+      state.chatMessages = []
+      saveLocalChatMessages(state.chatMessages)
+    },
+
     clearFilters(state) {
       state.filters = initialFilters
       state.filteredListings = applyFilters(state.listings, state.filters)
     },
+
     completePurchase(
       state,
       action: PayloadAction<{ order: Order; licenseRecord: LicenseRecord }>
     ) {
       state.orders.unshift(action.payload.order)
       state.ownedLicenses.unshift(action.payload.licenseRecord)
+      // Salva persistentemente nel database locale
+      saveLocalOrders(state.orders)
+      saveLocalOwnedLicenses(state.ownedLicenses)
     },
+
+    mergeRelayListings(
+      state,
+      action: PayloadAction<NostrMarketplaceListingPayload[]>
+    ) {
+      const listingsById = new Map(
+        state.listings.map((listing) => [listing.id, listing])
+      )
+      for (const { listing, status } of action.payload) {
+        if (status === 'withdrawn') {
+          listingsById.delete(listing.id)
+        } else {
+          listingsById.set(listing.id, listing)
+        }
+      }
+      state.listings = [...listingsById.values()]
+      state.filteredListings = applyFilters(state.listings, state.filters)
+      saveLocalListings(state.listings)
+    },
+
+    mergeRelayOffers(state, action: PayloadAction<NostrLicenseOffer[]>) {
+      const offersById = new Map(
+        state.p2pOffers.map((offer) => [offer.id, offer])
+      )
+      for (const offer of action.payload) {
+        if (offer.status === 'cancelled') {
+          offersById.delete(offer.id)
+        } else {
+          offersById.set(offer.id, offer)
+        }
+      }
+      state.p2pOffers = [...offersById.values()]
+    },
+
+    // ── Mint / Issue RGB License Listing ────────────────────────────────
     mintLicenseListing(
       state,
       action: PayloadAction<{
         id: string
+        rgbAsset: LicenseAssetReference
         productName: string
         edition: string
         price: number
         transferPolicy: TransferPolicy
         royaltyPercent: number
-        rgbAsset: LicenseAssetReference
+        listingDetails?: Partial<
+          Pick<
+            LicenseListing,
+            | 'category'
+            | 'durationDays'
+            | 'licenseType'
+            | 'platforms'
+            | 'productDescription'
+            | 'tags'
+            | 'version'
+          >
+        >
+        company?: Pick<Company, 'companyStatus' | 'domain' | 'name'>
       }>
     ) {
       const template = state.listings[0]
-      if (!template) return
-      const now = new Date().toISOString()
-      const listing: LicenseListing = {
-        ...template,
-        createdAt: now,
+      const newListing: LicenseListing = {
+        category: action.payload.listingDetails?.category || 'Development',
+        company: action.payload.company
+          ? {
+              companyStatus: action.payload.company.companyStatus,
+              defaultRoyaltyPercent: action.payload.royaltyPercent,
+              defaultTransferPolicy: action.payload.transferPolicy,
+              description:
+                'Editore non verificato; termini derivati dall’EULA.',
+              domain: action.payload.company.domain,
+              id: `company-${action.payload.id}`,
+              logoUrl: '',
+              name: action.payload.company.name,
+              refundPolicy: 'Definita dai termini della licenza.',
+            }
+          : template?.company || {
+              companyStatus: 'verified',
+              defaultRoyaltyPercent: action.payload.royaltyPercent,
+              defaultTransferPolicy: action.payload.transferPolicy,
+              description: 'Verified Issuer Node',
+              domain: 'jetbrains.com',
+              id: 'comp-1',
+              logoUrl: '',
+              name: 'JetBrains s.r.o.',
+              refundPolicy: 'Standard 14-day policy',
+            },
+        companyId: action.payload.company
+          ? `company-${action.payload.id}`
+          : template?.companyId || 'comp-1',
+        createdAt: new Date().toISOString(),
+        durationDays: action.payload.listingDetails?.durationDays ?? null,
         edition: action.payload.edition,
         id: action.payload.id,
+        imageUrl: '',
+        licenseType: action.payload.listingDetails?.licenseType || 'perpetual',
         maxTransfers:
           action.payload.transferPolicy === 'not_transferable' ? 0 : 5,
         minHoldingDays: 0,
+        paymentAsset: 'BTC (sats)',
+        platforms: action.payload.listingDetails?.platforms || [
+          'Windows',
+          'macOS',
+          'Linux',
+        ],
         price: action.payload.price,
+        productDescription:
+          action.payload.listingDetails?.productDescription ||
+          `${action.payload.productName} (${action.payload.edition}) - Licenza software emessa come asset RGB su Bitcoin.`,
         productName: action.payload.productName,
         rgbAsset: action.payload.rgbAsset,
         royaltyPercent: action.payload.royaltyPercent,
         status: 'published',
+        tags: action.payload.listingDetails?.tags || ['RGB Asset', 'UDA'],
         transferPolicy: action.payload.transferPolicy,
-        updatedAt: now,
+        updatedAt: new Date().toISOString(),
+        version: action.payload.listingDetails?.version || '1.0',
       }
-      state.listings.unshift(listing)
+
+      state.listings.unshift(newListing)
       state.filteredListings = applyFilters(state.listings, state.filters)
+      state.companyStats.totalListings += 1
+      saveLocalListings(state.listings)
+      saveLocalCompanyStats(state.companyStats)
     },
     recordDemoPurchase(state, action: PayloadAction<Order>) {
       state.orders.unshift(action.payload)
@@ -338,11 +484,13 @@ export const licexSlice = createSlice({
       state.watchlist = state.watchlist.filter(
         (item) => item.listingId !== action.payload
       )
+      saveLocalWatchlist(state.watchlist)
     },
     removePriceAlert(state, action: PayloadAction<string>) {
       state.priceAlerts = state.priceAlerts.filter(
         (alert) => alert.id !== action.payload
       )
+      saveLocalPriceAlerts(state.priceAlerts)
     },
     removeWishlistItem(state, action: PayloadAction<string>) {
       state.wishlist = state.wishlist.filter(
@@ -372,7 +520,25 @@ export const licexSlice = createSlice({
           },
         ]
       })
+      saveLocalWishlist(state.wishlist)
     },
+
+    // ── Local Database Reset ───────────────────────────────────────────
+    resetDatabase(state) {
+      resetLocalLicexDatabase()
+      state.ownedLicenses = MOCK_OWNED_LICENSES
+      state.orders = MOCK_ORDERS
+      state.p2pOffers = []
+      state.watchlist = MOCK_WATCHLIST
+      state.priceAlerts = MOCK_PRICE_ALERTS
+      state.wishlist = MOCK_WISHLIST
+      state.wishlistGroups = []
+      state.companyStats = MOCK_COMPANY_STATS
+      state.chatMessages = MOCK_CHAT_MESSAGES
+      state.listings = MOCK_LISTINGS
+      state.filteredListings = applyFilters(MOCK_LISTINGS, state.filters)
+    },
+
     selectListing(state, action: PayloadAction<string | null>) {
       state.selectedListing = action.payload
         ? (state.listings.find((listing) => listing.id === action.payload) ??
@@ -382,31 +548,68 @@ export const licexSlice = createSlice({
     setChatLoading(state, action: PayloadAction<boolean>) {
       state.chatLoading = action.payload
     },
+
+    // ── Filters ────────────────────────────────────────────────────────
     setFilters(state, action: PayloadAction<Partial<MarketplaceFilters>>) {
       state.filters = { ...state.filters, ...action.payload }
       state.filteredListings = applyFilters(state.listings, state.filters)
     },
+
+    setOrders(state, action: PayloadAction<Order[]>) {
+      state.orders = action.payload
+    },
+
+    setOwnedLicenses(state, action: PayloadAction<LicenseRecord[]>) {
+      state.ownedLicenses = action.payload
+    },
+
+    setPriceAlerts(state, action: PayloadAction<PriceAlert[]>) {
+      state.priceAlerts = action.payload
+    },
+
     setViewMode(state, action: PayloadAction<'grid' | 'list'>) {
       state.viewMode = action.payload
+    },
+
+    setWatchlist(state, action: PayloadAction<WatchlistItem[]>) {
+      state.watchlist = action.payload
+    },
+    setWishlist(state, action: PayloadAction<WantedSoftwareRequest[]>) {
+      state.wishlist = action.payload
     },
   },
 })
 
 export const {
   addListing,
+  addP2pOffer,
+  mergeRelayOffers,
+  mergeRelayListings,
   addPriceAlert,
   addToWatchlist,
   addWishlistGroup,
   addWishlistItem,
   clearFilters,
-  completePurchase,
-  mintLicenseListing,
+
   recordDemoPurchase,
   removeFromWatchlist,
   removePriceAlert,
   removeWishlistItem,
+
   selectListing,
-  setChatLoading,
+
   setFilters,
+
   setViewMode,
+  setWatchlist,
+  setWishlist,
+  setPriceAlerts,
+  addChatMessage,
+  clearChatMessages,
+  setChatLoading,
+  completePurchase,
+  setOwnedLicenses,
+  setOrders,
+  mintLicenseListing,
+  resetDatabase,
 } = licexSlice.actions

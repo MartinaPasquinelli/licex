@@ -1,2 +1,5 @@
-[build]
-target-dir = "C:/Users/Public/cargo_target/licex"
+# Su Windows, per evitare errori di percorso lungo (MAX_PATH 260 caratteri) durante la compilazione,
+# impostare la variabile di ambiente: CARGO_TARGET_DIR="C:/Users/Public/cargo_target/licex"
+# Non decommentare [build] target-dir globale qui per garantire la compatibilità cross-platform (macOS/Linux).
+# [build]
+# target-dir = "C:/Users/Public/cargo_target/licex"

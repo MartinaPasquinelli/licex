@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Heart,
@@ -13,7 +14,13 @@ import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
 import {
   removeFromWatchlist,
   removePriceAlert,
+  setWatchlist,
+  setPriceAlerts,
 } from '../../slices/licex/licex.slice'
+import {
+  loadWatchlistFromSqlite,
+  loadPriceAlertsFromSqlite,
+} from '../../services/licex/licexStorage'
 import { LICEX_MARKETPLACE_PATH } from '../../app/router/paths'
 
 function formatSats(sats: number): string {
@@ -27,6 +34,15 @@ export function Component() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const { watchlist, priceAlerts } = useAppSelector((s) => s.licex)
+
+  useEffect(() => {
+    loadWatchlistFromSqlite().then((items) => {
+      if (items && items.length > 0) dispatch(setWatchlist(items))
+    })
+    loadPriceAlertsFromSqlite().then((alerts) => {
+      if (alerts && alerts.length > 0) dispatch(setPriceAlerts(alerts))
+    })
+  }, [dispatch])
 
   return (
     <div className="h-full overflow-y-auto">
