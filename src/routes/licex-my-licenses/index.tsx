@@ -81,6 +81,67 @@ export function Component() {
       listing.rgbAsset.mode === 'rgb-node'
   )
 
+  const handleCreateDemoUda = async () => {
+    if (isCreatingUda) return
+    setIsCreatingUda(true)
+    try {
+      const network = await getNetworkInfo().unwrap()
+      if (network.network === 'Mainnet') {
+        throw new Error(
+          'Emissione demo bloccata su Mainnet. Collega il nodo a Signet o Regtest.'
+        )
+      }
+      const issuer = await getNodeInfo().unwrap()
+      const requestId = crypto.randomUUID()
+      const issuanceInput = createIssuanceInputFromEula(
+        MOCK_EULA_ANALYSIS,
+        requestId
+      )
+      const issue = () =>
+        issueLicenseRgbAsset(
+          issuanceInput,
+          (request) => issueUda(request).unwrap(),
+          async (message) =>
+            (await signMessage({ message }).unwrap()).signed_message,
+          issuer.pubkey
+        )
+      let issuedAsset: IssuedLicenseAsset
+      try {
+        issuedAsset = await issue()
+      } catch (error) {
+        if (!isMissingUncoloredUtxo(error)) throw error
+        toast.info('Preparo un UTXO Bitcoin per l’emissione UDA…')
+        await createUtxos({
+          fee_rate: 2,
+          num: 1,
+          size: 32500,
+          up_to: false,
+        }).unwrap()
+        issuedAsset = await issue()
+      }
+
+      dispatch(
+        mintLicenseListing({
+          category: 'Creative & Design',
+          edition: issuanceInput.edition,
+          id: `lic-${requestId}`,
+          platforms: [...MOCK_EULA_ANALYSIS.suggestedListing.platforms],
+          price: MOCK_EULA_ANALYSIS.suggestedListing.priceSats,
+          productName: issuanceInput.productName,
+          rgbAsset: issuedAsset,
+          royaltyPercent: issuanceInput.royaltyPercent,
+          transferPolicy: issuanceInput.transferPolicy,
+        })
+      )
+      toast.success(`UDA demo creata e pubblicata su ${network.network}.`)
+    } catch (error) {
+      const message = getIssuanceErrorMessage(error)
+      toast.error(message)
+    } finally {
+      setIsCreatingUda(false)
+    }
+  }
+
   const handleTestHandshake = (id: string) => {
     setTestedHandshakeId(id)
     setTimeout(() => setTestedHandshakeId(null), 3500)

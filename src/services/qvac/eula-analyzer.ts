@@ -1,7 +1,7 @@
 // ─── QVAC Local EULA Analysis Engine ───────────────────────────────────────────
 // Heuristic & Semantic parser executing 100% on-device.
 // Extracts structured terms, cross-checks vendor compliance, identifies risks,
-// and produces verified license listing suggestions (US-05, US-06).
+// and produces verified license listing suggestions.
 
 import type { TransferPolicy, LicenseType } from '../../types/licex'
 import type {
@@ -30,13 +30,13 @@ export class QvacEulaAnalyzer {
     // 2. Extract specific grounded clauses with original snippets
     const clauses = this.extractClauses(text)
 
-    // 3. Perform compliance cross-check (US-06 audit)
+    // 3. Perform optional compliance cross-check
     const complianceAudit = this.performComplianceAudit(
       extracted.transferPolicy,
       claimedPolicy
     )
 
-    // 4. Generate executive summary in clear Italian
+    // 4. Generate an executive summary in clear English
     const executiveSummary = this.generateExecutiveSummary(
       extracted,
       complianceAudit
@@ -446,7 +446,7 @@ export class QvacEulaAnalyzer {
     return clauses
   }
 
-  // ── 4. Compliance Audit (US-06) ─────────────────────────────────────────────
+  // ── 4. Optional compliance audit ────────────────────────────────────────────
   private static performComplianceAudit(
     detectedPolicy: TransferPolicy,
     claimedPolicy?: TransferPolicy
@@ -464,7 +464,7 @@ export class QvacEulaAnalyzer {
 
       if (detectedPolicy === 'not_transferable') {
         flagReason =
-          'Incongruenza critica (US-06): Il venditore ha dichiarato la licenza come trasferibile, ma il contratto EULA contiene clausole restrittive che ne vietano espressamente la vendita o la cessione a terzi.'
+          'Critical mismatch: the seller marked the license as transferable, but the EULA contains restrictive clauses that explicitly prohibit sale or transfer to third parties.'
       } else if (
         claimedPolicy === 'transferable_free' &&
         detectedPolicy === 'transferable_with_approval'
@@ -476,10 +476,10 @@ export class QvacEulaAnalyzer {
         detectedPolicy === 'transferable_with_approval'
       ) {
         flagReason =
-          'Incongruenza di conformità (US-06): Il venditore ha dichiarato la licenza come non trasferibile, ma il contratto consente la cessione previa autorizzazione e pagamento della transfer fee. La politica corretta da impostare è "transferable_with_approval".'
+          'Compliance mismatch: the seller marked the license as non-transferable, but the contract allows transfer after approval and payment of a transfer fee. The correct policy is "transferable_with_approval".'
       } else {
         flagReason =
-          'Incongruenza di conformità (US-06): Il venditore ha dichiarato la licenza trasferibile previa approvazione, ma il contratto consente il trasferimento libero senza preventiva autorizzazione. La politica corretta da impostare è "transferable_free".'
+          'Compliance mismatch: the seller marked the license as approval-based, but the contract allows free transfer without prior authorization. The correct policy is "transferable_free".'
       }
 
       return {
@@ -518,7 +518,7 @@ export class QvacEulaAnalyzer {
     summary += `- **Attivazione & Telemetria:** ${extracted.onlineVerificationRequired ? 'Richiede verifica online periodica (compatibile con revoca e Proof of Holding via Issuer Kit).' : 'Funziona senza telemetria continua.'}`
 
     if (!audit.matchesClaim && audit.flagReason) {
-      summary += `\n\n> ⚠️ **ATTENZIONE AUDIT (US-06):** ${audit.flagReason}`
+      summary += `\n\n> ⚠️ **COMPLIANCE REVIEW:** ${audit.flagReason}`
     }
 
     return summary

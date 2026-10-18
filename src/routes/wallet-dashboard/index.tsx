@@ -561,7 +561,7 @@ export const Component = () => {
             {/* Actions — 4-button row */}
             <div className="relative z-10 grid grid-cols-4 gap-2">
               <button
-                className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 hover:border-status-success/50 text-status-success text-xs font-semibold transition-all overflow-hidden"
+                className="wallet-deposit-action flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 hover:border-status-success/50 text-status-success text-xs font-semibold transition-all overflow-hidden"
                 onClick={() =>
                   dispatch(
                     uiSliceActions.setModal({
@@ -575,7 +575,7 @@ export const Component = () => {
                 <span className="truncate">{t('dashboard.deposit')}</span>
               </button>
               <button
-                className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 text-xs font-semibold transition-all overflow-hidden"
+                className="wallet-channels-action flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 text-xs font-semibold transition-all overflow-hidden"
                 id="wallet-channels-btn"
                 onClick={() => navigate(CHANNELS_PATH)}
               >
