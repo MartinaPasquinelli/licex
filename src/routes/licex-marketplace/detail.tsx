@@ -2,6 +2,7 @@
 // Full details for a single license listing with purchase action.
 
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -37,6 +38,7 @@ import {
   ACCOUNT_PATH,
   WALLET_SETUP_PATH,
 } from '../../app/router/paths'
+import { getModalPositionClass } from '../../helpers/modalPortal'
 
 import {
   calculatePaymentQuote,
@@ -104,6 +106,7 @@ export function Component() {
   const { licenseId } = useParams<{ licenseId: string }>()
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
+  const modalPosition = getModalPositionClass()
   const { listings, watchlist } = useAppSelector((s) => s.licex)
   const nodeSettingsData = useAppSelector((s) => s.nodeSettings.data)
   const [showPurchaseModal, setShowPurchaseModal] = useState(false)
@@ -709,635 +712,645 @@ export function Component() {
 
         {/* Demo purchase modal */}
         {/* Modale di Checkout: Lightning Network o RGB-USDT Atomic Swap */}
-        {showPurchaseModal && quote && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md animate-fadeIn p-4">
-            <div className="bg-surface-overlay text-content-primary rounded-2xl max-w-lg w-full border border-border-default shadow-2xl p-6 space-y-5 animate-scaleIn">
-              {/* Intestazione */}
-              <div className="flex items-center justify-between border-b border-[#9a94bc]/20 pb-4">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm ${
-                      swapStep === 'completed'
-                        ? 'bg-[#10b981]/20 text-[#10b981]'
-                        : paymentMethod === 'lightning'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          : 'bg-[#10b981]/20 text-[#10b981]'
-                    }`}
-                  >
-                    {swapStep === 'completed' ? (
-                      <CheckCircle className="w-5 h-5 text-[#10b981]" />
-                    ) : paymentMethod === 'lightning' ? (
-                      <Zap className="w-5 h-5 text-amber-400" />
-                    ) : (
-                      '₮'
+        {showPurchaseModal &&
+          quote &&
+          createPortal(
+            <div
+              className={`${modalPosition} inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 backdrop-blur-md animate-fadeIn p-2 sm:p-4`}
+            >
+              <div className="bg-surface-overlay text-content-primary rounded-2xl w-full max-w-lg max-h-[calc(100%_-_1rem)] sm:max-h-[calc(100%_-_2rem)] overflow-y-auto border border-border-default shadow-2xl p-4 sm:p-6 space-y-5 animate-scaleIn">
+                {/* Intestazione */}
+                <div className="flex items-center justify-between border-b border-[#9a94bc]/20 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm ${
+                        swapStep === 'completed'
+                          ? 'bg-[#10b981]/20 text-[#10b981]'
+                          : paymentMethod === 'lightning'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : 'bg-[#10b981]/20 text-[#10b981]'
+                      }`}
+                    >
+                      {swapStep === 'completed' ? (
+                        <CheckCircle className="w-5 h-5 text-[#10b981]" />
+                      ) : paymentMethod === 'lightning' ? (
+                        <Zap className="w-5 h-5 text-amber-400" />
+                      ) : (
+                        '₮'
+                      )}
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-content-primary">
+                        {swapStep === 'completed'
+                          ? 'Licenza Acquisita!'
+                          : paymentMethod === 'lightning'
+                            ? 'Checkout Pagamento Lightning'
+                            : 'Checkout Atomic Swap (RGB-USDT)'}
+                      </h2>
+                      <p className="text-xs text-content-secondary">
+                        {swapStep === 'completed'
+                          ? 'Registrata nel Database SQLite Locale & Wallet'
+                          : paymentMethod === 'lightning'
+                            ? 'Pagamento istantaneo in Satoshis via Nodo LDK'
+                            : 'Protocollo di Scambio RGB su Bitcoin'}
+                      </p>
+                    </div>
+                  </div>
+                  {swapStep !== 'completed' &&
+                    swapStep !== 'signing' &&
+                    swapStep !== 'broadcasting' &&
+                    swapStep !== 'proof_of_holding' && (
+                      <button
+                        className="text-content-secondary hover:text-content-primary text-sm"
+                        onClick={() => setShowPurchaseModal(false)}
+                      >
+                        ✕
+                      </button>
                     )}
-                  </div>
-                  <div>
-                    <h2 className="text-base font-bold text-content-primary">
-                      {swapStep === 'completed'
-                        ? 'Licenza Acquisita!'
-                        : paymentMethod === 'lightning'
-                          ? 'Checkout Pagamento Lightning'
-                          : 'Checkout Atomic Swap (RGB-USDT)'}
-                    </h2>
-                    <p className="text-xs text-content-secondary">
-                      {swapStep === 'completed'
-                        ? 'Registrata nel Database SQLite Locale & Wallet'
-                        : paymentMethod === 'lightning'
-                          ? 'Pagamento istantaneo in Satoshis via Nodo LDK'
-                          : 'Protocollo di Scambio RGB su Bitcoin'}
-                    </p>
-                  </div>
                 </div>
-                {swapStep !== 'completed' &&
-                  swapStep !== 'signing' &&
-                  swapStep !== 'broadcasting' &&
-                  swapStep !== 'proof_of_holding' && (
-                    <button
-                      className="text-content-secondary hover:text-content-primary text-sm"
-                      onClick={() => setShowPurchaseModal(false)}
-                    >
-                      ✕
-                    </button>
-                  )}
-              </div>
 
-              {/* FASE 1: RIEPILOGO FINANZIARIO & SCELTA METODO */}
-              {swapStep === 'quote' && (
-                <div className="space-y-4">
-                  {/* Selettore Metodo di Pagamento */}
-                  <div className="flex rounded-xl bg-surface-base/70 p-1 border border-border-default/40">
-                    <button
-                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all ${
-                        paymentMethod === 'lightning'
-                          ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                          : 'text-content-secondary hover:text-content-primary'
-                      }`}
-                      id="select-lightning-payment"
-                      onClick={() => setPaymentMethod('lightning')}
-                      type="button"
-                    >
-                      <Zap className="w-3.5 h-3.5 text-amber-400" />
-                      <span>⚡ Lightning (Consigliato)</span>
-                    </button>
-                    <button
-                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all ${
-                        paymentMethod === 'usdt_swap'
-                          ? 'bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/40 shadow-sm'
-                          : 'text-content-secondary hover:text-content-primary'
-                      }`}
-                      id="select-usdt-payment"
-                      onClick={() => setPaymentMethod('usdt_swap')}
-                      type="button"
-                    >
-                      <span>₮ RGB-USDT Swap</span>
-                    </button>
-                  </div>
+                {/* FASE 1: RIEPILOGO FINANZIARIO & SCELTA METODO */}
+                {swapStep === 'quote' && (
+                  <div className="space-y-4">
+                    {/* Selettore Metodo di Pagamento */}
+                    <div className="flex rounded-xl bg-surface-base/70 p-1 border border-border-default/40">
+                      <button
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all ${
+                          paymentMethod === 'lightning'
+                            ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                            : 'text-content-secondary hover:text-content-primary'
+                        }`}
+                        id="select-lightning-payment"
+                        onClick={() => setPaymentMethod('lightning')}
+                        type="button"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-400" />
+                        <span>⚡ Lightning (Consigliato)</span>
+                      </button>
+                      <button
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all ${
+                          paymentMethod === 'usdt_swap'
+                            ? 'bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/40 shadow-sm'
+                            : 'text-content-secondary hover:text-content-primary'
+                        }`}
+                        id="select-usdt-payment"
+                        onClick={() => setPaymentMethod('usdt_swap')}
+                        type="button"
+                      >
+                        <span>₮ RGB-USDT Swap</span>
+                      </button>
+                    </div>
 
-                  {paymentMethod === 'lightning' && lnQuote ? (
-                    <>
-                      <div className="p-4 rounded-xl bg-surface-base/70 border border-amber-500/20 space-y-2.5 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-[#9a94bc]">Software</span>
-                          <span className="font-semibold text-content-primary">
-                            {listing.productName} ({listing.edition})
-                          </span>
+                    {paymentMethod === 'lightning' && lnQuote ? (
+                      <>
+                        <div className="p-4 rounded-xl bg-surface-base/70 border border-amber-500/20 space-y-2.5 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-[#9a94bc]">Software</span>
+                            <span className="font-semibold text-content-primary">
+                              {listing.productName} ({listing.edition})
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[#9a94bc]">
+                              Prezzo Licenza
+                            </span>
+                            <span className="font-semibold text-amber-300">
+                              {lnQuote.formattedPriceSats}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#9a94bc]">
+                              Protocol Fee LICEX (1%)
+                            </span>
+                            <span className="text-content-primary">
+                              {lnQuote.formattedFeeSats}
+                            </span>
+                          </div>
+                          <div className="border-t border-[#9a94bc]/20 pt-2 flex justify-between font-bold text-base">
+                            <span>Totale da Pagare</span>
+                            <span className="text-amber-400">
+                              {lnQuote.formattedTotalSats}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#9a94bc]">Prezzo Licenza</span>
-                          <span className="font-semibold text-amber-300">
-                            {lnQuote.formattedPriceSats}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-[#9a94bc]">
-                            Protocol Fee LICEX (1%)
-                          </span>
-                          <span className="text-content-primary">
-                            {lnQuote.formattedFeeSats}
-                          </span>
-                        </div>
-                        <div className="border-t border-[#9a94bc]/20 pt-2 flex justify-between font-bold text-base">
-                          <span>Totale da Pagare</span>
-                          <span className="text-amber-400">
-                            {lnQuote.formattedTotalSats}
-                          </span>
-                        </div>
-                      </div>
 
-                      {/* Stato Canali e Liquidità */}
-                      <div className="p-3 rounded-xl bg-surface-base/50 border border-border-default/40 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#9a94bc]">
-                            Liquidità Canale:
-                          </span>
+                        {/* Stato Canali e Liquidità */}
+                        <div className="p-3 rounded-xl bg-surface-base/50 border border-border-default/40 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#9a94bc]">
+                              Liquidità Canale:
+                            </span>
+                            <span
+                              className={`font-mono font-semibold ${
+                                hasSufficientLightningBalance
+                                  ? 'text-emerald-400'
+                                  : 'text-red-400'
+                              }`}
+                            >
+                              {lightningSpendableSats.toLocaleString()} sats
+                            </span>
+                          </div>
                           <span
-                            className={`font-mono font-semibold ${
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                               hasSufficientLightningBalance
-                                ? 'text-emerald-400'
-                                : 'text-red-400'
+                                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                : 'bg-red-500/15 text-red-400 border-red-500/30'
                             }`}
                           >
-                            {lightningSpendableSats.toLocaleString()} sats
+                            {readyChannels.length === 0
+                              ? '🔴 Nessun Canale Aperto'
+                              : hasSufficientLightningBalance
+                                ? '🟢 Saldo Sufficiente'
+                                : '🟡 Saldo Insufficiente'}
                           </span>
                         </div>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                            hasSufficientLightningBalance
-                              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                              : 'bg-red-500/15 text-red-400 border-red-500/30'
-                          }`}
-                        >
-                          {readyChannels.length === 0
-                            ? '🔴 Nessun Canale Aperto'
-                            : hasSufficientLightningBalance
-                              ? '🟢 Saldo Sufficiente'
-                              : '🟡 Saldo Insufficiente'}
-                        </span>
-                      </div>
 
-                      {/* Warning se il saldo è insufficiente */}
-                      {!hasSufficientLightningBalance && (
-                        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 space-y-2 text-xs text-red-200">
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-400 mt-0.5" />
-                            <div>
-                              <strong className="text-red-300">
-                                {readyChannels.length === 0
-                                  ? 'Nessun canale Lightning attivo nel wallet'
-                                  : 'Fondi insufficienti nel canale Lightning'}
-                              </strong>
-                              <p className="mt-1 text-[11px] text-red-200/80 leading-relaxed">
-                                {readyChannels.length === 0
-                                  ? `Il tuo wallet ha 0 sats spendibili via Lightning. Per completare questo acquisto reale servono ${lnQuote.formattedTotalSats}.`
-                                  : `Disponi di ${lightningSpendableSats.toLocaleString()} sats, ma l'acquisto richiede ${lnQuote.formattedTotalSats}.`}
-                              </p>
+                        {/* Warning se il saldo è insufficiente */}
+                        {!hasSufficientLightningBalance && (
+                          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 space-y-2 text-xs text-red-200">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-400 mt-0.5" />
+                              <div>
+                                <strong className="text-red-400">
+                                  {readyChannels.length === 0
+                                    ? 'Nessun canale Lightning attivo nel wallet'
+                                    : 'Fondi insufficienti nel canale Lightning'}
+                                </strong>
+                                <p className="mt-1 text-[11px] text-red-200/80 leading-relaxed">
+                                  {readyChannels.length === 0
+                                    ? `Il tuo wallet ha 0 sats spendibili via Lightning. Per completare questo acquisto reale servono ${lnQuote.formattedTotalSats}.`
+                                    : `Disponi di ${lightningSpendableSats.toLocaleString()} sats, ma l'acquisto richiede ${lnQuote.formattedTotalSats}.`}
+                                </p>
+                              </div>
                             </div>
+                            <button
+                              className="w-full py-1.5 px-3 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-white font-medium text-[11px] transition-colors border border-red-500/30"
+                              onClick={() => {
+                                setShowPurchaseModal(false)
+                                navigate('/channels')
+                              }}
+                              type="button"
+                            >
+                              → Apri o Ricarica un Canale in Channels
+                            </button>
                           </div>
+                        )}
+
+                        {hasSufficientLightningBalance && (
+                          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5 text-xs text-amber-200">
+                            <Zap className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
+                            <span>
+                              <strong>
+                                Pagamento Diretto via Lightning Network:
+                              </strong>{' '}
+                              I Satoshis vengono instradati istantaneamente
+                              attraverso il nodo LDK locale. A pagamento
+                              confermato, il sigillo UDA RGB25 viene generato e
+                              salvato nel DB locale.
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex gap-3 pt-2">
                           <button
-                            className="w-full py-1.5 px-3 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-white font-medium text-[11px] transition-colors border border-red-500/30"
-                            onClick={() => {
-                              setShowPurchaseModal(false)
-                              navigate('/channels')
-                            }}
-                            type="button"
+                            className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-base/70 text-content-secondary border border-border-default/40 hover:text-content-primary"
+                            onClick={() => setShowPurchaseModal(false)}
                           >
-                            → Apri o Ricarica un Canale in Channels
+                            Annulla
                           </button>
-                        </div>
-                      )}
-
-                      {hasSufficientLightningBalance && (
-                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5 text-xs text-amber-200">
-                          <Zap className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
-                          <span>
-                            <strong>
-                              Pagamento Diretto via Lightning Network:
-                            </strong>{' '}
-                            I Satoshis vengono instradati istantaneamente
-                            attraverso il nodo LDK locale. A pagamento
-                            confermato, il sigillo UDA RGB25 viene generato e
-                            salvato nel DB locale.
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex gap-3 pt-2">
-                        <button
-                          className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-base/70 text-content-secondary border border-border-default/40 hover:text-content-primary"
-                          onClick={() => setShowPurchaseModal(false)}
-                        >
-                          Annulla
-                        </button>
-                        <button
-                          className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                            hasSufficientLightningBalance
-                              ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black hover:opacity-95 shadow-lg shadow-amber-500/20'
-                              : 'bg-white/5 text-[#9a94bc]/40 border border-white/10 cursor-not-allowed'
-                          }`}
-                          disabled={!hasSufficientLightningBalance}
-                          id="confirm-atomic-swap-btn"
-                          onClick={async () => {
-                            if (!hasSufficientLightningBalance) return
-                            try {
-                              const result = await executeLicenseSwap(
-                                listing,
-                                'primary',
-                                (step, msg) => {
-                                  setSwapStep(step)
-                                  if (msg) setSwapMessage(msg)
-                                },
-                                {
-                                  method: 'lightning',
-                                  sendPaymentFn: async ({ invoice }) => {
-                                    const res = await sendPayment({ invoice })
-                                    if ('data' in res && res.data) {
-                                      if (res.data.status === 'Failed') {
+                          <button
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                              hasSufficientLightningBalance
+                                ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black hover:opacity-95 shadow-lg shadow-amber-500/20'
+                                : 'bg-white/5 text-[#9a94bc]/40 border border-white/10 cursor-not-allowed'
+                            }`}
+                            disabled={!hasSufficientLightningBalance}
+                            id="confirm-atomic-swap-btn"
+                            onClick={async () => {
+                              if (!hasSufficientLightningBalance) return
+                              try {
+                                const result = await executeLicenseSwap(
+                                  listing,
+                                  'primary',
+                                  (step, msg) => {
+                                    setSwapStep(step)
+                                    if (msg) setSwapMessage(msg)
+                                  },
+                                  {
+                                    method: 'lightning',
+                                    sendPaymentFn: async ({ invoice }) => {
+                                      const res = await sendPayment({ invoice })
+                                      if ('data' in res && res.data) {
+                                        if (res.data.status === 'Failed') {
+                                          throw new Error(
+                                            'Pagamento Lightning fallito sul nodo LDK: routing fallito o liquidità insufficiente.'
+                                          )
+                                        }
+                                        return res.data
+                                      }
+                                      if ('error' in res && res.error) {
+                                        const errData: any = res.error
                                         throw new Error(
-                                          'Pagamento Lightning fallito sul nodo LDK: routing fallito o liquidità insufficiente.'
+                                          errData?.data?.error ||
+                                            errData?.message ||
+                                            'Pagamento rifiutato dal nodo Lightning.'
                                         )
                                       }
-                                      return res.data
-                                    }
-                                    if ('error' in res && res.error) {
-                                      const errData: any = res.error
-                                      throw new Error(
-                                        errData?.data?.error ||
-                                          errData?.message ||
-                                          'Pagamento rifiutato dal nodo Lightning.'
-                                      )
-                                    }
-                                    return res
-                                  },
-                                  spendableBalanceSats: lightningSpendableSats,
-                                }
-                              )
-                              setSwapResult(result)
-                              dispatch(
-                                completePurchase({
-                                  licenseRecord: result.licenseRecord,
-                                  order: result.order,
-                                })
-                              )
-                            } catch (e: any) {
-                              setSwapStep('error')
-                              setSwapMessage(
-                                e?.message ||
-                                  'Errore durante il pagamento Lightning'
-                              )
-                            }
-                          }}
-                        >
-                          {hasSufficientLightningBalance
-                            ? `Conferma & Paga ${lnQuote.formattedTotalSats}`
-                            : `Saldo Insufficiente (${lightningSpendableSats.toLocaleString()} sats)`}
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="p-4 rounded-xl bg-surface-base/70 border border-border-default/40 space-y-2.5 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-[#9a94bc]">Software</span>
-                          <span className="font-semibold text-content-primary">
-                            {listing.productName} ({listing.edition})
-                          </span>
+                                      return res
+                                    },
+                                    spendableBalanceSats:
+                                      lightningSpendableSats,
+                                  }
+                                )
+                                setSwapResult(result)
+                                dispatch(
+                                  completePurchase({
+                                    licenseRecord: result.licenseRecord,
+                                    order: result.order,
+                                  })
+                                )
+                              } catch (e: any) {
+                                setSwapStep('error')
+                                setSwapMessage(
+                                  e?.message ||
+                                    'Errore durante il pagamento Lightning'
+                                )
+                              }
+                            }}
+                          >
+                            {hasSufficientLightningBalance
+                              ? `Conferma & Paga ${lnQuote.formattedTotalSats}`
+                              : `Saldo Insufficiente (${lightningSpendableSats.toLocaleString()} sats)`}
+                          </button>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#9a94bc]">Prezzo Licenza</span>
-                          <span className="font-semibold text-[#cdf7f6]">
-                            {quote.formattedPrice}
-                          </span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="p-4 rounded-xl bg-surface-base/70 border border-border-default/40 space-y-2.5 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-[#9a94bc]">Software</span>
+                            <span className="font-semibold text-content-primary">
+                              {listing.productName} ({listing.edition})
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[#9a94bc]">
+                              Prezzo Licenza
+                            </span>
+                            <span className="font-semibold text-[#cdf7f6]">
+                              {quote.formattedPrice}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#9a94bc]">
+                              Protocol Fee LICEX (1%)
+                            </span>
+                            <span className="text-content-primary">
+                              {quote.formattedFee}
+                            </span>
+                          </div>
+                          <div className="border-t border-[#9a94bc]/20 pt-2 flex justify-between font-bold text-base">
+                            <span>Totale da Pagare</span>
+                            <span className="text-[#10b981]">
+                              {quote.formattedTotal}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-[#9a94bc]">
-                            Protocol Fee LICEX (1%)
-                          </span>
-                          <span className="text-content-primary">
-                            {quote.formattedFee}
-                          </span>
-                        </div>
-                        <div className="border-t border-[#9a94bc]/20 pt-2 flex justify-between font-bold text-base">
-                          <span>Totale da Pagare</span>
-                          <span className="text-[#10b981]">
-                            {quote.formattedTotal}
-                          </span>
-                        </div>
-                      </div>
 
-                      {/* Stato Saldo USDT */}
-                      <div className="p-3 rounded-xl bg-surface-base/50 border border-border-default/40 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#9a94bc]">
-                            {isTestModeEnabled
-                              ? 'Saldo demo USDT Disponibile:'
-                              : 'Saldo USDT Disponibile:'}
-                          </span>
+                        {/* Stato Saldo USDT */}
+                        <div className="p-3 rounded-xl bg-surface-base/50 border border-border-default/40 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#9a94bc]">
+                              {isTestModeEnabled
+                                ? 'Saldo demo USDT Disponibile:'
+                                : 'Saldo USDT Disponibile:'}
+                            </span>
+                            <span
+                              className={`font-mono font-semibold ${
+                                hasSufficientUsdtBalance
+                                  ? 'text-[#10b981]'
+                                  : 'text-red-400'
+                              }`}
+                            >
+                              {usdtSpendable.toLocaleString(undefined, {
+                                maximumFractionDigits: 2,
+                                minimumFractionDigits: 2,
+                              })}{' '}
+                              USDT
+                            </span>
+                          </div>
                           <span
-                            className={`font-mono font-semibold ${
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                               hasSufficientUsdtBalance
-                                ? 'text-[#10b981]'
-                                : 'text-red-400'
+                                ? 'bg-[#10b981]/15 text-[#10b981] border-[#10b981]/30'
+                                : 'bg-red-500/15 text-red-400 border-red-500/30'
                             }`}
                           >
-                            {usdtSpendable.toLocaleString(undefined, {
-                              maximumFractionDigits: 2,
-                              minimumFractionDigits: 2,
-                            })}{' '}
-                            USDT
+                            {hasSufficientUsdtBalance
+                              ? '🟢 Saldo Sufficiente'
+                              : '🔴 Saldo Insufficiente'}
                           </span>
                         </div>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                            hasSufficientUsdtBalance
-                              ? 'bg-[#10b981]/15 text-[#10b981] border-[#10b981]/30'
-                              : 'bg-red-500/15 text-red-400 border-red-500/30'
-                          }`}
-                        >
-                          {hasSufficientUsdtBalance
-                            ? '🟢 Saldo Sufficiente'
-                            : '🔴 Saldo Insufficiente'}
-                        </span>
-                      </div>
 
-                      {isP2PSimulationAvailable() && (
-                        <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-400/30 text-xs text-violet-100 space-y-2">
-                          <div className="font-semibold">
-                            {isTestModeEnabled
-                              ? 'Modalità test attiva · pagamento simulato'
-                              : 'Test acquisto e rivendita'}
+                        {isP2PSimulationAvailable() && (
+                          <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-400/30 text-xs text-violet-100 space-y-2">
+                            <div className="font-semibold">
+                              {isTestModeEnabled
+                                ? 'Modalità test attiva · pagamento simulato'
+                                : 'Test acquisto e rivendita'}
+                            </div>
+                            <p className="text-[11px] text-violet-100/80">
+                              {isTestModeEnabled
+                                ? 'Il saldo mostrato sopra è demo-USDT. L’acquisto crea un asset demo locale, non un trasferimento o pagamento RGB reale.'
+                                : 'Attiva demo-USDT per simulare l’acquisto della licenza e poi provarne la rivendita P2P.'}
+                            </p>
+                            <button
+                              className="rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-semibold text-white"
+                              onClick={() => {
+                                try {
+                                  if (isTestModeEnabled) {
+                                    setTestWalletBalance(
+                                      adjustP2PSimulationUsdtBalance(1000)
+                                    )
+                                  } else {
+                                    enableP2PSimulation()
+                                    setIsTestModeEnabled(true)
+                                    setTestWalletBalance(
+                                      getP2PSimulationUsdtBalance()
+                                    )
+                                  }
+                                } catch (error) {
+                                  setSwapMessage(
+                                    error instanceof Error
+                                      ? error.message
+                                      : 'Attivazione del portafoglio test non riuscita.'
+                                  )
+                                }
+                              }}
+                              type="button"
+                            >
+                              {isTestModeEnabled
+                                ? 'Aggiungi 1.000 demo-USDT'
+                                : 'Attiva portafoglio test · 1.000 demo-USDT'}
+                            </button>
                           </div>
-                          <p className="text-[11px] text-violet-100/80">
-                            {isTestModeEnabled
-                              ? 'Il saldo mostrato sopra è demo-USDT. L’acquisto crea un asset demo locale, non un trasferimento o pagamento RGB reale.'
-                              : 'Attiva demo-USDT per simulare l’acquisto della licenza e poi provarne la rivendita P2P.'}
-                          </p>
-                          <button
-                            className="rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-semibold text-white"
-                            onClick={() => {
-                              try {
+                        )}
+
+                        {/* Warning se il saldo USDT è insufficiente */}
+                        {!hasSufficientUsdtBalance && (
+                          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 space-y-2 text-xs text-red-200">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-400 mt-0.5" />
+                              <div>
+                                <strong className="text-red-300">
+                                  {isTestModeEnabled
+                                    ? 'Saldo demo USDT insufficiente'
+                                    : 'Saldo USDT insufficiente nel wallet'}
+                                </strong>
+                                <p className="mt-1 text-[11px] text-red-200/80 leading-relaxed">
+                                  Disponi di {usdtSpendable.toFixed(2)} USDT, ma
+                                  l'acquisto richiede {quote.formattedTotal}.
+                                  {isTestModeEnabled
+                                    ? ' Aggiungi demo-USDT con il pulsante qui sopra.'
+                                    : ' Per un acquisto reale, effettua prima un deposito.'}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              className="w-full py-1.5 px-3 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-white font-medium text-[11px] transition-colors border border-red-500/30"
+                              onClick={() => {
                                 if (isTestModeEnabled) {
                                   setTestWalletBalance(
                                     adjustP2PSimulationUsdtBalance(1000)
                                   )
                                 } else {
-                                  enableP2PSimulation()
-                                  setIsTestModeEnabled(true)
-                                  setTestWalletBalance(
-                                    getP2PSimulationUsdtBalance()
-                                  )
+                                  setShowPurchaseModal(false)
+                                  navigate('/wallet-dashboard')
                                 }
-                              } catch (error) {
-                                setSwapMessage(
-                                  error instanceof Error
-                                    ? error.message
-                                    : 'Attivazione del portafoglio test non riuscita.'
-                                )
-                              }
-                            }}
-                            type="button"
-                          >
-                            {isTestModeEnabled
-                              ? 'Aggiungi 1.000 demo-USDT'
-                              : 'Attiva portafoglio test · 1.000 demo-USDT'}
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Warning se il saldo USDT è insufficiente */}
-                      {!hasSufficientUsdtBalance && (
-                        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 space-y-2 text-xs text-red-200">
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-400 mt-0.5" />
-                            <div>
-                              <strong className="text-red-300">
-                                {isTestModeEnabled
-                                  ? 'Saldo demo USDT insufficiente'
-                                  : 'Saldo USDT insufficiente nel wallet'}
-                              </strong>
-                              <p className="mt-1 text-[11px] text-red-200/80 leading-relaxed">
-                                Disponi di {usdtSpendable.toFixed(2)} USDT, ma
-                                l'acquisto richiede {quote.formattedTotal}.
-                                {isTestModeEnabled
-                                  ? ' Aggiungi demo-USDT con il pulsante qui sopra.'
-                                  : ' Per un acquisto reale, effettua prima un deposito.'}
-                              </p>
-                            </div>
+                              }}
+                              type="button"
+                            >
+                              {isTestModeEnabled
+                                ? '→ Aggiungi 1.000 demo-USDT'
+                                : '→ Vai al Wallet per Depositare USDT'}
+                            </button>
                           </div>
+                        )}
+
+                        {hasSufficientUsdtBalance && (
+                          <div className="p-3 rounded-xl bg-[#8fb8de]/10 border border-[#8fb8de]/20 flex items-start gap-2.5 text-xs text-[#8fb8de]">
+                            <Shield className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#10b981]" />
+                            <span>
+                              <strong>Scambio Atomico Non-Custodial:</strong>{' '}
+                              Gli USDT e la Licenza UDA RGB25 si scambiano
+                              simultaneamente nello stesso blocco Bitcoin.
+                              Nessun rischio di mancata consegna.
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex gap-3 pt-2">
                           <button
-                            className="w-full py-1.5 px-3 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-white font-medium text-[11px] transition-colors border border-red-500/30"
-                            onClick={() => {
+                            className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-base/70 text-content-secondary border border-border-default/40 hover:text-content-primary"
+                            onClick={() => setShowPurchaseModal(false)}
+                          >
+                            Annulla
+                          </button>
+                          <button
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                              hasSufficientUsdtBalance
+                                ? 'bg-gradient-to-r from-[#9b5094] to-[#8fb8de] text-white hover:opacity-90 shadow-lg shadow-[#9b5094]/30'
+                                : 'bg-white/5 text-[#9a94bc]/40 border border-white/10 cursor-not-allowed'
+                            }`}
+                            disabled={!hasSufficientUsdtBalance}
+                            id="confirm-atomic-swap-btn"
+                            onClick={async () => {
+                              if (!hasSufficientUsdtBalance) return
                               if (isTestModeEnabled) {
-                                setTestWalletBalance(
-                                  adjustP2PSimulationUsdtBalance(1000)
+                                await executeTestPurchase()
+                                return
+                              }
+                              try {
+                                const result = await executeLicenseSwap(
+                                  listing,
+                                  'primary',
+                                  (step, msg) => {
+                                    setSwapStep(step)
+                                    if (msg) setSwapMessage(msg)
+                                  },
+                                  {
+                                    method: 'usdt_swap',
+                                    spendableUsdtBalance: usdtSpendable,
+                                  }
                                 )
-                              } else {
-                                setShowPurchaseModal(false)
-                                navigate('/wallet-dashboard')
+                                setSwapResult(result)
+                                dispatch(
+                                  completePurchase({
+                                    licenseRecord: result.licenseRecord,
+                                    order: result.order,
+                                  })
+                                )
+                              } catch (e: any) {
+                                setSwapStep('error')
+                                setSwapMessage(
+                                  e?.message ||
+                                    'Errore durante lo scambio atomico in USDT'
+                                )
                               }
                             }}
-                            type="button"
                           >
-                            {isTestModeEnabled
-                              ? '→ Aggiungi 1.000 demo-USDT'
-                              : '→ Vai al Wallet per Depositare USDT'}
+                            {hasSufficientUsdtBalance
+                              ? `Conferma & Paga ${quote.formattedTotal}`
+                              : `Saldo Insufficiente (${usdtSpendable.toFixed(2)} USDT)`}
                           </button>
                         </div>
-                      )}
-
-                      {hasSufficientUsdtBalance && (
-                        <div className="p-3 rounded-xl bg-[#8fb8de]/10 border border-[#8fb8de]/20 flex items-start gap-2.5 text-xs text-[#8fb8de]">
-                          <Shield className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#10b981]" />
-                          <span>
-                            <strong>Scambio Atomico Non-Custodial:</strong> Gli
-                            USDT e la Licenza UDA RGB25 si scambiano
-                            simultaneamente nello stesso blocco Bitcoin. Nessun
-                            rischio di mancata consegna.
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex gap-3 pt-2">
-                        <button
-                          className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-base/70 text-content-secondary border border-border-default/40 hover:text-content-primary"
-                          onClick={() => setShowPurchaseModal(false)}
-                        >
-                          Annulla
-                        </button>
-                        <button
-                          className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                            hasSufficientUsdtBalance
-                              ? 'bg-gradient-to-r from-[#9b5094] to-[#8fb8de] text-white hover:opacity-90 shadow-lg shadow-[#9b5094]/30'
-                              : 'bg-white/5 text-[#9a94bc]/40 border border-white/10 cursor-not-allowed'
-                          }`}
-                          disabled={!hasSufficientUsdtBalance}
-                          id="confirm-atomic-swap-btn"
-                          onClick={async () => {
-                            if (!hasSufficientUsdtBalance) return
-                            if (isTestModeEnabled) {
-                              await executeTestPurchase()
-                              return
-                            }
-                            try {
-                              const result = await executeLicenseSwap(
-                                listing,
-                                'primary',
-                                (step, msg) => {
-                                  setSwapStep(step)
-                                  if (msg) setSwapMessage(msg)
-                                },
-                                {
-                                  method: 'usdt_swap',
-                                  spendableUsdtBalance: usdtSpendable,
-                                }
-                              )
-                              setSwapResult(result)
-                              dispatch(
-                                completePurchase({
-                                  licenseRecord: result.licenseRecord,
-                                  order: result.order,
-                                })
-                              )
-                            } catch (e: any) {
-                              setSwapStep('error')
-                              setSwapMessage(
-                                e?.message ||
-                                  'Errore durante lo scambio atomico in USDT'
-                              )
-                            }
-                          }}
-                        >
-                          {hasSufficientUsdtBalance
-                            ? `Conferma & Paga ${quote.formattedTotal}`
-                            : `Saldo Insufficiente (${usdtSpendable.toFixed(2)} USDT)`}
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* FASE 2: PROGRESSO TRANSAZIONE */}
-              {(swapStep === 'signing' ||
-                swapStep === 'broadcasting' ||
-                swapStep === 'proof_of_holding') && (
-                <div className="py-8 flex flex-col items-center justify-center space-y-4 text-center">
-                  <div
-                    className={`w-12 h-12 rounded-full border-3 ${
-                      paymentMethod === 'lightning'
-                        ? 'border-amber-400'
-                        : 'border-[#9b5094]'
-                    } border-t-transparent animate-spin`}
-                  />
-                  <div>
-                    <h3 className="font-bold text-sm text-content-primary">
-                      {paymentMethod === 'lightning'
-                        ? 'Instradamento Pagamento Lightning'
-                        : 'Transazione Atomica in Corso'}
-                    </h3>
-                    <p className="text-xs text-[#cdf7f6] mt-1 max-w-xs">
-                      {swapMessage}
-                    </p>
+                      </>
+                    )}
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* FASE 3: SUCCESSO E RILASCIO CHIAVE */}
-              {swapStep === 'completed' && swapResult && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-black/40 border border-[#10b981]/30 space-y-3">
-                    <div className="flex items-center gap-2 text-xs text-[#10b981] font-semibold">
-                      <CheckCircle className="w-4 h-4" />
-                      {swapResult.licenseRecord.listing.rgbAsset?.mode ===
-                      'demo'
-                        ? 'Acquisto simulato completato · asset locale demo'
-                        : swapResult.order.paymentMethod === 'lightning'
-                          ? 'Pagamento Lightning Verificato & Ricevuta Emessa'
-                          : 'Token UDA RGB25 assegnato al tuo Single-Use-Seal UTXO'}
+                {/* FASE 2: PROGRESSO TRANSAZIONE */}
+                {(swapStep === 'signing' ||
+                  swapStep === 'broadcasting' ||
+                  swapStep === 'proof_of_holding') && (
+                  <div className="py-8 flex flex-col items-center justify-center space-y-4 text-center">
+                    <div
+                      className={`w-12 h-12 rounded-full border-3 ${
+                        paymentMethod === 'lightning'
+                          ? 'border-amber-400'
+                          : 'border-[#9b5094]'
+                      } border-t-transparent animate-spin`}
+                    />
+                    <div>
+                      <h3 className="font-bold text-sm text-content-primary">
+                        {paymentMethod === 'lightning'
+                          ? 'Instradamento Pagamento Lightning'
+                          : 'Transazione Atomica in Corso'}
+                      </h3>
+                      <p className="text-xs text-[#cdf7f6] mt-1 max-w-xs">
+                        {swapMessage}
+                      </p>
                     </div>
+                  </div>
+                )}
 
-                    <div className="bg-[#13141f] p-3.5 rounded-xl border border-[#9a94bc]/20 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="text-[11px] text-[#9a94bc] font-medium">
-                          Modalità di Licenza
-                        </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30 font-bold uppercase tracking-wider">
-                          {swapResult.licenseRecord.listing.rgbAsset?.mode ===
-                          'demo'
-                            ? 'DEMO · Non RGB reale'
-                            : 'Nativa RGB · Senza Codici'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-content-primary leading-relaxed">
+                {/* FASE 3: SUCCESSO E RILASCIO CHIAVE */}
+                {swapStep === 'completed' && swapResult && (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl bg-black/40 border border-[#10b981]/30 space-y-3">
+                      <div className="flex items-center gap-2 text-xs text-[#10b981] font-semibold">
+                        <CheckCircle className="w-4 h-4" />
                         {swapResult.licenseRecord.listing.rgbAsset?.mode ===
                         'demo'
-                          ? 'Asset e pagamento sono simulati localmente per testare il percorso di acquisto e rivendita. Non è avvenuto alcun trasferimento RGB reale.'
-                          : 'Nessun codice seriale o chiave di testo: la licenza è legata crittograficamente al tuo wallet. Il software si attiva automaticamente interrogando il database locale.'}
-                      </p>
-                      {swapResult.order.lightningPreimage && (
-                        <div className="pt-1 text-[11px] text-amber-300 font-mono break-all">
-                          Preimage Lightning:{' '}
-                          {swapResult.order.lightningPreimage.slice(0, 32)}...
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-[10px] text-[#9a94bc] font-mono">
-                      <div>
-                        Contract:{' '}
-                        {swapResult.certificate.contractId.slice(0, 16)}...
+                          ? 'Acquisto simulato completato · asset locale demo'
+                          : swapResult.order.paymentMethod === 'lightning'
+                            ? 'Pagamento Lightning Verificato & Ricevuta Emessa'
+                            : 'Token UDA RGB25 assegnato al tuo Single-Use-Seal UTXO'}
                       </div>
-                      <div>Seal: {swapResult.certificate.sealUtxo}</div>
-                    </div>
-                  </div>
 
-                  <div className="flex gap-3">
-                    <button
-                      className="flex-1 py-2.5 rounded-xl text-sm font-medium
+                      <div className="bg-[#13141f] p-3.5 rounded-xl border border-[#9a94bc]/20 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="text-[11px] text-[#9a94bc] font-medium">
+                            Modalità di Licenza
+                          </div>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30 font-bold uppercase tracking-wider">
+                            {swapResult.licenseRecord.listing.rgbAsset?.mode ===
+                            'demo'
+                              ? 'DEMO · Non RGB reale'
+                              : 'Nativa RGB · Senza Codici'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-content-primary leading-relaxed">
+                          {swapResult.licenseRecord.listing.rgbAsset?.mode ===
+                          'demo'
+                            ? 'Asset e pagamento sono simulati localmente per testare il percorso di acquisto e rivendita. Non è avvenuto alcun trasferimento RGB reale.'
+                            : 'Nessun codice seriale o chiave di testo: la licenza è legata crittograficamente al tuo wallet. Il software si attiva automaticamente interrogando il database locale.'}
+                        </p>
+                        {swapResult.order.lightningPreimage && (
+                          <div className="pt-1 text-[11px] text-amber-300 font-mono break-all">
+                            Preimage Lightning:{' '}
+                            {swapResult.order.lightningPreimage.slice(0, 32)}...
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-[10px] text-[#9a94bc] font-mono">
+                        <div>
+                          Contract:{' '}
+                          {swapResult.certificate.contractId.slice(0, 16)}...
+                        </div>
+                        <div>Seal: {swapResult.certificate.sealUtxo}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        className="flex-1 py-2.5 rounded-xl text-sm font-medium
                     bg-[rgb(var(--app-surface-primary))] text-[rgb(var(--app-content-secondary))]
                     border border-[rgb(var(--app-border-primary))]/30
                     hover:text-[rgb(var(--app-content-primary))] transition-all"
-                      onClick={() => {
-                        setShowPurchaseModal(false)
-                        setSwapStep('quote')
-                      }}
-                    >
-                      Chiudi
-                    </button>
-                    <button
-                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold
+                        onClick={() => {
+                          setShowPurchaseModal(false)
+                          setSwapStep('quote')
+                        }}
+                      >
+                        Chiudi
+                      </button>
+                      <button
+                        className="flex-1 py-2.5 rounded-xl text-sm font-semibold
                     bg-gradient-to-r from-purple-600 to-purple-500 text-white
                     hover:from-purple-500 hover:to-purple-400
                     shadow-lg shadow-purple-500/25 transition-all"
-                      id="confirm-purchase-btn"
-                      onClick={() => {
-                        setShowPurchaseModal(false)
-                        navigate('/my-licenses')
-                      }}
-                    >
-                      Vai alle mie Licenze
-                    </button>
+                        id="confirm-purchase-btn"
+                        onClick={() => {
+                          setShowPurchaseModal(false)
+                          navigate('/my-licenses')
+                        }}
+                      >
+                        Vai alle mie Licenze
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* FASE ERRORE: TRANSAZIONE NON RIUSCITA */}
-              {swapStep === 'error' && (
-                <div className="py-6 space-y-5 text-center">
-                  <div className="w-14 h-14 mx-auto rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400">
-                    <AlertTriangle className="w-7 h-7" />
+                {/* FASE ERRORE: TRANSAZIONE NON RIUSCITA */}
+                {swapStep === 'error' && (
+                  <div className="py-6 space-y-5 text-center">
+                    <div className="w-14 h-14 mx-auto rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400">
+                      <AlertTriangle className="w-7 h-7" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h3 className="font-bold text-base text-content-primary">
+                        Pagamento Non Riuscito
+                      </h3>
+                      <p className="text-xs text-red-300 max-w-sm mx-auto leading-relaxed">
+                        {swapMessage ||
+                          'Si è verificato un errore durante l’instradamento del pagamento.'}
+                      </p>
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-base/70 text-content-secondary border border-border-default/40 hover:text-content-primary"
+                        onClick={() => {
+                          setShowPurchaseModal(false)
+                          setSwapStep('quote')
+                        }}
+                      >
+                        Chiudi
+                      </button>
+                      <button
+                        className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-amber-500 to-yellow-500 text-black hover:opacity-90"
+                        onClick={() => setSwapStep('quote')}
+                      >
+                        Riprova
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <h3 className="font-bold text-base text-content-primary">
-                      Pagamento Non Riuscito
-                    </h3>
-                    <p className="text-xs text-red-300 max-w-sm mx-auto leading-relaxed">
-                      {swapMessage ||
-                        'Si è verificato un errore durante l’instradamento del pagamento.'}
-                    </p>
-                  </div>
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-base/70 text-content-secondary border border-border-default/40 hover:text-content-primary"
-                      onClick={() => {
-                        setShowPurchaseModal(false)
-                        setSwapStep('quote')
-                      }}
-                    >
-                      Chiudi
-                    </button>
-                    <button
-                      className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-amber-500 to-yellow-500 text-black hover:opacity-90"
-                      onClick={() => setSwapStep('quote')}
-                    >
-                      Riprova
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+                )}
+              </div>
+            </div>,
+            document.getElementById('modal-portal') ?? document.body
+          )}
 
         {/* Auth Required Modal */}
         {showAuthModal && (
