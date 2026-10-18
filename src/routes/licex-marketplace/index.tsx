@@ -54,6 +54,13 @@ function formatSats(sats: number): string {
   return `${sats.toLocaleString()} sats`
 }
 
+function formatListingPrice(listing: LicenseListing): string {
+  if (listing.rgbAsset?.mode === 'demo') {
+    return `${listing.price.toLocaleString(undefined, { maximumFractionDigits: 2 })} demo-USDT`
+  }
+  return formatSats(listing.price)
+}
+
 function transferPolicyLabel(policy: TransferPolicy): string {
   switch (policy) {
     case 'not_transferable':
@@ -146,6 +153,11 @@ const LicenseCard: React.FC<{
           <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-surface-base/90 backdrop-blur-sm text-content-primary border border-divider/40 shadow-sm flex items-center gap-1.5">
             {categoryIcon(listing.category)} {listing.category}
           </span>
+          {listing.rgbAsset?.mode === 'demo' && (
+            <span className="rounded-full border border-violet-400/40 bg-violet-950/80 px-2.5 py-1 text-xs font-semibold text-violet-200">
+              Demo
+            </span>
+          )}
         </div>
 
         {/* Watchlist heart */}
@@ -242,7 +254,7 @@ const LicenseCard: React.FC<{
         <div className="flex items-center justify-between">
           <div>
             <p className="text-lg font-bold text-[rgb(var(--app-content-primary))]">
-              {formatSats(listing.price)}
+              {formatListingPrice(listing)}
             </p>
             {listing.durationDays && (
               <p className="text-[10px] text-[rgb(var(--app-content-secondary))]">
@@ -334,7 +346,7 @@ const LicenseRow: React.FC<{
       {/* Price */}
       <div className="text-left sm:text-right flex-shrink-0 sm:w-28">
         <p className="text-base font-bold text-[rgb(var(--app-content-primary))]">
-          {formatSats(listing.price)}
+          {formatListingPrice(listing)}
         </p>
         {listing.durationDays && (
           <p className="text-[10px] text-[rgb(var(--app-content-secondary))]">
@@ -522,6 +534,9 @@ export function Component() {
   const { filteredListings, filters, viewMode, watchlist } = useAppSelector(
     (s) => s.licex
   )
+  const marketplaceListings = filteredListings.filter(
+    (listing) => listing.rgbAsset?.mode !== 'demo' || isP2PSimulationEnabled()
+  )
   const resaleOffers = useAppSelector((s) =>
     s.licex.p2pOffers.filter((offer) => offer.status === 'active')
   )
@@ -621,8 +636,8 @@ export function Component() {
               />
             </button>
             <span className="text-xs text-[rgb(var(--app-content-secondary))] bg-[rgb(var(--app-surface-secondary))] px-3 py-1.5 rounded-full">
-              {filteredListings.length} license
-              {filteredListings.length !== 1 ? 's' : ''}
+              {marketplaceListings.length} license
+              {marketplaceListings.length !== 1 ? 's' : ''}
             </span>
           </div>
         </div>
@@ -705,7 +720,7 @@ export function Component() {
 
       {/* Listings grid/list */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
-        {filteredListings.length === 0 ? (
+        {marketplaceListings.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center animate-fadeIn">
             <Package className="w-16 h-16 text-[rgb(var(--app-content-secondary))]/30 mb-4" />
             <h3 className="text-lg font-semibold text-[rgb(var(--app-content-primary))] mb-1">
@@ -723,7 +738,7 @@ export function Component() {
           </div>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredListings.map((listing) => (
+            {marketplaceListings.map((listing) => (
               <LicenseCard
                 isWatchlisted={isWatchlisted(listing.id)}
                 key={listing.id}
@@ -737,7 +752,7 @@ export function Component() {
           </div>
         ) : (
           <div className="space-y-2 animate-fadeIn">
-            {filteredListings.map((listing) => (
+            {marketplaceListings.map((listing) => (
               <LicenseRow
                 isWatchlisted={isWatchlisted(listing.id)}
                 key={listing.id}

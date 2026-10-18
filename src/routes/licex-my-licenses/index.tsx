@@ -40,6 +40,7 @@ import {
 } from '../../services/licex/licexStorage'
 import { issueDemoLicenseAsset } from '../../services/licex/licenseAssetIssuer'
 import { logger } from '../../utils/logger'
+import { removeDemoRgbAsset, saveDemoRgbAsset } from '../../utils/demoAssets'
 import {
   adjustP2PSimulationUsdtBalance,
   createP2PSimulationSwapString,
@@ -96,14 +97,16 @@ export function Component() {
     null
   )
   const [, setTestAssetBalanceRevision] = useState(0)
-  const { data: nodeAssets } = nodeApi.useListAssetsQuery(undefined, {
-    skip: isTestModeEnabled,
-  })
+  const { data: nodeAssets, refetch: refetchNodeAssets } =
+    nodeApi.useListAssetsQuery(undefined, {
+      skip: isTestModeEnabled,
+    })
   const { data: nodeInfo } = nodeApi.endpoints.nodeInfo.useQuery(undefined, {
     skip: isTestModeEnabled,
   })
   const [makerInit] = nodeApi.useMakerInitMutation()
   const [makerExecute] = nodeApi.useMakerExecuteMutation()
+  const [refreshRgbTransfers] = nodeApi.endpoints.refresh.useMutation()
   const [getAssetBalance] = nodeApi.endpoints.assetBalance.useLazyQuery()
   const [activeTab, setActiveTab] = useState<'licenses' | 'orders'>('licenses')
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
@@ -194,7 +197,8 @@ export function Component() {
     (listing) =>
       listing.status === 'published' &&
       listing.rgbAsset?.schema === 'UDA' &&
-      listing.rgbAsset.mode === 'rgb-node'
+      (listing.rgbAsset.mode === 'rgb-node' ||
+        (isTestModeEnabled && listing.rgbAsset.mode === 'demo'))
   )
 
   const handleTestHandshake = (id: string) => {
@@ -431,6 +435,12 @@ export function Component() {
         throw new Error('Sincronizzazione disponibile nell’app desktop LICEX.')
       }
 
+      if (!isTestModeEnabled) {
+        setP2pSyncMessage('Aggiorno i trasferimenti RGB in arrivo…')
+        await refreshRgbTransfers(undefined).unwrap()
+        await refetchNodeAssets()
+      }
+
       const snapshot = await fetchMarketplaceSnapshot()
       const buyerResults = snapshot.purchaseResults.filter(
         (result) =>
@@ -462,6 +472,15 @@ export function Component() {
 
         if (result.simulation && offer.simulation && isTestModeEnabled) {
           setP2PSimulationAssetBalance(assetId, 1)
+          saveDemoRgbAsset({
+            amount: 1,
+            assetId,
+            name: `${offer.listing.productName} (${offer.listing.edition})`,
+            precision: 0,
+            ticker:
+              offer.listing.productName.replace(/[^a-zA-Z]/g, '').slice(0, 8) ||
+              'LIC',
+          })
         } else {
           if (assetReference.mode !== 'rgb-node') continue
           let spendableBalance = 0
@@ -548,6 +567,7 @@ export function Component() {
           throw new Error('Il venditore non possiede più questa licenza demo.')
         }
         setP2PSimulationAssetBalance(assetId, 0)
+        removeDemoRgbAsset(assetId)
         setTestWalletBalance(
           adjustP2PSimulationUsdtBalance(offer.resalePriceUsdt)
         )
@@ -898,7 +918,9 @@ export function Component() {
                 Analizzatore EULA
               </h2>
               <p className="text-xs text-content-secondary">
-                Analizza i termini e pubblica la licenza come RGB UDA.
+                {isTestModeEnabled
+                  ? 'Analizza i termini e crea una licenza simulata acquistabile con demo-USDT.'
+                  : 'Analizza i termini e pubblica la licenza come RGB UDA.'}
               </p>
             </div>
             <button
@@ -910,7 +932,10 @@ export function Component() {
               <X className="h-5 w-5" />
             </button>
           </div>
-          <EulaAnalyzerTab onPublished={() => setShowEulaAnalyzer(false)} />
+          <EulaAnalyzerTab
+            demoModeEnabled={isTestModeEnabled}
+            onPublished={() => setShowEulaAnalyzer(false)}
+          />
         </section>
       ) : activeTab === 'licenses' ? (
         <div className="space-y-4">
@@ -951,7 +976,12 @@ export function Component() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-content-secondary">Prezzo</span>
                       <span className="font-bold text-content-primary">
-                        {listing.price.toLocaleString()} sats
+                        {listing.price.toLocaleString(undefined, {
+                          maximumFractionDigits: 2,
+                        })}{' '}
+                        {listing.paymentAsset === 'demo-USDT'
+                          ? 'demo-USDT'
+                          : 'sats'}
                       </span>
                     </div>
                     <p className="text-[11px] font-mono text-content-tertiary truncate">
@@ -1258,7 +1288,7 @@ export function Component() {
                     <th className="p-3.5 font-semibold">Ordine ID</th>
                     <th className="p-3.5 font-semibold">Software / Licenza</th>
                     <th className="p-3.5 font-semibold">Tipo</th>
-                    <th className="p-3.5 font-semibold">Prezzo (sats)</th>
+                    <th className="p-3.5 font-semibold">Prezzo</th>
                     <th className="p-3.5 font-semibold">Stato Ordine</th>
                     <th className="p-3.5 font-semibold">Data</th>
                   </tr>
@@ -1281,7 +1311,12 @@ export function Component() {
                         </span>
                       </td>
                       <td className="p-3.5 font-bold text-content-primary">
-                        {order.price.toLocaleString()} sats
+                        {order.price.toLocaleString(undefined, {
+                          maximumFractionDigits: 2,
+                        })}{' '}
+                        {order.listing.paymentAsset === 'demo-USDT'
+                          ? 'demo-USDT'
+                          : 'sats'}
                       </td>
                       <td className="p-3.5">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 text-[11px] font-semibold">

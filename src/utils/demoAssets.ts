@@ -6,6 +6,7 @@ const DEMO_UTXO_STORAGE_KEY = 'licex_demo_utxos'
 const DEMO_STORAGE_KEY = 'licex_demo_rgb_assets'
 
 export interface CreateDemoAssetInput {
+  assetId?: string
   ticker: string
   name: string
   amount: number
@@ -43,7 +44,7 @@ export const getDemoRgbAssets = (): NiaAsset[] => {
  */
 export const saveDemoRgbAsset = (input: CreateDemoAssetInput): NiaAsset => {
   const existing = getDemoRgbAssets()
-  const assetId = generateRgbAssetId()
+  const assetId = input.assetId || generateRgbAssetId()
   const actualAmount = Number(input.amount) || 0
   const precision = Number(input.precision) || 0
 
@@ -72,6 +73,18 @@ export const saveDemoRgbAsset = (input: CreateDemoAssetInput): NiaAsset => {
   }
 
   return newAsset
+}
+
+/** Remove an asset from the local demo wallet after a simulated transfer. */
+export const removeDemoRgbAsset = (assetId: string): void => {
+  const updated = getDemoRgbAssets().filter(
+    (asset) => asset.asset_id !== assetId
+  )
+  try {
+    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(updated))
+  } catch (error) {
+    logger.error('Failed to remove transferred demo RGB asset', error)
+  }
 }
 
 /**
