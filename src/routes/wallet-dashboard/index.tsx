@@ -129,7 +129,10 @@ export const Component = () => {
   const [assetBalance] = nodeApi.endpoints.assetBalance.useLazyQuery()
   const [refreshTransfers] = nodeApi.endpoints.refresh.useMutation()
   const [assetBalances, setAssetBalances] = useState<
-    Record<string, { offChain: number; onChain: number; incoming: number }>
+    Record<
+      string,
+      { offChain: number; onChain: number; incoming: number; loaded: boolean }
+    >
   >({})
   const [demoAssets, setDemoAssets] = useState<NiaAsset[]>(() =>
     getDemoRgbAssets()
@@ -204,7 +207,7 @@ export const Component = () => {
     const fetchAssetBalances = async () => {
       const newBalances: Record<
         string,
-        { offChain: number; onChain: number; incoming: number }
+        { offChain: number; onChain: number; incoming: number; loaded: boolean }
       > = {}
       for (const asset of niaAssets) {
         if (asset.asset_id) {
@@ -214,6 +217,7 @@ export const Component = () => {
               asset.balance?.spendable ?? asset.issued_supply ?? 0
             newBalances[asset.asset_id] = {
               incoming: 0,
+              loaded: true,
               offChain: 0,
               onChain: spendable,
             }
@@ -223,6 +227,7 @@ export const Component = () => {
             const future = balance.data?.future || 0
             newBalances[asset.asset_id] = {
               incoming: Math.max(0, future - spendable),
+              loaded: Boolean(balance.data),
               offChain: balance.data?.offchain_outbound || 0,
               onChain: spendable,
             }
@@ -239,6 +244,14 @@ export const Component = () => {
     listChannelsResponse.data,
     assetBalance,
   ])
+
+  const walletAssets = niaAssets.filter((asset) => {
+    const assetId = asset.asset_id
+    if (!assetId) return false
+    const balance = assetBalances[assetId]
+    if (!balance?.loaded) return true
+    return balance.onChain > 0 || balance.offChain > 0 || balance.incoming > 0
+  })
 
   const { formatFiat, btcPrice } = useBitcoinPrice()
 
@@ -565,7 +578,7 @@ export const Component = () => {
                 onClick={() =>
                   dispatch(
                     uiSliceActions.setModal({
-                      assetId: niaAssets[0]?.asset_id,
+                      assetId: walletAssets[0]?.asset_id,
                       type: 'deposit',
                     })
                   )
@@ -594,7 +607,7 @@ export const Component = () => {
                 onClick={() =>
                   dispatch(
                     uiSliceActions.setModal({
-                      assetId: niaAssets[0]?.asset_id,
+                      assetId: walletAssets[0]?.asset_id,
                       type: 'withdraw',
                     })
                   )
@@ -690,7 +703,7 @@ export const Component = () => {
                       onClick: () =>
                         dispatch(
                           uiSliceActions.setModal({
-                            assetId: niaAssets[0]?.asset_id,
+                            assetId: walletAssets[0]?.asset_id,
                             type: 'deposit',
                           })
                         ),
@@ -702,7 +715,7 @@ export const Component = () => {
                       onClick: () =>
                         dispatch(
                           uiSliceActions.setModal({
-                            assetId: niaAssets[0]?.asset_id,
+                            assetId: walletAssets[0]?.asset_id,
                             type: 'withdraw',
                           })
                         ),
@@ -753,22 +766,24 @@ export const Component = () => {
                     </div>
                   ))}
                 </div>
-              ) : niaAssets.length === 0 ? (
+              ) : walletAssets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-content-tertiary">
                   <Database className="w-10 h-10 mb-3 opacity-40" />
-                  <p className="text-sm font-medium">No RGB assets found.</p>
+                  <p className="text-sm font-medium">
+                    No RGB assets with a balance found.
+                  </p>
                   <p className="text-xs mt-1 opacity-70">
                     Issue an asset or deposit to get started.
                   </p>
                 </div>
               ) : (
-                niaAssets.map((asset: any) => (
+                walletAssets.map((asset: any) => (
                   <AssetRow
                     asset={asset as NiaAsset}
                     incomingBalance={
                       (assetBalances[asset.asset_id || ''] || {}).incoming || 0
                     }
-                    isLoading={!(asset.asset_id in assetBalances)}
+                    isLoading={!assetBalances[asset.asset_id || '']?.loaded}
                     key={asset.asset_id}
                     offChainBalance={
                       (assetBalances[asset.asset_id || ''] || {}).offChain || 0

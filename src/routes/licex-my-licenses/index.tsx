@@ -130,6 +130,9 @@ export function Component() {
   const [isSyncingP2PPurchases, setIsSyncingP2PPurchases] = useState(false)
   const [p2pSyncMessage, setP2pSyncMessage] = useState<string | null>(null)
   const [isPortfolioLoaded, setIsPortfolioLoaded] = useState(false)
+  const [marketplaceIdentity, setMarketplaceIdentity] = useState<string | null>(
+    null
+  )
 
   // Interroga direttamente le tabelle SQLite native al montaggio della pagina
   useEffect(() => {
@@ -150,11 +153,11 @@ export function Component() {
     let isCurrent = true
     const loadIncomingPurchases = async () => {
       try {
-        const [identity, snapshot] = await Promise.all([
-          getMarketplaceIdentity(),
-          fetchMarketplaceSnapshot(),
-        ])
-        if (!identity || !isCurrent) return
+        const identity = await getMarketplaceIdentity()
+        if (!isCurrent) return
+        setMarketplaceIdentity(identity)
+        if (!identity) return
+        const snapshot = await fetchMarketplaceSnapshot()
         const ownOffers = snapshot.offers.filter(
           (offer) => offer.sellerNpub === identity && offer.status === 'active'
         )
@@ -197,6 +200,12 @@ export function Component() {
     (listing) =>
       listing.status === 'published' &&
       listing.rgbAsset?.schema === 'UDA' &&
+      (listing.publisherNpub
+        ? listing.publisherNpub === marketplaceIdentity
+        : Boolean(
+            listing.rgbAsset.issuerPubkey &&
+            listing.rgbAsset.issuerPubkey === nodeInfo?.pubkey
+          )) &&
       (listing.rgbAsset.mode === 'rgb-node' ||
         (isTestModeEnabled && listing.rgbAsset.mode === 'demo'))
   )
