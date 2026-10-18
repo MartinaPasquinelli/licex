@@ -1053,8 +1053,8 @@ export const Layout = (props: Props) => {
                     <span className="font-black text-sm tracking-widest bg-gradient-to-r from-[#6885b1] via-[#835a7b] to-[#9e1644] bg-clip-text text-transparent">
                       LicEX
                     </span>
-                    <span className="text-[8px] uppercase tracking-wider text-[#9A94BC] font-semibold">
-                      from{' '}
+                    <span className="text-[8px] tracking-wider text-[#9A94BC] font-semibold">
+                      From{' '}
                       <span className="font-blac ktext-[8px] tracking-widest bg-gradient-to-r from-[#7135FF] via-[#19C994] to-[#19C994] bg-clip-text text-transparent">
                         KaleidoSwap
                       </span>
@@ -1156,11 +1156,6 @@ export const Layout = (props: Props) => {
             </div>
 
             <div className="px-4 py-3 border-t border-divider/20 space-y-2">
-              <ThemeToggle
-                className="w-full justify-start"
-                showLabel={!isSidebarCollapsed}
-                variant="button"
-              />
               <SidebarNavItem
                 isActive={location.pathname.startsWith(SETTINGS_PATH)}
                 isCollapsed={isSidebarCollapsed}
