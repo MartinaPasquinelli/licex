@@ -590,7 +590,7 @@ export const Component = () => {
                 <span className="truncate">Marketplace</span>
               </button>
               <button
-                className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 hover:border-violet-500/50 text-violet-400 text-xs font-semibold transition-all overflow-hidden"
+                className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-status-danger/15 hover:bg-status-danger/25 border border-status-danger/30 hover:border-status-danger/50 text-status-danger text-xs font-semibold transition-all overflow-hidden"
                 onClick={() =>
                   dispatch(
                     uiSliceActions.setModal({
@@ -696,7 +696,7 @@ export const Component = () => {
                         ),
                     },
                     {
-                      color: 'text-violet-400 hover:bg-violet-500/15',
+                      color: 'text-status-danger hover:bg-status-danger/15',
                       icon: <Upload className="w-3.5 h-3.5" />,
                       label: t('dashboard.withdraw'),
                       onClick: () =>

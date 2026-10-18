@@ -39,11 +39,11 @@ export const UnlockingProgress = ({
   ]
 
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="w-full max-w-md px-1 sm:px-0 mx-auto flex flex-col space-y-5 sm:space-y-7 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header Info */}
       <div className="flex flex-col items-center text-center space-y-3">
         <div
-          className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-2 shadow-lg ${
+          className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mb-1 sm:mb-2 shadow-lg ${
             errorMessage
               ? 'bg-status-danger/10 text-status-danger shadow-status-danger/20'
               : 'bg-primary/10 text-primary shadow-primary/20'
@@ -52,10 +52,10 @@ export const UnlockingProgress = ({
           {errorMessage ? (
             <XCircle className="w-8 h-8" />
           ) : (
-            <Shield className="w-8 h-8" />
+            <Shield className="w-7 h-7 sm:w-8 sm:h-8" />
           )}
         </div>
-        <h2 className="text-2xl font-bold text-content-primary">
+        <h2 className="text-xl sm:text-2xl font-bold text-content-primary">
           {errorMessage
             ? 'Unlock Failed'
             : isUnlocking
@@ -106,7 +106,7 @@ export const UnlockingProgress = ({
 
             return (
               <div
-                className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 ${
+                className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border transition-all duration-300 ${
                   isCurrent
                     ? 'bg-surface-elevated/80 border-primary/30 shadow-sm shadow-primary/5'
                     : isCompleted

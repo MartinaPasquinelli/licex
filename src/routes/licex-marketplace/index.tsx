@@ -260,7 +260,7 @@ const LicenseRow: React.FC<{
 }> = ({ listing, isWatchlisted, onView, onToggleWatchlist }) => {
   return (
     <div
-      className="group relative rounded-2xl overflow-hidden
+      className="group relative flex flex-col gap-4 rounded-2xl overflow-hidden p-4 sm:flex-row sm:items-center
   !transform-none !scale-100 !transition-none
   bg-gradient-to-br from-[rgb(var(--app-surface-secondary))] to-[rgb(var(--app-surface-primary))]
   border border-[rgb(var(--app-border-primary))]/30
@@ -269,7 +269,7 @@ const LicenseRow: React.FC<{
     >
       {/* Icon */}
       <div
-        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0
+        className="w-12 h-12 rounded-xl flex items-center justify-center text-content-primary flex-shrink-0
         bg-gradient-to-br from-purple-500/10 to-cyan-500/10 border border-purple-500/20"
       >
         {categoryIcon(listing.category)}
@@ -288,10 +288,10 @@ const LicenseRow: React.FC<{
             by {listing.company.name}
           </span>
         </div>
-        <p className="text-xs text-[rgb(var(--app-content-secondary))] truncate mt-0.5">
-          {listing.productDescription}
+        <p className="text-xs text-[rgb(var(--app-content-secondary))] line-clamp-2 mt-0.5">
+          {cleanMarkdownForPreview(listing.productDescription)}
         </p>
-        <div className="flex items-center gap-3 mt-1.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1.5">
           <span className="text-[10px] px-2 py-0.5 rounded bg-[rgb(var(--app-surface-primary))] text-[rgb(var(--app-content-secondary))]">
             {listing.edition} · v{listing.version}
           </span>
@@ -315,7 +315,7 @@ const LicenseRow: React.FC<{
       </div>
 
       {/* Price */}
-      <div className="text-right flex-shrink-0">
+      <div className="text-left sm:text-right flex-shrink-0 sm:w-28">
         <p className="text-base font-bold text-[rgb(var(--app-content-primary))]">
           {formatSats(listing.price)}
         </p>
@@ -327,7 +327,7 @@ const LicenseRow: React.FC<{
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
         <button
           className={`p-2 rounded-lg transition-all ${
             isWatchlisted
@@ -345,7 +345,7 @@ const LicenseRow: React.FC<{
           />
         </button>
         <button
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
             bg-[#9B5094]/15 text-[#9B5094] dark:bg-purple-500/20 dark:text-purple-300 hover:bg-[#9B5094]/25 border border-[#9B5094]/30 dark:border-purple-500/30
             transition-all duration-200"
           onClick={(e) => {
@@ -354,6 +354,7 @@ const LicenseRow: React.FC<{
           }}
         >
           <Eye className="w-3.5 h-3.5" />
+          <span>Details</span>
         </button>
       </div>
     </div>

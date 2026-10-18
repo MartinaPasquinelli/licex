@@ -965,9 +965,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         >
           {/* Title - completely hidden in collapsed state, no hover effect */}
           {!isCollapsed && (
-            <h2 className="text-xs font-semibold text-content-tertiary uppercase tracking-wider">
-              {t('toolbar.main.title')}
-            </h2>
+            <div className="flex w-full items-center justify-between gap-3">
+              <h2 className="text-xs font-semibold text-content-tertiary uppercase tracking-wider">
+                {t('toolbar.main.title')}
+              </h2>
+              <button
+                className="rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                onClick={() => navigate(WALLET_SETUP_PATH)}
+                type="button"
+              >
+                Crea nuovo nodo
+              </button>
+            </div>
           )}
         </div>
 

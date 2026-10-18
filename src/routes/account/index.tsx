@@ -25,6 +25,7 @@ import {
   WALLET_HISTORY_DEPOSITS_PATH,
   SETTINGS_PATH,
   CHANNELS_PATH,
+  WALLET_SETUP_PATH,
 } from '../../app/router/paths'
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
 import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
@@ -169,8 +170,9 @@ export const Component = () => {
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 {
-                  color: 'text-[#8FB8DE]',
-                  hover: 'hover:border-primary/40 hover:bg-primary/5',
+                  color: 'text-status-success',
+                  hover:
+                    'hover:border-status-success/40 hover:bg-status-success/5',
                   icon: <Download className="w-4 h-4" />,
                   label: t('dashboard.deposit'),
                   onClick: () =>
@@ -189,8 +191,9 @@ export const Component = () => {
                   onClick: () => navigate(CHANNELS_PATH),
                 },
                 {
-                  color: 'text-[#9B5094]',
-                  hover: 'hover:border-secondary/40 hover:bg-secondary/5',
+                  color: 'text-status-danger',
+                  hover:
+                    'hover:border-status-danger/40 hover:bg-status-danger/5',
                   icon: <Upload className="w-4 h-4" />,
                   label: t('dashboard.withdraw'),
                   onClick: () =>
@@ -344,7 +347,7 @@ export const Component = () => {
               </div>
               <button
                 className="px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-                onClick={() => navigate('/wallet-setup')}
+                onClick={() => navigate(WALLET_SETUP_PATH)}
                 type="button"
               >
                 Connetti nodo

@@ -163,7 +163,7 @@ export const getTransactionMenuItems = (t: TFunction) => [
   {
     action: 'deposit',
     icon: (
-      <div className="p-1 rounded-full bg-primary/10 text-primary">
+      <div className="p-1 rounded-full bg-status-success/15 text-status-success">
         <ArrowDownLeft className="w-4 h-4" />
       </div>
     ),
@@ -172,7 +172,7 @@ export const getTransactionMenuItems = (t: TFunction) => [
   {
     action: 'withdraw',
     icon: (
-      <div className="p-1 rounded-full bg-purple/10 text-purple">
+      <div className="p-1 rounded-full bg-status-danger/15 text-status-danger">
         <ArrowUpRight className="w-4 h-4" />
       </div>
     ),

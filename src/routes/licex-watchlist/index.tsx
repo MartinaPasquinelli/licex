@@ -8,6 +8,13 @@ import {
   Eye,
   Shield,
   TrendingDown,
+  Palette,
+  ShieldCheck,
+  Code2,
+  BrainCircuit,
+  ClipboardList,
+  Gamepad2,
+  Package,
 } from 'lucide-react'
 
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
@@ -28,6 +35,26 @@ function formatSats(sats: number): string {
   if (sats >= 1000000) return `${(sats / 1000000).toFixed(2)}M sats`
   if (sats >= 1000) return `${(sats / 1000).toFixed(0)}K sats`
   return `${sats.toLocaleString()} sats`
+}
+
+function categoryIcon(category: string) {
+  const iconProps = { size: 22, strokeWidth: 1.8 }
+  switch (category) {
+    case 'Creative & Design':
+      return <Palette {...iconProps} />
+    case 'Security':
+      return <ShieldCheck {...iconProps} />
+    case 'Development':
+      return <Code2 {...iconProps} />
+    case 'Analytics & AI':
+      return <BrainCircuit {...iconProps} />
+    case 'Productivity':
+      return <ClipboardList {...iconProps} />
+    case 'Gaming':
+      return <Gamepad2 {...iconProps} />
+    default:
+      return <Package {...iconProps} />
+  }
 }
 
 export function Component() {
@@ -101,20 +128,10 @@ export function Component() {
                 >
                   {/* Icon */}
                   <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-content-primary flex-shrink-0
                     bg-gradient-to-br from-purple-500/10 to-cyan-500/10 border border-purple-500/20"
                   >
-                    {item.listing.category === 'Creative & Design'
-                      ? '🎨'
-                      : item.listing.category === 'Security'
-                        ? '🛡️'
-                        : item.listing.category === 'Development'
-                          ? '⚙️'
-                          : item.listing.category === 'Analytics & AI'
-                            ? '🧠'
-                            : item.listing.category === 'Gaming'
-                              ? '🎮'
-                              : '📦'}
+                    {categoryIcon(item.listing.category)}
                   </div>
 
                   {/* Info */}
