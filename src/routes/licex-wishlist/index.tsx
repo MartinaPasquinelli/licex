@@ -421,64 +421,88 @@ export function Component() {
               key={item.id}
             >
               <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-bold text-[rgb(var(--app-content-primary))]">
-                      {item.title}
-                    </h3>
-                    {item.category && (
-                      <span className="mt-1 inline-flex rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] text-purple-200">
-                        {item.category}
-                      </span>
-                    )}
-                    <p className="text-xs text-[rgb(var(--app-content-secondary))] flex items-center gap-1.5 mt-0.5">
-                      <Building className="w-3.5 h-3.5 text-cyan-400" />
-                      Use Case:{' '}
-                      <span className="font-medium text-[rgb(var(--app-content-primary))]">
-                        {item.useCase}
-                      </span>
-                    </p>
-                  </div>
+                <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-primary))]/35 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-bold text-[rgb(var(--app-content-primary))]">
+                        {item.title}
+                      </h3>
+                      {item.category && (
+                        <span className="mt-1 inline-flex rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] text-purple-200">
+                          {item.category}
+                        </span>
+                      )}
+                      <p className="text-xs text-[rgb(var(--app-content-secondary))] flex items-center gap-1.5 mt-0.5">
+                        <Building className="w-3.5 h-3.5 text-cyan-400" />
+                        Use Case:{' '}
+                        <span className="font-medium text-[rgb(var(--app-content-primary))]">
+                          {item.useCase}
+                        </span>
+                      </p>
+                    </div>
 
-                  <span
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                      item.status === 'matched'
-                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                        : item.status === 'fulfilled'
-                          ? 'bg-[#8FB8DE]/15 text-[#CDF7F6] border border-[#8FB8DE]/30'
-                          : 'bg-[#9B5094]/15 text-[#CDF7F6] border border-[#9B5094]/30'
-                    }`}
-                  >
-                    {item.status === 'matched'
-                      ? 'Publisher Matched'
-                      : item.status === 'fulfilled'
-                        ? 'Available in Catalog'
-                        : 'Open Request'}
-                  </span>
-                </div>
-
-                <p className="text-xs text-[rgb(var(--app-content-secondary))] leading-relaxed line-clamp-3">
-                  {item.description}
-                </p>
-
-                {item.requirements.length > 0 && (
-                  <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-[rgb(var(--app-content-secondary))]">
-                    {item.requirements.slice(0, 3).map((requirement) => (
-                      <li key={requirement}>{requirement}</li>
-                    ))}
-                  </ul>
-                )}
-
-                <div className="flex flex-wrap gap-1">
-                  {item.platforms.map((plat) => (
                     <span
-                      className="text-[10px] px-2 py-0.5 rounded bg-[rgb(var(--app-surface-primary))] text-[rgb(var(--app-content-secondary))]"
-                      key={plat}
+                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                        item.status === 'matched'
+                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          : item.status === 'fulfilled'
+                            ? 'bg-[#8FB8DE]/15 text-[#CDF7F6] border border-[#8FB8DE]/30'
+                            : 'bg-[#9B5094]/15 text-[#CDF7F6] border border-[#9B5094]/30'
+                      }`}
                     >
-                      {plat}
+                      {item.status === 'matched'
+                        ? 'Publisher Matched'
+                        : item.status === 'fulfilled'
+                          ? 'Available in Catalog'
+                          : 'Open Request'}
                     </span>
-                  ))}
+                  </div>
                 </div>
+
+                <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-primary))]/35 p-3">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
+                    Descrizione
+                  </p>
+                  <p className="text-xs leading-relaxed text-[rgb(var(--app-content-secondary))] line-clamp-3">
+                    {item.description}
+                  </p>
+                </div>
+
+                {(item.requirements.length > 0 ||
+                  item.platforms.length > 0) && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {item.requirements.length > 0 && (
+                      <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-primary))]/35 p-3">
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
+                          Requisiti
+                        </p>
+                        <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-[rgb(var(--app-content-secondary))]">
+                          {item.requirements.slice(0, 3).map((requirement) => (
+                            <li key={requirement}>{requirement}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {item.platforms.length > 0 && (
+                      <div className="rounded-xl border border-[rgb(var(--app-border-primary))]/20 bg-[rgb(var(--app-surface-primary))]/35 p-3">
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
+                          Piattaforme
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {item.platforms.map((plat) => (
+                            <span
+                              className="rounded bg-[rgb(var(--app-surface-primary))] px-2 py-0.5 text-[10px] text-[rgb(var(--app-content-secondary))]"
+                              key={plat}
+                            >
+                              {plat}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Footer info & pledges */}
