@@ -3,7 +3,10 @@
 // AI chat, and company dashboard. Uses mock data as initial state.
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import type { NostrLicenseOffer } from '../../types/licexNostr'
+import type {
+  NostrLicenseOffer,
+  NostrMarketplaceListingPayload,
+} from '../../types/licexNostr'
 
 import type {
   LicenseAssetReference,
@@ -15,6 +18,7 @@ import type {
   CompanyDashboardStats,
   LicenseRecord,
   Order,
+  Company,
   MarketplaceFilters,
   TransferPolicy,
   WishlistDemandGroup,
@@ -29,7 +33,6 @@ import {
   MOCK_COMPANY_STATS,
   MOCK_OWNED_LICENSES,
   MOCK_ORDERS,
-  MOCK_NOSTR_OFFERS,
 } from '../../constants/licex-mock-data'
 import {
   loadLocalOwnedLicenses,
@@ -109,7 +112,7 @@ const initialState: LicexState = {
   listings: initialListings,
   orders: initialOrders,
   ownedLicenses: initialOwnedLicenses,
-  p2pOffers: MOCK_NOSTR_OFFERS,
+  p2pOffers: [],
   priceAlerts: initialPriceAlerts,
   selectedListing: null,
   viewMode: 'grid',
@@ -195,8 +198,14 @@ export const licexSlice = createSlice({
     addListing(state, action: PayloadAction<LicenseListing>) {
       state.listings.unshift(action.payload)
       state.filteredListings = applyFilters(state.listings, state.filters)
+      saveLocalListings(state.listings)
     },
-
+    addP2pOffer(state, action: PayloadAction<NostrLicenseOffer>) {
+      state.p2pOffers = [
+        action.payload,
+        ...state.p2pOffers.filter((offer) => offer.id !== action.payload.id),
+      ]
+    },
     // ── Price Alerts ───────────────────────────────────────────────────
     addPriceAlert(
       state,
@@ -295,6 +304,7 @@ export const licexSlice = createSlice({
         summary,
       })
     },
+
     // ── Wishlist ───────────────────────────────────────────────────────
     addWishlistItem(
       state,
@@ -343,6 +353,39 @@ export const licexSlice = createSlice({
       saveLocalOwnedLicenses(state.ownedLicenses)
     },
 
+    mergeRelayListings(
+      state,
+      action: PayloadAction<NostrMarketplaceListingPayload[]>
+    ) {
+      const listingsById = new Map(
+        state.listings.map((listing) => [listing.id, listing])
+      )
+      for (const { listing, status } of action.payload) {
+        if (status === 'withdrawn') {
+          listingsById.delete(listing.id)
+        } else {
+          listingsById.set(listing.id, listing)
+        }
+      }
+      state.listings = [...listingsById.values()]
+      state.filteredListings = applyFilters(state.listings, state.filters)
+      saveLocalListings(state.listings)
+    },
+
+    mergeRelayOffers(state, action: PayloadAction<NostrLicenseOffer[]>) {
+      const offersById = new Map(
+        state.p2pOffers.map((offer) => [offer.id, offer])
+      )
+      for (const offer of action.payload) {
+        if (offer.status === 'cancelled') {
+          offersById.delete(offer.id)
+        } else {
+          offersById.set(offer.id, offer)
+        }
+      }
+      state.p2pOffers = [...offersById.values()]
+    },
+
     // ── Mint / Issue RGB License Listing ────────────────────────────────
     mintLicenseListing(
       state,
@@ -354,45 +397,78 @@ export const licexSlice = createSlice({
         price: number
         transferPolicy: TransferPolicy
         royaltyPercent: number
-        category?: string
-        platforms?: string[]
+        listingDetails?: Partial<
+          Pick<
+            LicenseListing,
+            | 'category'
+            | 'durationDays'
+            | 'licenseType'
+            | 'platforms'
+            | 'productDescription'
+            | 'tags'
+            | 'version'
+          >
+        >
+        company?: Pick<Company, 'companyStatus' | 'domain' | 'name'>
       }>
     ) {
+      const template = state.listings[0]
       const newListing: LicenseListing = {
-        category: action.payload.category || 'Development',
-        company: state.listings[0]?.company || {
-          companyStatus: 'verified',
-          defaultRoyaltyPercent: action.payload.royaltyPercent,
-          defaultTransferPolicy: action.payload.transferPolicy,
-          description: 'Verified Issuer Node',
-          domain: 'jetbrains.com',
-          id: 'comp-1',
-          logoUrl: '',
-          name: 'JetBrains s.r.o.',
-          refundPolicy: 'Standard 14-day policy',
-        },
-        companyId: 'comp-1',
+        category: action.payload.listingDetails?.category || 'Development',
+        company: action.payload.company
+          ? {
+              companyStatus: action.payload.company.companyStatus,
+              defaultRoyaltyPercent: action.payload.royaltyPercent,
+              defaultTransferPolicy: action.payload.transferPolicy,
+              description:
+                'Editore non verificato; termini derivati dall’EULA.',
+              domain: action.payload.company.domain,
+              id: `company-${action.payload.id}`,
+              logoUrl: '',
+              name: action.payload.company.name,
+              refundPolicy: 'Definita dai termini della licenza.',
+            }
+          : template?.company || {
+              companyStatus: 'verified',
+              defaultRoyaltyPercent: action.payload.royaltyPercent,
+              defaultTransferPolicy: action.payload.transferPolicy,
+              description: 'Verified Issuer Node',
+              domain: 'jetbrains.com',
+              id: 'comp-1',
+              logoUrl: '',
+              name: 'JetBrains s.r.o.',
+              refundPolicy: 'Standard 14-day policy',
+            },
+        companyId: action.payload.company
+          ? `company-${action.payload.id}`
+          : template?.companyId || 'comp-1',
         createdAt: new Date().toISOString(),
-        durationDays: null,
+        durationDays: action.payload.listingDetails?.durationDays ?? null,
         edition: action.payload.edition,
         id: action.payload.id,
         imageUrl: '',
-        licenseType: 'perpetual',
+        licenseType: action.payload.listingDetails?.licenseType || 'perpetual',
         maxTransfers:
           action.payload.transferPolicy === 'not_transferable' ? 0 : 5,
         minHoldingDays: 0,
-        paymentAsset: 'RGB-USDT (demo stablecoin)',
-        platforms: action.payload.platforms || ['Windows', 'macOS', 'Linux'],
+        paymentAsset: 'BTC (sats)',
+        platforms: action.payload.listingDetails?.platforms || [
+          'Windows',
+          'macOS',
+          'Linux',
+        ],
         price: action.payload.price,
-        productDescription: `${action.payload.productName} (${action.payload.edition}) - Licenza software ufficiale emessa come asset RGB su Bitcoin.`,
+        productDescription:
+          action.payload.listingDetails?.productDescription ||
+          `${action.payload.productName} (${action.payload.edition}) - Licenza software emessa come asset RGB su Bitcoin.`,
         productName: action.payload.productName,
         rgbAsset: action.payload.rgbAsset,
         royaltyPercent: action.payload.royaltyPercent,
         status: 'published',
-        tags: ['RGB Asset', 'Verified Issuer', 'Demo Mint'],
+        tags: action.payload.listingDetails?.tags || ['RGB Asset', 'UDA'],
         transferPolicy: action.payload.transferPolicy,
         updatedAt: new Date().toISOString(),
-        version: '2026.1',
+        version: action.payload.listingDetails?.version || '1.0',
       }
 
       state.listings.unshift(newListing)
@@ -452,6 +528,7 @@ export const licexSlice = createSlice({
       resetLocalLicexDatabase()
       state.ownedLicenses = MOCK_OWNED_LICENSES
       state.orders = MOCK_ORDERS
+      state.p2pOffers = []
       state.watchlist = MOCK_WATCHLIST
       state.priceAlerts = MOCK_PRICE_ALERTS
       state.wishlist = MOCK_WISHLIST
@@ -505,6 +582,9 @@ export const licexSlice = createSlice({
 
 export const {
   addListing,
+  addP2pOffer,
+  mergeRelayOffers,
+  mergeRelayListings,
   addPriceAlert,
   addToWatchlist,
   addWishlistGroup,

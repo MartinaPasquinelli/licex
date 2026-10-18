@@ -1,7 +1,7 @@
 // ─── LICEX Marketplace Page ───────────────────────────────────────────────────
 // Catalog of software licenses with filters, search, and grid/list views.
 
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Search,
@@ -14,6 +14,7 @@ import {
   Heart,
   Package,
   X,
+  RefreshCw,
 } from 'lucide-react'
 
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks'
@@ -23,11 +24,27 @@ import {
   setViewMode,
   addToWatchlist,
   removeFromWatchlist,
+  mergeRelayListings,
+  mergeRelayOffers,
 } from '../../slices/licex/licex.slice'
 import { CATEGORIES } from '../../constants/licex-mock-data'
 import type { LicenseListing, TransferPolicy } from '../../types/licex'
+import type { NostrLicenseOffer } from '../../types/licexNostr'
 import { LICEX_MARKETPLACE_PATH } from '../../app/router/paths'
 import { cleanMarkdownForPreview } from '../../components/LicexMarkdown'
+import {
+  fetchMarketplaceSnapshot,
+  getMarketplaceIdentity,
+  publishMarketplacePurchaseRequest,
+} from '../../services/licexNostrMarketplace'
+import { nodeApi } from '../../slices/nodeApi/nodeApi.slice'
+import { logger } from '../../utils/logger'
+import {
+  adjustP2PSimulationUsdtBalance,
+  getP2PSimulationNodePubkey,
+  getP2PSimulationUsdtBalance,
+  isP2PSimulationEnabled,
+} from '../../services/licexP2PSimulation'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function formatSats(sats: number): string {
@@ -505,7 +522,37 @@ export function Component() {
   const { filteredListings, filters, viewMode, watchlist } = useAppSelector(
     (s) => s.licex
   )
+  const resaleOffers = useAppSelector((s) =>
+    s.licex.p2pOffers.filter((offer) => offer.status === 'active')
+  )
   const [showFilters, setShowFilters] = React.useState(false)
+  const [relaySyncStatus, setRelaySyncStatus] = React.useState<
+    'loading' | 'synced' | 'error'
+  >('loading')
+  const [relayListingCount, setRelayListingCount] = React.useState(0)
+
+  const syncMarketplace = useCallback(async () => {
+    setRelaySyncStatus('loading')
+    try {
+      const { listings: relayListings, offers: relayOffers } =
+        await fetchMarketplaceSnapshot()
+      dispatch(mergeRelayListings(relayListings))
+      dispatch(mergeRelayOffers(relayOffers))
+      setRelayListingCount(
+        relayListings.filter((payload) => payload.status === 'published')
+          .length +
+          relayOffers.filter((offer) => offer.status === 'active').length
+      )
+      setRelaySyncStatus('synced')
+    } catch (error) {
+      logger.warn('[LICEX Marketplace] Relay sync failed:', error)
+      setRelaySyncStatus('error')
+    }
+  }, [dispatch])
+
+  useEffect(() => {
+    void syncMarketplace()
+  }, [syncMarketplace])
 
   const isWatchlisted = useCallback(
     (listingId: string) => watchlist.some((w) => w.listingId === listingId),
@@ -545,6 +592,34 @@ export function Component() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <div
+              aria-live="polite"
+              className={`text-xs px-3 py-1.5 rounded-full border ${
+                relaySyncStatus === 'synced'
+                  ? 'text-green-400 bg-green-400/10 border-green-400/20'
+                  : relaySyncStatus === 'error'
+                    ? 'text-red-400 bg-red-400/10 border-red-400/20'
+                    : 'text-[rgb(var(--app-content-secondary))] bg-[rgb(var(--app-surface-secondary))] border-[rgb(var(--app-border-primary))]/30'
+              }`}
+            >
+              {relaySyncStatus === 'loading'
+                ? 'Relay: sincronizzazione…'
+                : relaySyncStatus === 'error'
+                  ? 'Relay: non raggiungibili'
+                  : `Relay: ${relayListingCount} inserzioni`}
+            </div>
+            <button
+              aria-label="Sincronizza marketplace dai relay"
+              className="p-2 rounded-lg text-[rgb(var(--app-content-secondary))] hover:text-purple-300 hover:bg-[rgb(var(--app-surface-secondary))] disabled:opacity-50"
+              disabled={relaySyncStatus === 'loading'}
+              onClick={() => void syncMarketplace()}
+              title="Sincronizza dai Nostr Relay"
+              type="button"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${relaySyncStatus === 'loading' ? 'animate-spin' : ''}`}
+              />
+            </button>
             <span className="text-xs text-[rgb(var(--app-content-secondary))] bg-[rgb(var(--app-surface-secondary))] px-3 py-1.5 rounded-full">
               {filteredListings.length} license
               {filteredListings.length !== 1 ? 's' : ''}
@@ -675,8 +750,214 @@ export function Component() {
             ))}
           </div>
         )}
+
+        {resaleOffers.length > 0 && (
+          <section
+            aria-labelledby="resale-offers-heading"
+            className="mt-8 space-y-4"
+          >
+            <div>
+              <h2
+                className="text-lg font-bold text-[rgb(var(--app-content-primary))]"
+                id="resale-offers-heading"
+              >
+                Licenze usate in vendita
+              </h2>
+              <p className="text-xs text-[rgb(var(--app-content-secondary))] mt-1">
+                Offerte pubblicate dai proprietari tramite Nostr Relay.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {resaleOffers.map((offer) => (
+                <ResaleOfferCard key={offer.id} offer={offer} />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
+  )
+}
+
+const ResaleOfferCard: React.FC<{ offer: NostrLicenseOffer }> = ({ offer }) => {
+  const [taker] = nodeApi.useTakerMutation()
+  const simulationEnabled = isP2PSimulationEnabled()
+  // Older development offers may predate the explicit marker. A demo asset
+  // must never fall through to the real RGB node flow.
+  const isSimulationOffer =
+    offer.simulation === true || offer.listing.rgbAsset?.mode === 'demo'
+  const { data: nodeInfo } = nodeApi.endpoints.nodeInfo.useQuery(undefined, {
+    skip: simulationEnabled && isSimulationOffer,
+  })
+  const { data: assets } = nodeApi.endpoints.listAssets.useQuery(undefined, {
+    skip: simulationEnabled && isSimulationOffer,
+  })
+  const [isBuying, setIsBuying] = React.useState(false)
+  const [purchaseMessage, setPurchaseMessage] = React.useState<string | null>(
+    null
+  )
+
+  const buyAtomically = async () => {
+    if (isBuying) return
+    setIsBuying(true)
+    setPurchaseMessage(null)
+    try {
+      if (!offer.swapString) {
+        throw new Error('Questa offerta non contiene uno swap atomico valido.')
+      }
+      if (isSimulationOffer && !simulationEnabled) {
+        throw new Error(
+          'Attiva il portafoglio test per acquistare questa offerta demo.'
+        )
+      }
+      if (!isSimulationOffer && !nodeInfo?.pubkey) {
+        throw new Error('Connetti e sblocca il nodo RGB prima di acquistare.')
+      }
+      const buyerNpub = await getMarketplaceIdentity()
+      if (!buyerNpub) {
+        throw new Error('Acquisto disponibile dall’app desktop LICEX.')
+      }
+      if (buyerNpub === offer.sellerNpub) {
+        throw new Error('Non puoi acquistare una tua offerta.')
+      }
+
+      const parts = offer.swapString.split('/')
+      if (parts.length !== 6) throw new Error('Dati dello swap non validi.')
+      const [qtyFrom, fromAsset, qtyTo, toAsset, timeout] = parts
+      const usdtAsset = (assets?.nia ?? []).find(
+        (asset) => asset.ticker === 'USDT'
+      )
+      const licenseAssetId = offer.listing.rgbAsset?.assetId
+      const expectedUsdtAmount = isSimulationOffer
+        ? Math.round(offer.resalePriceUsdt * 100)
+        : usdtAsset
+          ? Math.round(offer.resalePriceUsdt * 10 ** (usdtAsset.precision ?? 0))
+          : 0
+      if (
+        !licenseAssetId ||
+        (isSimulationOffer
+          ? fromAsset !== 'demo-usdt'
+          : !usdtAsset || fromAsset !== usdtAsset.asset_id) ||
+        toAsset !== licenseAssetId ||
+        !Number.isFinite(Number(qtyFrom)) ||
+        Number(qtyFrom) !== expectedUsdtAmount ||
+        Number(qtyTo) !== 1 ||
+        !Number.isFinite(Number(timeout))
+      ) {
+        throw new Error(
+          'Lo swap non corrisponde a prezzo e asset di questa offerta.'
+        )
+      }
+      const expiresAt =
+        new Date(offer.createdAt).getTime() + Number(timeout) * 1000
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+        throw new Error(
+          'Questa offerta è scaduta. Chiedi al venditore di ripubblicarla.'
+        )
+      }
+
+      if (isSimulationOffer) {
+        if (getP2PSimulationUsdtBalance() < offer.resalePriceUsdt) {
+          throw new Error(
+            'Saldo demo USDT insufficiente. Attiva o ricarica il portafoglio test.'
+          )
+        }
+      } else {
+        await taker({ swapstring: offer.swapString }).unwrap()
+      }
+      const requestId = `purchase-${crypto.randomUUID()}`
+      const buyerNodePubkey = isSimulationOffer
+        ? getP2PSimulationNodePubkey()
+        : nodeInfo!.pubkey
+      const nostrEventId = await publishMarketplacePurchaseRequest({
+        buyerNodePubkey,
+        buyerNpub,
+        createdAt: new Date().toISOString(),
+        id: requestId,
+        offerId: offer.id,
+        status: 'pending',
+        ...(isSimulationOffer ? { simulation: true } : {}),
+      })
+      if (!nostrEventId) {
+        throw new Error(
+          'Swap autorizzato nel nodo, ma richiesta non pubblicata sul relay. Riprova la sincronizzazione.'
+        )
+      }
+      if (isSimulationOffer)
+        adjustP2PSimulationUsdtBalance(-offer.resalePriceUsdt)
+      setPurchaseMessage(
+        isSimulationOffer
+          ? 'Acquisto demo registrato sul relay. Il venditore deve completare la simulazione.'
+          : 'Swap autorizzato. Il venditore ha ricevuto la richiesta di completamento.'
+      )
+    } catch (error) {
+      setPurchaseMessage(
+        error instanceof Error ? error.message : 'Acquisto non riuscito.'
+      )
+    } finally {
+      setIsBuying(false)
+    }
+  }
+
+  return (
+    <article className="rounded-2xl border border-amber-400/20 bg-gradient-to-br from-[rgb(var(--app-surface-secondary))] to-[rgb(var(--app-surface-primary))] p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] uppercase tracking-wide font-semibold rounded-full px-2 py-1 bg-amber-400/10 text-amber-300 border border-amber-400/20">
+          Usata · rivendita P2P
+        </span>
+        <span className="text-sm font-bold text-[rgb(var(--app-content-primary))]">
+          {offer.resalePriceUsdt.toLocaleString(undefined, {
+            maximumFractionDigits: 2,
+          })}{' '}
+          USDT
+        </span>
+      </div>
+      {isSimulationOffer && (
+        <span className="inline-flex rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-violet-300">
+          Simulazione · nessun trasferimento RGB reale
+        </span>
+      )}
+      {isSimulationOffer && !simulationEnabled && (
+        <p className="text-xs text-violet-200">
+          Per acquistare, attiva prima il portafoglio test in “Le Mie Licenze”.
+        </p>
+      )}
+      <div>
+        <h3 className="font-semibold text-[rgb(var(--app-content-primary))]">
+          {offer.listing.productName}
+        </h3>
+        <p className="text-xs text-[rgb(var(--app-content-secondary))]">
+          {offer.listing.edition} · {offer.listing.company.name}
+        </p>
+      </div>
+      <div className="border-t border-[rgb(var(--app-border-primary))]/20 pt-2 flex items-center justify-between text-xs text-[rgb(var(--app-content-secondary))]">
+        <span>Venditore: {offer.sellerName}</span>
+        <span>{offer.transferCount} trasferimenti</span>
+      </div>
+      <button
+        className="w-full rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
+        disabled={
+          isBuying ||
+          !offer.swapString ||
+          (isSimulationOffer && !simulationEnabled)
+        }
+        onClick={() => void buyAtomically()}
+        type="button"
+      >
+        {isBuying
+          ? 'Autorizzazione swap…'
+          : isSimulationOffer
+            ? simulationEnabled
+              ? 'Acquista in simulazione'
+              : 'Portafoglio test non attivo'
+            : 'Acquista con swap atomico'}
+      </button>
+      {purchaseMessage && (
+        <p className="text-xs text-[rgb(var(--app-content-secondary))]">
+          {purchaseMessage}
+        </p>
+      )}
+    </article>
   )
 }
 

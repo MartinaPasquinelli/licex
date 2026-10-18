@@ -12,6 +12,7 @@ mod mind;
 mod mind_hardware;
 mod mind_runtime;
 mod node_backend;
+mod licex_nostr_marketplace;
 mod nwc;
 mod rgb_node;
 mod secret_store;
@@ -253,6 +254,12 @@ fn main() {
             licex_set_user_data,
             licex_get_user_data,
             licex_reset_database,
+            licex_marketplace_identity,
+            licex_marketplace_publish,
+            licex_marketplace_fetch,
+            licex_p2p_save_swap_secret,
+            licex_p2p_get_swap_secret,
+            licex_p2p_delete_swap_secret,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1450,6 +1457,93 @@ fn licex_set_user_data(key: String, payload: String) -> Result<(), String> {
 #[tauri::command]
 fn licex_get_user_data(key: String) -> Result<Option<String>, String> {
     db::get_licex_user_data(&key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn licex_marketplace_identity(state: State<'_, CurrentAccount>) -> Result<String, String> {
+    let account_id = state
+        .0
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .map(|account| account.id)
+        .ok_or_else(|| "No account is currently selected".to_string())?;
+    licex_nostr_marketplace::identity(account_id)
+}
+
+#[tauri::command]
+async fn licex_marketplace_publish(
+    state: State<'_, CurrentAccount>,
+    payload: serde_json::Value,
+) -> Result<String, String> {
+    let account_id = state
+        .0
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .map(|account| account.id)
+        .ok_or_else(|| "No account is currently selected".to_string())?;
+    licex_nostr_marketplace::publish(account_id, payload).await
+}
+
+#[tauri::command]
+async fn licex_marketplace_fetch(
+    state: State<'_, CurrentAccount>,
+) -> Result<Vec<licex_nostr_marketplace::MarketplaceRelayEvent>, String> {
+    let account_id = state
+        .0
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .map(|account| account.id)
+        .ok_or_else(|| "No account is currently selected".to_string())?;
+    licex_nostr_marketplace::fetch(account_id).await
+}
+
+#[tauri::command]
+fn licex_p2p_save_swap_secret(
+    state: State<'_, CurrentAccount>,
+    offer_id: String,
+    secret: String,
+) -> Result<(), String> {
+    let account_id = state
+        .0
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .map(|account| account.id)
+        .ok_or_else(|| "No account is currently selected".to_string())?;
+    licex_nostr_marketplace::save_swap_secret(account_id, &offer_id, &secret)
+}
+
+#[tauri::command]
+fn licex_p2p_get_swap_secret(
+    state: State<'_, CurrentAccount>,
+    offer_id: String,
+) -> Result<Option<String>, String> {
+    let account_id = state
+        .0
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .map(|account| account.id)
+        .ok_or_else(|| "No account is currently selected".to_string())?;
+    licex_nostr_marketplace::get_swap_secret(account_id, &offer_id)
+}
+
+#[tauri::command]
+fn licex_p2p_delete_swap_secret(
+    state: State<'_, CurrentAccount>,
+    offer_id: String,
+) -> Result<(), String> {
+    let account_id = state
+        .0
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .map(|account| account.id)
+        .ok_or_else(|| "No account is currently selected".to_string())?;
+    licex_nostr_marketplace::delete_swap_secret(account_id, &offer_id)
 }
 
 #[tauri::command]
