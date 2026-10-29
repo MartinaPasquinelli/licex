@@ -1,4 +1,4 @@
-# LICEX — Software Licenses as RGB Assets
+# LICEX - Software Licenses as RGB Assets
 
 LICEX is a hackathon project exploring a marketplace for software
 licenses represented as RGB assets on Bitcoin.
